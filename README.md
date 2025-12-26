@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nogonad Photo Organizer
 
-## Getting Started
+Nogonad Photo Organizer is a high-performance, local-first photo viewer and organizer built with **Next.js**. It is designed to run on your local machine, allowing you to browse your photo library with the power of modern web technologies, specifically focusing on high-fidelity image rendering and metadata transparency.
 
-First, run the development server:
+**⚠️ This project is entirely build with [vibe coding](https://en.wikipedia.org/wiki/Vibe_coding): use it at your own risk.**
 
+## 🌟 Key Features
+
+* **HDR Rendering:** Leverages modern browser engines to display photos in High Dynamic Range (HDR), providing deeper blacks and brighter highlights compared to standard photo viewers.
+* **Filmstrip Navigation:** A smooth, intuitive filmstrip interface that allows you to quickly scroll through images in a directory.
+* **Detailed EXIF Viewer:** View comprehensive metadata for every highlighted photo, including camera settings, lens info, and timestamps.
+* **Local-First:** Runs entirely on your PC. Your photos never leave your local environment, ensuring maximum privacy and speed.
+* **Next.js Powered:** A fast, responsive UI built with the latest React patterns.
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+* **Node.js** (v22.x or higher recommended)
+* **npm** or **yarn**
+
+### Installation
+
+1. **Clone the repository:**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/shirleydejong/nogonad-photo-organizer.git
+cd nogonad-photo-organizer
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. **Install dependencies:**
+```bash
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+3. **Run the development server:**
+```bash
+npm run start
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3.1. **Run server:**
+```bash
+npm run build
+npm run start
 
-## Deploy on Vercel
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Open in your browser:**
+Navigate to [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000).
+
+## 🛠 Tech Stack
+
+* **Framework:** [Next.js](https://nextjs.org/)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS (optional, but recommended)
+* **Metadata Parsing:** `exiftool` (needed in PATH)
+* **Backend:** Node.js File System (fs) API
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+
