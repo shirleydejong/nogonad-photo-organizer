@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'start') {
-      // Tel eerst hoeveel afbeeldingen er zijn
+      // Count how many images there are
       const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
       const files = await fs.readdir(folderPath);
       const imageFiles = files.filter((file) => {
@@ -44,17 +44,17 @@ export async function POST(request: NextRequest) {
         return SUPPORTED_EXTENSIONS.includes(ext);
       });
 
-      // Tel bestaande thumbnails
+      // Count existing thumbnails
       const existingThumbnailCount = await countExistingThumbnails(folderPath);
 
-      // Initialize progress - start met bestaande thumbnails
+      // Initialize progress - start with existing thumbnails
       progressStore.set(folderPath, {
         total: imageFiles.length,
         processed: existingThumbnailCount,
         files: imageFiles,
       });
 
-      // Start thumbnail generatie in de achtergrond
+      // Start thumbnail generation in the background
       setTimeout(async () => {
         try {
           const watcher = new ImageWatcher({
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     const fileBuffer = await fs.readFile(path.join(folderPath, fileName));
 
-    // Bepaal content type op basis van extensie
+    // Determine content type based on extension
     const ext = path.extname(fileName).toLowerCase();
     const contentType = {
       '.jpg': 'image/jpeg',

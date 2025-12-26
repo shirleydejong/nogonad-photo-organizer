@@ -22,6 +22,10 @@ export default function Home() {
   const [pathHistory, setPathHistory] = useState<string[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false);
   const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
+  const [isExifOpen, setIsExifOpen] = useState<boolean>(false);
+  const [exifData, setExifData] = useState<Record<string, any> | null>(null);
+  const [exifError, setExifError] = useState<string | null>(null);
+  const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
   //const mainRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +46,7 @@ export default function Home() {
     }
   }, []);
 
-  // Keyboard navigatie
+  // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (imageFiles.length === 0) return;
@@ -55,6 +59,63 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [imageFiles.length]);
+  
+  // Fetch EXIF data when active image changes
+  useEffect(() => {
+    if (imageFiles.length === 0 || !folderPath) {
+      setExifData(null);
+      setExifError(null);
+      setIsExifLoading(false);
+      return;
+    }
+
+    const currentImage = imageFiles[activeIndex];
+    if (!currentImage) return;
+
+    let canceled = false;
+    setIsExifLoading(true);
+    setExifError(null);
+    setExifData(null);
+
+    async function fetchExifData() {
+      try {
+        const response = await fetch('/api/exif', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folderPath,
+            fileName: currentImage.fileName,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          if (!canceled) {
+              setExifError(error?.error || 'No EXIF data found');
+          }
+        }
+        const data = await response.json();
+        console.log(data)
+        
+        if (!canceled) {
+          setExifData(data?.exifData ?? null);
+        }
+      } catch (err) {
+        if (!canceled) {
+          setExifError(err instanceof Error ? err.message : 'Could not retrieve EXIF data');
+        }
+      } finally {
+        if (!canceled) {
+          setIsExifLoading(false);
+        }
+      }
+    }
+
+    fetchExifData();
+    return () => {
+      canceled = true;
+    };
+  }, [activeIndex, imageFiles, folderPath]);
 
   // Save path to history
   function savePathToHistory(path: string) {
@@ -101,7 +162,7 @@ export default function Home() {
     setShowAutocomplete(false);
     
     if (!inputPath.trim()) {
-      setError("Voer alstublieft een pad in");
+      setError("Please enter a path");
       return;
     }
 
@@ -115,19 +176,19 @@ export default function Home() {
       
       // Check if it's the thumbnails folder
       if (trimmedPath.toLowerCase().includes(CONFIG.THUMBNAILS_FOLDER)) {
-        setError("Je kunt geen thumbnail directory gebruiken. Kies de hoofdmap met foto's.");
+        setError("You cannot use a thumbnail directory. Choose the main folder with photos.");
         setIsProcessing(false);
         return;
       }
       
-      // Basis validatie: moet ofwel met drive letter (C:\) ofwel UNC pad (\\) beginnen
+      // Basic validation: must start with drive letter (C:\\) or UNC path (\\\\)
       if (!/^[a-zA-Z]:\\|^\\\\/.test(trimmedPath)) {
-        setError("Voer alstublieft een geldig Windows pad in (bijv. C:\\Users\\Foto's of \\\\server\\share)");
+        setError("Please enter a valid Windows path (e.g. C:\\Users\\Photos or \\\\server\\share)");
         setIsProcessing(false);
         return;
       }
 
-      // Normaliseer het pad (zet forward slashes om naar backslashes)
+      // Normalize the path (convert forward slashes to backslashes)
       const normalizedPath = trimmedPath.replace(/\//g, '\\');
       const normalizedThumbPath = trimmedThumbPath.replace(/\//g, '\\');
       setFolderPath(normalizedPath);
@@ -135,12 +196,12 @@ export default function Home() {
       // Save to history
       savePathToHistory(normalizedPath);
 
-      // Haal de mapnaam uit het pad
+      // Get the folder name from the path
       const parts = normalizedPath.split('\\');
       const lastPart = parts[parts.length - 1];
       setFolderName(lastPart || normalizedPath);
 
-      // Start thumbnail generatie op de server
+      // Start thumbnail generation on the server
       const startResponse = await fetch('/api/thumbnails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,21 +210,21 @@ export default function Home() {
 
       if (!startResponse.ok) {
         const errorData = await startResponse.json();
-        throw new Error(errorData.error || 'Kon thumbnails niet genereren');
+        throw new Error(errorData.error || 'Could not generate thumbnails');
       }
 
       const startData = await startResponse.json();
 
-      // Als geen afbeeldingen gevonden
+      // If no images found
       if (startData.total === 0) {
-        setError("Geen afbeeldingen gevonden in deze map");
+        setError("No images found in this folder");
         setIsProcessing(false);
         return;
       }
 
       const files = startData.files as string[];
       
-      // Poll voor progress
+      // Poll for progress
       const pollInterval = setInterval(async () => {
         try {
           const progressResponse = await fetch('/api/thumbnails', {
@@ -176,11 +237,11 @@ export default function Home() {
             const progressData = await progressResponse.json();
             setProgress(progressData.percentage);
 
-            // Als klaar, stop polling en toon afbeeldingen
+            // If done, stop polling and show images
             if (progressData.processed >= progressData.total) {
               clearInterval(pollInterval);
               
-              // Maak ImageData objecten
+              // Create ImageData objects
               const imageData: ImageData[] = files.map((fileName) => ({
                 originalFile: null as any, // Niet nodig voor server-side thumbnails
                 fileName: fileName,
@@ -201,18 +262,18 @@ export default function Home() {
         }
       }, 500);
 
-      // Safety timeout na 60 seconden
+      // Safety timeout after 60 seconds
       setTimeout(() => {
         clearInterval(pollInterval);
         if (isProcessing) {
-          setError('Timeout bij het genereren van thumbnails');
+          setError('Timeout while generating thumbnails');
           setIsProcessing(false);
         }
       }, 60000);
 
     } catch (e: any) {
       console.error('Error:', e);
-      setError(e.message || "Kon map niet verwerken. Controleer het pad en probeer het opnieuw.");
+      setError(e.message || "Could not process folder. Check the path and try again.");
       setIsProcessing(false);
     }
   }
@@ -222,15 +283,282 @@ export default function Home() {
     if (lastDot === -1) return filename + '-thumb';
     return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
   }
+  
+  function baseName(name?: string | null) {
+    if (!name) return null;
+    const i = name.lastIndexOf(".");
+    return i > 0 ? name.slice(0, i) : name;
+  }
+
+  function formatAperture(v?: number | string | null) {
+    if (v == null || v === "") return null;
+    const n = typeof v === "string" ? Number(v) : v;
+    return Number.isFinite(n) ? `ƒ/${n}` : `ƒ/${v}`;
+  }
+
+  function formatExposureTime(v?: number | string | null) {
+    if (v == null || v === "") return null;
+    if (typeof v === "string") {
+      // exiftool may already give "1/50"
+      return v.includes("/") ? `${v} sec` : `${v} sec`;
+    }
+    const t = Number(v);
+    if (!Number.isFinite(t) || t <= 0) return null;
+    if (t >= 1) return `${t.toFixed(1)} sec`;
+    const denom = Math.round(1 / t);
+    return `1/${denom} sec`;
+  }
+
+  function formatISO(v?: number | null) {
+    return v != null ? `ISO ${v}` : null;
+  }
+
+  function formatFocalLength(v?: number | string | null) {
+    if (v == null || v === "") return null;
+    const n = typeof v === "string" ? Number(v) : v;
+    return Number.isFinite(n) ? `${n} mm` : `${v} mm`;
+  }
+
+  function formatCropFactor(exif: any) {
+    const f = exif?.FocalLength;
+    const f35 = exif?.FocalLengthIn35mmFormat;
+    if (!f || !f35) return null;
+    const nF = Number(f);
+    const nF35 = Number(f35);
+    if (!Number.isFinite(nF) || !Number.isFinite(nF35) || nF === 0) return null;
+    const cf = nF35 / nF;
+    return `Crop factor: ${cf.toFixed(1)}x`;
+  }
+
+  function formatMegapixels(w?: number, h?: number) {
+    if (!w || !h) return null;
+    const mp = (w * h) / 1_000_000;
+    return `${mp.toFixed(1)} MP`;
+  }
+
+  function formatDPI(exif: any) {
+    const xr = exif?.XResolution;
+    const yr = exif?.YResolution;
+    const unit = exif?.ResolutionUnit; // 2=inches, 3=cm (exiftool)
+    if (!xr && !yr) return null;
+    const dpiX = xr ? Number(xr) : null;
+    const dpiY = yr ? Number(yr) : null;
+    const label = unit === 3 ? "dpcm" : "dpi";
+    const v = dpiX || dpiY;
+    return v ? `${Math.round(v)} ${label}` : null;
+  }
+
+  function formatDate(exif: any) {
+    const s = exif?.DateTimeOriginal || exif?.CreateDate;
+    if (!s || typeof s !== "string") return null;
+    // EXIF format "YYYY:MM:DD HH:MM:SS"
+    const iso = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3").replace(" ", "T");
+    const offset = exif?.OffsetTimeOriginal || exif?.OffsetTime || "";
+    const d = new Date(iso + (typeof offset === "string" ? offset : ""));
+    if (isNaN(d.getTime())) return s; // fallback
+    const dt = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(d);
+    const tz = typeof offset === "string" && offset ? ` ${offset}` : "";
+    return `${dt}${tz}`;
+  }
+
+  function formatFlash(exif: any) {
+    // exiftool -n returns numeric bitfield for Flash
+    const v = exif?.Flash;
+    const fired =
+      typeof v === "number" ? (v & 0x1) === 1 : String(exif?.Flash)?.toLowerCase().includes("fired");
+    return fired ? "On, Fired" : "Off";
+  }
+
+  function formatWhiteBalance(exif: any) {
+    const wb = exif?.WhiteBalance;
+    if (wb == null) return null;
+    // exiftool often returns "Auto", otherwise numeric
+    if (typeof wb === "string") return wb;
+    const map: Record<number, string> = { 0: "Auto", 1: "Manual" };
+    return map[wb] || String(wb);
+  }
+
+  function formatExposure(exif: any) {
+    const mode = exif?.ExposureMode;
+    const prog = exif?.ExposureProgram;
+    const modeMap: Record<number, string> = { 0: "Auto", 1: "Manual", 2: "Auto Bracket" };
+    const progMap: Record<number, string> = {
+      0: "Undefined",
+      1: "Manual",
+      2: "Normal",
+      3: "Aperture Priority",
+      4: "Shutter Priority",
+      5: "Creative",
+      6: "Action",
+      7: "Portrait",
+      8: "Landscape",
+    };
+    const left = mode != null ? modeMap[mode] ?? String(mode) : null;
+    const right = prog != null ? progMap[prog] ?? String(prog) : null;
+    if (left && right) return `Auto    Program AE`.replace("Auto", left).replace("Program AE", right);
+    return left || right || null;
+  }
+
+  function formatFileSize(exif: any) {
+    const bytes = exif?.FileSize;
+    if (!Number.isFinite(bytes)) return exif?.FileSize || null;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatColor(exif: any) {
+    const profile = exif?.ProfileDescription;
+    const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ColorSpace;
+    let cs = null;
+    if (typeof colorSpace === "string") cs = colorSpace;
+    else if (colorSpace === 1) cs = "sRGB";
+    else if (colorSpace === 65535) cs = "Uncalibrated";
+    const bitsArr = exif?.BitsPerSample;
+    let bits = null;
+    if (Array.isArray(bitsArr) && bitsArr.length) bits = `${bitsArr[0]} bits/channel`;
+    else if (Number.isFinite(bitsArr)) bits = `${bitsArr} bits/channel`;
+    else bits = "";
+    
+    bits = isHDR(exif) ? bits + " - HDR" : bits;
+    
+    return {
+      left: cs || "",
+      right: profile || "",
+      extra: bits,
+    };
+  }
+  
+  function isHDR(exif: any) {
+    return Array.isArray(exif?.DirectoryItemSemantic) && exif?.DirectoryItemSemantic.map(el => el?.toLowerCase()).includes('gainmap') ||
+    (exif?.HDREditMode === 1 || exif?.HDRMaxValue > 0)
+  }
+
+  function Icon({ name }: { name: string }) {
+    // simple inline SVGs resembling the material icons
+    const cls = "w-6 h-6 text-zinc-300";
+    switch (name) {
+      case "text":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path stroke="currentColor" strokeWidth="2" d="M4 6h16M10 18V6m4 12V6" />
+          </svg>
+        );
+      case "image":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+            <path d="M21 15l-5-5-11 11" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "calendar":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+            <path d="M16 3v4M8 3v4M3 9h18" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "camera":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h4l2-2h4l2 2h4v12H4V7z" stroke="currentColor" strokeWidth="2" />
+            <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "flash":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M13 3L4 14h6v7l9-13h-6V3z" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "lens":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="2" />
+            <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "wb":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M3 12h18" stroke="currentColor" strokeWidth="2" />
+            <circle cx="7" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+            <circle cx="17" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "exposure":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "file":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M6 3h8l5 5v13H6V3z" stroke="currentColor" strokeWidth="2" />
+            <path d="M14 3v5h5" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        );
+      case "palette":
+        return (
+          <svg className={cls} viewBox="0 0 24 24" fill="none">
+            <path d="M12 3a9 9 0 0 0 0 18c2 0 2-2 4-2h1a4 4 0 1 0 0-8h-1a3 3 0 0 1-3-3V3z" stroke="currentColor" strokeWidth="2" />
+            <circle cx="7" cy="10" r="1.5" fill="currentColor" />
+            <circle cx="9" cy="14" r="1.5" fill="currentColor" />
+            <circle cx="13" cy="15" r="1.5" fill="currentColor" />
+            <circle cx="16" cy="11" r="1.5" fill="currentColor" />
+          </svg>
+        );
+      default:
+        return <span className="w-6 h-6" />;
+    }
+  }
+
+  function ExifItem({
+    icon,
+    label,
+    values,
+  }: {
+    icon: string;
+    label: string;
+    values: Array<string | null>;
+  }) {
+    const clean = values.filter(Boolean) as string[];
+    if (clean.length === 0) return null;
+    return (
+      <div className="flex gap-3 border-b border-white/5 pb-2">
+        <div className="w-14 min-w-14 flex items-center justify-center">
+          <Icon name={icon} />
+        </div>
+        <div className="flex-1">
+          <div className="text-zinc-300 text-xs font-medium">{label}</div>
+          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+            {clean.map((v, i) => (
+              <span key={i} className="truncate">{v}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <main className="flex-1 flex flex-col items-center justify-center w-full">
         {isProcessing ? (
-          // Splash screen met progressiebalk
+          // Splash screen with progress bar
           <div className="flex flex-col items-center gap-6 p-8">
             <div className="text-zinc-200 text-2xl font-semibold">
-              Thumbnails genereren...
+              Generating thumbnails...
             </div>
             <div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
               <div
@@ -239,17 +567,17 @@ export default function Home() {
               />
             </div>
             <div className="text-zinc-400 text-sm">
-              {progress}% voltooid
+              {progress}% complete
             </div>
             {folderName && (
               <div className="text-zinc-500 text-sm">
-                Map: <b>{folderName}</b>
+                Folder: <b>{folderName}</b>
               </div>
             )}
           </div>
         ) : imageFiles.length === 0 ? (
           <div className="flex flex-col items-center gap-6 w-full max-w-2xl px-4">
-            <div className="text-zinc-200 text-2xl font-semibold">Voer een pad in</div>
+            <div className="text-zinc-200 text-2xl font-semibold">Enter a path</div>
             
             <div className="relative w-full">
               <input
@@ -273,7 +601,7 @@ export default function Home() {
                   // Delay to allow click on autocomplete item
                   setTimeout(() => setShowAutocomplete(false), 200);
                 }}
-                placeholder="Bijv: C:\Users\xxx\Pictures of \\server\share\photos"
+                placeholder="E.g: C:\Users\xxx\Pictures or \\server\share\photos"
                 className="w-full px-4 py-3 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded focus:outline-none focus:border-zinc-500 text-sm"
               />
               
@@ -297,75 +625,246 @@ export default function Home() {
               className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
               onClick={handlePickFolder}
             >
-              Fotostrip laden
+              Load photo strip
             </button>
             
             {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           </div>
         ) : (
-          <div className="flex flex-col items-center w-full h-full">
-            <div className="w-full flex items-center justify-between px-8 mb-2">
-              <button
-                className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition"
-                onClick={() => {
-                  setImageFiles([]);
-                  setFolderName(null);
-                  setActiveIndex(0);
-                }}
-              >
-                &larr; Kies andere map
-              </button>
-              <div className="text-zinc-400 text-sm">{imageFiles.length} afbeeldingen gevonden</div>
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full" style={{ minHeight: 0 }}>
-              <div className="flex w-full h-full items-center justify-center gap-4 px-4" style={{ minHeight: 0 }}>
+          <div className="flex flex-col w-full h-screen">
+            <div className="w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0">
+              <div className="flex items-center gap-3">
                 <button
-                  className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40"
-                  onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
-                  disabled={activeIndex === 0}
-                  aria-label="Vorige foto"
-                >
-                  &#8592;
-                </button>
-                <img
-                  src={imageFiles[activeIndex].originalPath.replace('-thumb', '')}
-                  alt={`Foto ${activeIndex + 1}`}
-                  className="rounded shadow-lg object-contain bg-zinc-900"
-                  style={{
-                    width: "100%",
-                    maxWidth: "100vw",
-                    maxHeight: "calc(100vh - 220px)",
-                    minHeight: 0,
+                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition"
+                  onClick={() => {
+                    setImageFiles([]);
+                    setFolderName(null);
+                    setActiveIndex(0);
+                    setExifData(null);
+                    setExifError(null);
                   }}
-                />
-                <button
-                  className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40"
-                  onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
-                  disabled={activeIndex === imageFiles.length - 1}
-                  aria-label="Volgende foto"
                 >
-                  &#8594;
+                  &larr; Choose another folder
                 </button>
+                {folderName && <span className="text-zinc-500 text-sm truncate max-w-[12rem]">{folderName}</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  className={`px-4 py-2 rounded text-sm font-medium transition ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
+                  onClick={() => setIsExifOpen((open) => !open)}
+                >
+                  {isExifOpen ? "Close EXIF" : "Show EXIF"}
+                </button>
+                <div className="text-zinc-400 text-sm">{imageFiles.length} images found</div>
               </div>
             </div>
-            {/* Thumbnails */}
-            <div className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 rounded mt-4 justify-center">
-              {imageFiles.map((imageData, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveIndex(idx)}
-                  className={`border-2 rounded transition focus:outline-none ${activeIndex === idx ? "border-zinc-300" : "border-transparent"}`}
-                  style={{ padding: 0, background: "none" }}
-                  tabIndex={0}
-                >
-                  <img
-                    src={imageData.thumbnailPath}
-                    alt={`Thumbnail ${idx + 1}`}
-                    className={`h-20 w-auto rounded ${activeIndex === idx ? "ring-2 ring-zinc-300" : "opacity-70 hover:opacity-100"}`}
-                    style={{ maxWidth: 120 }}
-                  />
-                </button>
-              ))}
+
+            <div className="flex flex-1 w-full overflow-hidden">
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex items-center justify-center overflow-hidden">
+                  <div className="flex w-full h-full items-center justify-center gap-4 px-4">
+                    <button
+                      className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"
+                      onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
+                      disabled={activeIndex === 0}
+                      aria-label="Previous photo"
+                    >
+                      &#8592;
+                    </button>
+                    <img
+                      src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
+                      alt={`Photo ${activeIndex + 1}`}
+                      className="rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
+                    />
+                    <button
+                      className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"
+                      onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
+                      disabled={activeIndex === imageFiles.length - 1}
+                      aria-label="Next photo"
+                    >
+                      &#8594;
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0" style={{ maxHeight: '120px' }}>
+                  {imageFiles.map((imageData, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveIndex(idx)}
+                      className={`border-2 rounded transition focus:outline-none flex-shrink-0 ${activeIndex === idx ? "border-zinc-300" : "border-transparent"}`}
+                      style={{ padding: 0, background: "none" }}
+                      tabIndex={0}
+                    >
+                      <img
+                        src={imageData.thumbnailPath}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className={`h-20 w-auto rounded ${activeIndex === idx ? "ring-2 ring-zinc-300" : "opacity-70 hover:opacity-100"}`}
+                        style={{ maxWidth: 120 }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isExifOpen && (
+              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <div className="text-zinc-200 font-semibold text-base">EXIF info</div>
+                    {imageFiles[activeIndex] && (
+                      <div className="text-zinc-500 text-xs truncate max-w-[14rem]">
+                        {imageFiles[activeIndex].fileName}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-zinc-500 text-xs">
+                    {activeIndex + 1}/{imageFiles.length}
+                  </span>
+                </div>
+
+                {isExifLoading ? (
+                  <div className="flex flex-col items-center py-10 text-center">
+                    <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
+                    <span className="text-zinc-400 text-sm">Loading EXIF...</span>
+                  </div>
+                ) : exifError ? (
+                  <div className="text-red-400 text-sm">{exifError}</div>
+                ) : exifData ? (
+                  <div className="space-y-4">
+
+                    {/* Image info */}
+                    <div className="flex gap-3 border-b border-white/5 pb-2">
+                      <div className="w-14 min-w-14 flex items-center justify-center">
+                        <Icon name="image" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-zinc-300 text-xs font-medium">
+                          {exifData?.FileName || imageFiles[activeIndex]?.fileName}
+                        </div>
+                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                          {[
+                            exifData?.ImageWidth && exifData?.ImageHeight
+                              ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
+                              : null,
+                            formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
+                            formatDPI(exifData),
+                          ]
+                            .filter(Boolean)
+                            .map((v, i) => (
+                              <span key={i} className="truncate">{v as string}</span>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Date taken */}
+                    <ExifItem
+                      icon="calendar"
+                      label="Date/time"
+                      values={[formatDate(exifData)]}
+                    />
+
+                    {/* Camera */}
+                    <div className="flex gap-3 border-b border-white/5 pb-2">
+                      <div className="w-14 min-w-14 flex items-center justify-center">
+                        <Icon name="camera" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-zinc-300 text-xs font-medium">
+                          {[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
+                        </div>
+                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                          {[
+                            formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                            formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
+                            formatISO(exifData?.ISO),
+                          ]
+                            .filter(Boolean)
+                            .map((v, i) => (
+                              <span key={i} className="truncate">{v as string}</span>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Flash */}
+                    <ExifItem icon="flash" label="Flash" values={[formatFlash(exifData)]} />
+
+                    {/* Lens */}
+                    <div className="flex gap-3 border-b border-white/5 pb-2">
+                      <div className="w-14 min-w-14 flex items-center justify-center">
+                        <Icon name="lens" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-zinc-300 text-xs font-medium">
+                          {exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
+                        </div>
+                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                          {[
+                            formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                            formatFocalLength(exifData?.FocalLength),
+                            formatCropFactor(exifData),
+                          ]
+                            .filter(Boolean)
+                            .map((v, i) => (
+                              <span key={i} className="truncate">{v as string}</span>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* White balance */}
+                    <ExifItem icon="wb" label="White balance" values={[formatWhiteBalance(exifData)]} />
+
+                    {/* Exposure */}
+                    <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
+
+                    {/* File size */}
+                    <div className="flex gap-3 border-b border-white/5 pb-2">
+                      <div className="w-14 min-w-14 flex items-center justify-center">
+                        <Icon name="file" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-zinc-300 text-xs font-medium">File</div>
+                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                          {[
+                            formatFileSize(exifData),
+                            exifData?.MIMEType || null,
+                          ]
+                            .filter(Boolean)
+                            .map((v, i) => (
+                              <span key={i} className="truncate">{v as string}</span>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Color */}
+                    {(() => {
+                      const c = formatColor(exifData);
+                      return (
+                        <div className="flex gap-3 border-b border-white/5 pb-2">
+                          <div className="w-14 min-w-14 flex items-center justify-center">
+                            <Icon name="palette" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-zinc-300 text-xs font-medium">Color</div>
+                            <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                              {[c.left, c.right, c.extra].filter(Boolean).map((v, i) => (
+                                <span key={i} className="truncate">{v as string}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 text-sm">No EXIF information available.</div>
+                )}
+              </aside>
+              )}
             </div>
           </div>
         )}

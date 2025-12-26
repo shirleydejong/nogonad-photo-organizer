@@ -5,7 +5,7 @@ import chokidar from 'chokidar';
 import sharp from 'sharp';
 import CONFIG from '@/config';
 
-// Ondersteunde afbeeldingsextensies
+// Supported image extensions
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
 interface WatcherConfig {
@@ -33,22 +33,22 @@ class ImageWatcher {
   }
 
   /**
-   * Start de file watcher
+   * Start the file watcher
    */
   async start(): Promise<void> {
     try {
-      // Zorg ervoor dat de thumbnails map bestaat
+      // Ensure thumbnails folder exists
       await fs.mkdir(this.thumbsPath, { recursive: true });
 
-      // Verwerk bestaande afbeeldingen
+      // Process existing images
       await this.processExistingImages();
 
-      // Start de watcher
+      // Start the watcher
       this.watcher = chokidar.watch(this.sourcePath, {
         ignored: [
           (filepath: string) => {
             const filename = path.basename(filepath);
-            // Negeer de thumbs map zelf
+            // Ignore the thumbs folder itself
             return filepath.includes(CONFIG.THUMBNAILS_FOLDER);
           },
           /node_modules/,
@@ -65,7 +65,7 @@ class ImageWatcher {
       this.watcher.on('unlink', (filepath) => this.handleFileDelete(filepath));
       this.watcher.on('error', (error) => this.config.onError(error));
 
-      console.log(`ImageWatcher gestart voor: ${this.sourcePath}`);
+      console.log(`ImageWatcher started for: ${this.sourcePath}`);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.config.onError(err);
@@ -74,17 +74,17 @@ class ImageWatcher {
   }
 
   /**
-   * Stop de file watcher
+   * Stop the file watcher
    */
   async stop(): Promise<void> {
     if (this.watcher) {
       await this.watcher.close();
-      console.log('ImageWatcher gestopt');
+      console.log('ImageWatcher stopped');
     }
   }
 
   /**
-   * Verwerk alle bestaande afbeeldingen in de map
+   * Process all existing images in the folder
    */
   private async processExistingImages(): Promise<void> {
     try {
@@ -133,7 +133,7 @@ class ImageWatcher {
     }
 
     try {
-      // Verwijder de oude thumbnail en maak een nieuwe
+      // Delete the old thumbnail and create a new one
       await this.deleteThumbnail(filename);
       await this.createThumbnail(filepath);
     } catch (error) {
@@ -161,28 +161,29 @@ class ImageWatcher {
   }
 
   /**
-   * Maak een thumbnail van een afbeelding
+   * Create a thumbnail from an image
    */
   private async createThumbnail(filepath: string): Promise<void> {
     const filename = path.basename(filepath);
     const thumbnailFilename = this.getThumbnailFilename(filename);
     const thumbnailPath = path.join(this.thumbsPath, thumbnailFilename);
 
-    // Check of thumbnail al bestaat
+    // Check if thumbnail already exists
     if (fsSync.existsSync(thumbnailPath)) {
       return;
     }
 
     try {
-      // Maak thumbnail met sharp
+      // Create thumbnail with sharp
       await sharp(filepath)
         .resize(CONFIG.THUMBNAIL_WIDTH, CONFIG.THUMBNAIL_WIDTH, {
           fit: 'inside',
           withoutEnlargement: true,
         })
+        .withMetadata()
         .toFile(thumbnailPath);
 
-      console.log(`Thumbnail gemaakt: ${thumbnailFilename}`);
+      console.log(`Thumbnail created: ${thumbnailFilename}`);
       this.config.onThumbnailCreated(thumbnailFilename);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -191,7 +192,7 @@ class ImageWatcher {
   }
 
   /**
-   * Verwijder een thumbnail
+   * Delete a thumbnail
    */
   private async deleteThumbnail(filename: string): Promise<void> {
     const thumbnailFilename = this.getThumbnailFilename(filename);
@@ -200,7 +201,7 @@ class ImageWatcher {
     try {
       if (fsSync.existsSync(thumbnailPath)) {
         await fs.unlink(thumbnailPath);
-        console.log(`Thumbnail verwijderd: ${thumbnailFilename}`);
+        console.log(`Thumbnail deleted: ${thumbnailFilename}`);
         this.config.onThumbnailDeleted(thumbnailFilename);
       }
     } catch (error) {
@@ -210,7 +211,7 @@ class ImageWatcher {
   }
 
   /**
-   * Get de thumbnail bestandsnaam op basis van de originele bestandsnaam
+   * Get the thumbnail filename based on the original filename
    */
   private getThumbnailFilename(filename: string): string {
     const ext = path.extname(filename);
@@ -219,7 +220,7 @@ class ImageWatcher {
   }
 
   /**
-   * Check of het bestand een ondersteunde afbeelding is
+   * Check if the file is a supported image
    */
   private isSupportedImage(filename: string): boolean {
     const ext = path.extname(filename).toLowerCase();
