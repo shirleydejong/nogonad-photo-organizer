@@ -706,7 +706,7 @@ export default function Home() {
                     <img
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
                       alt={`Photo ${activeIndex + 1}`}
-                      className="rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
+                      className="main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
                     />
                     <button
                       className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"
