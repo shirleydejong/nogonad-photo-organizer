@@ -26,9 +26,7 @@ export default function Home() {
   const [exifData, setExifData] = useState<Record<string, any> | null>(null);
   const [exifError, setExifError] = useState<string | null>(null);
   const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
-  //const mainRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const filmstripRef = useRef<HTMLDivElement>(null);
 
   // Load path history from localStorage on mount
   useEffect(() => {
@@ -46,6 +44,35 @@ export default function Home() {
       }
     }
   }, []);
+  
+  useEffect(() => {
+    const lsActiveIndex = localStorage.getItem('activeIndices');
+    if( lsActiveIndex ) {
+      try {
+        const activeIndices = JSON.parse(lsActiveIndex);
+        if( folderPath in activeIndices ) {
+          const index = !isNaN(Number(activeIndices[folderPath])) ? Number(activeIndices[folderPath]) : 0;
+          setActiveIndex(index);
+        }
+        
+      } catch (e) {
+        console.error('Failed to load last index:', e);
+      }
+    }
+  }, [folderPath, setActiveIndex]);
+
+  // Persist activeIndex per folderPath to localStorage
+  useEffect(() => {
+    if (!folderPath) return;
+    try {
+      const stored = localStorage.getItem('activeIndices');
+      const activeIndices = stored ? JSON.parse(stored) : {};
+      activeIndices[folderPath] = activeIndex;
+      localStorage.setItem('activeIndices', JSON.stringify(activeIndices));
+    } catch (e) {
+      console.error('Failed to save active index:', e);
+    }
+  }, [activeIndex, folderPath]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -256,7 +283,6 @@ export default function Home() {
               });
 
               setImageFiles(imageData);
-              setActiveIndex(0);
               
               setTimeout(() => {
                 setIsProcessing(false);
