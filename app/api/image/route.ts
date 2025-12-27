@@ -8,12 +8,6 @@ import CONFIG from '@/config';
 // In-memory progress tracking
 const progressStore = new Map<string, { total: number; processed: number; files: string[] }>();
 
-function getThumbnailFilename(filename: string): string {
-  const ext = path.extname(filename);
-  const name = path.basename(filename, ext);
-  return `${name}-thumb${ext}`;
-}
-
 async function countExistingThumbnails(folderPath: string): Promise<number> {
   try {
     const thumbsPath = path.join(folderPath, CONFIG.THUMBNAILS_FOLDER);
@@ -102,44 +96,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const folderPath = searchParams.get('folderPath');
-    const fileName = searchParams.get('fileName');
-
-    if (!folderPath || !fileName) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
-    }
-
-    const fileBuffer = await fs.readFile(path.join(folderPath, fileName));
-
-    // Determine content type based on extension
-    const ext = path.extname(fileName).toLowerCase();
-    const contentType = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.bmp': 'image/bmp',
-    }[ext] || 'image/jpeg';
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=6000',
-      },
-    });
-  } catch (error) {
-    console.error('Thumbnail fetch error:', error);
-    return NextResponse.json(
-      { error: 'Thumbnail not found' },
-      { status: 404 }
     );
   }
 }

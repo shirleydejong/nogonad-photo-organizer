@@ -28,6 +28,7 @@ export default function Home() {
   const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
   //const mainRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filmstripRef = useRef<HTMLDivElement>(null);
 
   // Load path history from localStorage on mount
   useEffect(() => {
@@ -202,7 +203,7 @@ export default function Home() {
       setFolderName(lastPart || normalizedPath);
 
       // Start thumbnail generation on the server
-      const startResponse = await fetch('/api/thumbnails', {
+      const startResponse = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
@@ -227,7 +228,7 @@ export default function Home() {
       // Poll for progress
       const pollInterval = setInterval(async () => {
         try {
-          const progressResponse = await fetch('/api/thumbnails', {
+          const progressResponse = await fetch('/api/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ folderPath: normalizedPath, action: 'progress' }),
@@ -242,12 +243,17 @@ export default function Home() {
               clearInterval(pollInterval);
               
               // Create ImageData objects
-              const imageData: ImageData[] = files.map((fileName) => ({
-                originalFile: null as any, // Niet nodig voor server-side thumbnails
-                fileName: fileName,
-                thumbnailPath: `/api/thumbnails?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodeURIComponent(getThumbnailFilename(fileName))}`,
-                originalPath: `/api/thumbnails?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodeURIComponent(fileName)}`,
-              }));
+              
+              const imageData: ImageData[] = files.map((fileName) => {
+                const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
+                const encodedPath = encodeURIComponent(fileName);
+                return {
+                  originalFile: null as any, // Niet nodig voor server-side thumbnails
+                  fileName: fileName,
+                  thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+                  originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
+                }
+              });
 
               setImageFiles(imageData);
               setActiveIndex(0);
@@ -687,7 +693,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0" style={{ maxHeight: '120px' }}>
+                <div id="filmstrip" className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0" style={{ maxHeight: '120px' }}>
                   {imageFiles.map((imageData, idx) => (
                     <button
                       key={idx}
@@ -711,9 +717,8 @@ export default function Home() {
               <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <div className="text-zinc-200 font-semibold text-base">EXIF info</div>
                     {imageFiles[activeIndex] && (
-                      <div className="text-zinc-500 text-xs truncate max-w-[14rem]">
+                      <div className="text-zinc-200 font-semibold text-base">
                         {imageFiles[activeIndex].fileName}
                       </div>
                     )}
@@ -869,6 +874,7 @@ export default function Home() {
           </div>
         )}
       </main>
+      <script src="/filmstrip.js" async type="module"></script>
     </div>
   );
 }
