@@ -33,3 +33,8 @@ body {
 button {
   user-select: none;
 }
+
+.main-image {
+  will-change: transform;
+  image-rendering: -webkit-optimize-contrast;
+}
