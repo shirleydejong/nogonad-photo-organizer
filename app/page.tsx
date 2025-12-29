@@ -388,7 +388,7 @@ export default function Home() {
     const offset = exif?.OffsetTimeOriginal || exif?.OffsetTime || "";
     const d = new Date(iso + (typeof offset === "string" ? offset : ""));
     if (isNaN(d.getTime())) return s; // fallback
-    const dt = new Intl.DateTimeFormat("en-US", {
+    const dt = new Intl.DateTimeFormat("nl-NL", {
       weekday: "short",
       year: "numeric",
       month: "short",
@@ -740,7 +740,7 @@ export default function Home() {
               </div>
 
               {isExifOpen && (
-              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
+              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-clip shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
                     {imageFiles[activeIndex] && (
