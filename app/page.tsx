@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type PointerEvent, type WheelEvent } from "react";
 import CONFIG from "@/config";
 
 interface ImageData {
@@ -27,6 +27,47 @@ export default function Home() {
   const [exifError, setExifError] = useState<string | null>(null);
   const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  const isFilmstripDraggingRef = useRef(false);
+  const filmstripDragStartXRef = useRef(0);
+  const filmstripStartScrollLeftRef = useRef(0);
+
+  function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (delta === 0) return;
+
+    const step = Math.round(window.innerWidth * 0.6);
+    const direction = delta > 0 ? 1 : -1;
+
+    //e.preventDefault();
+    el.scrollBy({ left: direction * step, behavior: "smooth" });
+  }
+
+  function handleFilmstripPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    const el = e.currentTarget;
+    isFilmstripDraggingRef.current = true;
+    filmstripDragStartXRef.current = e.clientX;
+    filmstripStartScrollLeftRef.current = el.scrollLeft;
+  }
+
+  function handleFilmstripPointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (!isFilmstripDraggingRef.current) return;
+
+    const el = e.currentTarget;
+    const deltaX = e.clientX - filmstripDragStartXRef.current;
+    el.scrollLeft = filmstripStartScrollLeftRef.current - deltaX;
+  }
+
+  function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (!isFilmstripDraggingRef.current) return;
+
+    isFilmstripDraggingRef.current = false;
+  }
 
   // Load path history from localStorage on mount
   useEffect(() => {
@@ -470,7 +511,7 @@ export default function Home() {
   }
   
   function isHDR(exif: any) {
-    return Array.isArray(exif?.DirectoryItemSemantic) && exif?.DirectoryItemSemantic.map(el => el?.toLowerCase()).includes('gainmap') ||
+    return Array.isArray(exif?.DirectoryItemSemantic) && exif?.DirectoryItemSemantic.map((el: string | null | undefined) => el?.toLowerCase()).includes('gainmap') ||
     (exif?.HDREditMode === 1 || exif?.HDRMaxValue > 0)
   }
 
@@ -719,7 +760,17 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div id="filmstrip" className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0" style={{ maxHeight: '120px' }}>
+                <div
+                  id="filmstrip"
+                  ref={filmstripRef}
+                  onWheel={handleFilmstripWheel}
+                  onPointerDown={handleFilmstripPointerDown}
+                  onPointerMove={handleFilmstripPointerMove}
+                  onPointerUp={handleFilmstripPointerUp}
+                  onPointerCancel={handleFilmstripPointerUp}
+                  className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0 cursor-grab active:cursor-grabbing touch-pan-x"
+                  style={{ maxHeight: '120px' }}
+                >
                   {imageFiles.map((imageData, idx) => (
                     <button
                       key={idx}
@@ -900,7 +951,6 @@ export default function Home() {
           </div>
         )}
       </main>
-      <script src="/filmstrip.js" async type="module"></script>
     </div>
   );
 }
