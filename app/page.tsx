@@ -60,7 +60,7 @@ export default function Home() {
 
     const el = e.currentTarget;
     const deltaX = e.clientX - filmstripDragStartXRef.current;
-    el.scrollLeft = filmstripStartScrollLeftRef.current - deltaX;
+    el.scrollLeft = filmstripStartScrollLeftRef.current - (deltaX * 4);
   }
 
   function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
@@ -748,6 +748,7 @@ export default function Home() {
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
                       alt={`Photo ${activeIndex + 1}`}
                       className="main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
+                      draggable={false}
                     />
                     <button
                       className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"

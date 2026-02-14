@@ -31,7 +31,7 @@ export async function runExifTool(imagePath: string): Promise<string> {
   });
 }
 
-export async function getExifJson(imagePath: string): Promise<unknown> {
+export async function getExifJson(imagePath: string): Promise<any> {
   const output = await runExifTool(imagePath);
   try {
     return JSON.parse(output);
