@@ -26,11 +26,20 @@ export default function Home() {
   const [exifData, setExifData] = useState<Record<string, any> | null>(null);
   const [exifError, setExifError] = useState<string | null>(null);
   const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
   const filmstripStartScrollLeftRef = useRef(0);
+  const isMainImageSwipingRef = useRef(false);
+  const mainImageStartXRef = useRef(0);
+  const mainImageStartYRef = useRef(0);
+  const mainImageSwipeTriggeredRef = useRef(false);
+  const swipeButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
   function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
     const el = e.currentTarget;
@@ -68,6 +77,73 @@ export default function Home() {
 
     isFilmstripDraggingRef.current = false;
   }
+
+  function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    // Cancel any pending timeout from previous swipe
+    if (swipeButtonTimeoutRef.current) {
+      clearTimeout(swipeButtonTimeoutRef.current);
+      swipeButtonTimeoutRef.current = null;
+    }
+
+    isMainImageSwipingRef.current = true;
+    mainImageStartXRef.current = e.clientX;
+    mainImageStartYRef.current = e.clientY;
+    mainImageSwipeTriggeredRef.current = false;
+    setIsSwipingActive(true);
+  }
+
+  function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
+    if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || imageFiles.length === 0) return;
+
+    const deltaX = e.clientX - mainImageStartXRef.current;
+    const deltaY = e.clientY - mainImageStartYRef.current;
+
+    if (Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) return;
+    if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+    if (deltaX < 0) {
+      // Swipe left = next image, image goes left
+      if (activeIndex < imageFiles.length - 1) {
+        setSwipeDirection('left');
+        setActiveIndex((i) => i + 1);
+      }
+    } else {
+      // Swipe right = previous image, image goes right
+      if (activeIndex > 0) {
+        setSwipeDirection('right');
+        setActiveIndex((i) => i - 1);
+      }
+    }
+
+    mainImageSwipeTriggeredRef.current = true;
+    isMainImageSwipingRef.current = false;
+  }
+
+  function handleMainImagePointerUp() {
+    isMainImageSwipingRef.current = false;
+    mainImageSwipeTriggeredRef.current = false;
+    
+    // Show buttons after 2 seconds
+    if (swipeButtonTimeoutRef.current) {
+      clearTimeout(swipeButtonTimeoutRef.current);
+    }
+    swipeButtonTimeoutRef.current = setTimeout(() => {
+      setIsSwipingActive(false);
+      swipeButtonTimeoutRef.current = null;
+    }, 2000);
+  }
+
+  // Reset swipe animation after it completes
+  useEffect(() => {
+    if (swipeDirection !== null) {
+      const timer = setTimeout(() => {
+        setSwipeDirection(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [swipeDirection]);
 
   // Load path history from localStorage on mount
   useEffect(() => {
@@ -737,7 +813,9 @@ export default function Home() {
                 <div className="flex-1 flex items-center justify-center overflow-hidden">
                   <div className="flex w-full h-full items-center justify-center gap-4 px-4">
                     <button
-                      className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 ${
+                        isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                      }`}
                       onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
                       disabled={activeIndex === 0}
                       aria-label="Previous photo"
@@ -748,10 +826,25 @@ export default function Home() {
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
                       alt={`Photo ${activeIndex + 1}`}
                       className="main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
+                      onPointerDown={handleMainImagePointerDown}
+                      onPointerMove={handleMainImagePointerMove}
+                      onPointerUp={handleMainImagePointerUp}
+                      onPointerCancel={handleMainImagePointerUp}
+                      onPointerLeave={handleMainImagePointerUp}
+                      style={{
+                        touchAction: "pan-y",
+                        animation: swipeDirection === 'left' 
+                          ? 'swipeOutLeft 0.25s ease-out forwards'
+                          : swipeDirection === 'right'
+                          ? 'swipeOutRight 0.25s ease-out forwards'
+                          : 'swipeInCenter 0.25s ease-out forwards',
+                      }}
                       draggable={false}
                     />
                     <button
-                      className="px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0"
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 ${
+                        isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                      }`}
                       onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
                       disabled={activeIndex === imageFiles.length - 1}
                       aria-label="Next photo"
