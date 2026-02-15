@@ -30,6 +30,9 @@ export default function Home() {
   const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
   const [isMainImageDragging, setIsMainImageDragging] = useState<boolean>(false);
   const [isFilmstripDragging, setIsFilmstripDragging] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [panX, setPanX] = useState<number>(0);
+  const [panY, setPanY] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
@@ -40,6 +43,11 @@ export default function Home() {
   const mainImageStartYRef = useRef(0);
   const mainImageSwipeTriggeredRef = useRef(false);
   const swipeButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const touchPinchRef = useRef({ distance: 0, startZoom: 100 });
+  const panStartXRef = useRef(0);
+  const panStartYRef = useRef(0);
+  const maxZoom = 400;
+  const pinchFactor = 1.5;
 
   const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
@@ -102,6 +110,9 @@ export default function Home() {
   function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
     if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || imageFiles.length === 0) return;
 
+    // Don't trigger navigation swipe when zoomed in
+    if (zoomLevel > 100) return;
+
     const deltaX = e.clientX - mainImageStartXRef.current;
     const deltaY = e.clientY - mainImageStartYRef.current;
 
@@ -139,6 +150,100 @@ export default function Home() {
       setIsSwipingActive(false);
       swipeButtonTimeoutRef.current = null;
     }, 2000);
+  }
+
+  function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
+    if (zoomLevel === 100 && e.deltaY > 0) return; // Don't zoom out below 100%
+    
+    //e.preventDefault();
+    
+    const zoomStep = 20;
+    const newZoom = Math.max(100, Math.min(maxZoom, zoomLevel - (e.deltaY > 0 ? zoomStep : -zoomStep)));
+    
+    if (newZoom === zoomLevel) return;
+    
+    // Reset pan when zooming back to 100%
+    if (newZoom === 100) {
+      setZoomLevel(100);
+      setPanX(0);
+      setPanY(0);
+    } else {
+      setZoomLevel(newZoom);
+    }
+  }
+
+  function getDistance(p1: React.Touch, p2: React.Touch): number {
+    const dx = p1.clientX - p2.clientX;
+    const dy = p1.clientY - p2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function handleImageTouchStart(e: React.TouchEvent<HTMLImageElement>) {
+    if (e.touches.length === 2) {
+      // Two-finger pinch
+      touchPinchRef.current.distance = getDistance(e.touches[0], e.touches[1]);
+      touchPinchRef.current.startZoom = zoomLevel;
+    } else if (zoomLevel > 100) {
+      // Single finger pan when zoomed in
+      panStartXRef.current = e.touches[0].clientX;
+      panStartYRef.current = e.touches[0].clientY;
+    }
+  }
+
+  function handleImageTouchMove(e: React.TouchEvent<HTMLImageElement>) {
+    if (e.touches.length === 2) {
+      // Two-finger pinch zoom
+      const newDistance = getDistance(e.touches[0], e.touches[1]);
+      const delta = newDistance - touchPinchRef.current.distance;
+      const zoomChange = (delta / 100) * 10;
+      const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom + zoomChange));
+      
+      if (newZoom === 100) {
+        setPanX(0);
+        setPanY(0);
+      }
+      setZoomLevel(newZoom);
+      
+    } else if (e.touches.length === 1 && zoomLevel > 100) {
+      pan(e);
+    }
+  }
+
+  function handleImageMouseDown(e: React.MouseEvent<HTMLImageElement>) {
+    if (zoomLevel > 100 && e.button === 0) {
+      // Left mouse button + zoomed in = pan mode
+      panStartXRef.current = e.clientX;
+      panStartYRef.current = e.clientY;
+      isMainImageSwipingRef.current = false;
+    }
+  }
+
+  function handleImageMouseMove(e: React.MouseEvent<HTMLImageElement>) {
+    if (zoomLevel > 100 && (e.buttons & 1) && isMainImageSwipingRef.current === false) {
+      pan(e);
+    }
+  }
+  
+  function pan(e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) {
+    const z = 'touches' in e ? e.touches[0] : e;
+
+    const deltaX = (z.clientX - panStartXRef.current) * pinchFactor;
+    const deltaY = (z.clientY - panStartYRef.current) * pinchFactor;
+    const zoomFactor = zoomLevel / 100;
+
+    const container = document.querySelector('.main-image-container');
+
+    const maxPanX = ((e.currentTarget.clientWidth * zoomFactor - container!.clientWidth) / 2) / zoomFactor;
+    const maxPanY = ((e.currentTarget.clientHeight * zoomFactor - container!.clientHeight) / 2) / zoomFactor;
+
+    const newPanX = e.currentTarget.clientWidth * zoomFactor < container!.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + deltaX / zoomFactor));
+    const newPanY = e.currentTarget.clientHeight * zoomFactor < container!.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + deltaY / zoomFactor));
+
+    setPanX(newPanX);
+    setPanY(newPanY);
+
+    panStartXRef.current = z.clientX;
+    panStartYRef.current = z.clientY;
   }
 
   // Reset swipe animation after it completes
@@ -200,7 +305,7 @@ export default function Home() {
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (imageFiles.length === 0) return;
+      if (imageFiles.length === 0 || zoomLevel > 100) return;
       if (e.key === "ArrowLeft") {
         setActiveIndex((prev) => (prev > 0 ? prev - 1 : prev));
       } else if (e.key === "ArrowRight") {
@@ -209,7 +314,14 @@ export default function Home() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [imageFiles.length]);
+  }, [imageFiles.length, zoomLevel]);
+  
+  // Reset zoom and pan when changing photos
+  useEffect(() => {
+    setZoomLevel(100);
+    setPanX(0);
+    setPanY(0);
+  }, [activeIndex]);
   
   // Fetch EXIF data when active image changes
   useEffect(() => {
@@ -747,13 +859,13 @@ export default function Home() {
             <div className="flex flex-1 w-full overflow-hidden">
               <div className="flex-1 flex flex-col min-w-0">
                 <div className="flex-1 flex items-center justify-center overflow-hidden">
-                  <div className="flex w-full h-full items-center justify-center gap-4 px-4">
+                  <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
                         isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
                       }`}
                       onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
-                      disabled={activeIndex === 0}
+                      disabled={activeIndex === 0 || zoomLevel > 100}
                       aria-label="Previous photo"
                     >
                       <Icon name="arrow_back" />
@@ -761,28 +873,36 @@ export default function Home() {
                     <img
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
                       alt={`Photo ${activeIndex + 1}`}
-                      className={`main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                      className={`main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full ${isMainImageDragging ? 'cursor-grabbing' : zoomLevel > 100 ? 'cursor-grab' : 'cursor-default'}`}
                       onPointerDown={handleMainImagePointerDown}
                       onPointerMove={handleMainImagePointerMove}
                       onPointerUp={handleMainImagePointerUp}
                       onPointerCancel={handleMainImagePointerUp}
                       onPointerLeave={handleMainImagePointerUp}
+                      onWheel={handleImageWheel}
+                      onTouchStart={handleImageTouchStart}
+                      onTouchMove={handleImageTouchMove}
+                      onMouseDown={handleImageMouseDown}
+                      onMouseMove={handleImageMouseMove}
                       style={{
-                        touchAction: "pan-y",
+                        touchAction: zoomLevel > 100 ? "none" : "pan-y",
+                        transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
+                        transformOrigin: "center",
+                        transition: swipeDirection ? "none" : "transform 0.1s ease-out",
                         animation: swipeDirection === 'left' 
                           ? 'swipeOutLeft 0.25s ease-out forwards'
                           : swipeDirection === 'right'
                           ? 'swipeOutRight 0.25s ease-out forwards'
-                          : 'swipeInCenter 0.25s ease-out forwards',
+                          : undefined,
                       }}
                       draggable={false}
                     />
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
                         isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
                       }`}
                       onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
-                      disabled={activeIndex === imageFiles.length - 1}
+                      disabled={activeIndex === imageFiles.length - 1 || zoomLevel > 100}
                       aria-label="Next photo"
                     >
                       <Icon name="arrow_forward" />
