@@ -537,17 +537,30 @@ export default function Home() {
 
             <div className="flex flex-1 w-full overflow-hidden">
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 flex items-center justify-center overflow-hidden">
+                <div className="flex-1 flex items-center justify-center overflow-hidden relative">
+                  
+                  <button
+                    className={`photo-nav-button left-4 ${
+                      isSwipingActive ? 'opacity-0' : ''
+                    }`}
+                    disabled={activeIndex === 0}
+                    onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                  >
+                    <Icon name="chevron_backward" />
+                  </button>
+                  
+                  <button
+                    className={`photo-nav-button right-4 ${
+                      isSwipingActive ? 'opacity-0' : ''
+                    }`}
+                    disabled={activeIndex === imageFiles.length - 1}
+                    onClick={() => setActiveIndex((i) => Math.min(imageFiles.length - 1, i + 1))}
+                  >
+                    <Icon name="chevron_forward" />
+                  </button>
+                  
                   <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
-                    <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center justify-center ${
-                        isSwipingActive ? 'opacity-0' : ''
-                      }`}
-                      disabled={activeIndex === 0}
-                      onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
-                    >
-                      <Icon name="chevron_backward" />
-                    </button>
+                    
                     <div className="flex-1 flex items-center justify-center h-full">
                       {imageFiles[activeIndex] && (
                         <img
@@ -578,15 +591,7 @@ export default function Home() {
                         />
                       )}
                     </div>
-                    <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center justify-center ${
-                        isSwipingActive ? 'opacity-0' : ''
-                      }`}
-                      disabled={activeIndex === imageFiles.length - 1}
-                      onClick={() => setActiveIndex((i) => Math.min(imageFiles.length - 1, i + 1))}
-                    >
-                      <Icon name="chevron_forward" />
-                    </button>
+                    
                   </div>
                 </div>
 
@@ -608,7 +613,7 @@ export default function Home() {
                       onClick={() => setActiveIndex(idx)}
                       className={`flex-shrink-0 rounded overflow-hidden transition ${
                         idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
-                      }`}
+                      } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     >
                       <img
                         src={img.thumbnailPath}

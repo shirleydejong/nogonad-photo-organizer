@@ -79,3 +79,16 @@ button {
     transform: translateX(0);
   }
 }
+
+@layer components {
+  .photo-nav-button {
+    @apply px-3 py-2 cursor-pointer absolute z-10 rounded-full text-white text-xl font-bold disabled:opacity-0 flex-shrink-0 transition-opacity duration-150 flex h-12 w-12 items-center justify-center;
+    background: rgb(0 0 0 / 50%);
+    border: 1px solid rgb(255 255 255 / 25%);
+  }
+  
+  .photo-nav-button:hover {
+    background: rgb(0 0 0 / 70%);
+    border-color: rgb(255 255 255 / 50%);
+  }
+}
