@@ -317,10 +317,10 @@ export default function Home() {
     try {
       // Valideer Windows pad format
       const trimmedPath = inputPath.trim();
-      const trimmedThumbPath = `${trimmedPath}\\${CONFIG.THUMBNAILS_FOLDER}`;
+      const trimmedThumbPath = `${trimmedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
       
       // Check if it's the thumbnails folder
-      if (trimmedPath.toLowerCase().includes(CONFIG.THUMBNAILS_FOLDER)) {
+      if (trimmedPath.toLowerCase().includes(`${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`.toLowerCase())) {
         setError("You cannot use a thumbnail directory. Choose the main folder with photos.");
         setIsProcessing(false);
         return;
@@ -518,11 +518,14 @@ export default function Home() {
     return `${dt}${tz}`;
   }
 
-  function formatFlash(exif: any) {
+  function formatFlash(exif: any, asIcon = false) {
     // exiftool -n returns numeric bitfield for Flash
     const v = exif?.Flash;
     const fired =
       typeof v === "number" ? (v & 0x1) === 1 : String(exif?.Flash)?.toLowerCase().includes("fired");
+    if (asIcon) {
+      return fired ? "flash_on" : "flash_off";
+    }
     return fired ? "On, Fired" : "Off";
   }
 
@@ -592,84 +595,11 @@ export default function Home() {
   }
 
   function Icon({ name }: { name: string }) {
-    // simple inline SVGs resembling the material icons
-    const cls = "w-6 h-6 text-zinc-300";
-    switch (name) {
-      case "text":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path stroke="currentColor" strokeWidth="2" d="M4 6h16M10 18V6m4 12V6" />
-          </svg>
-        );
-      case "image":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-            <path d="M21 15l-5-5-11 11" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "calendar":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
-            <path d="M16 3v4M8 3v4M3 9h18" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "camera":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M4 7h4l2-2h4l2 2h4v12H4V7z" stroke="currentColor" strokeWidth="2" />
-            <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "flash":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M13 3L4 14h6v7l9-13h-6V3z" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "lens":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="2" />
-            <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "wb":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M3 12h18" stroke="currentColor" strokeWidth="2" />
-            <circle cx="7" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-            <circle cx="17" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "exposure":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "file":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M6 3h8l5 5v13H6V3z" stroke="currentColor" strokeWidth="2" />
-            <path d="M14 3v5h5" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        );
-      case "palette":
-        return (
-          <svg className={cls} viewBox="0 0 24 24" fill="none">
-            <path d="M12 3a9 9 0 0 0 0 18c2 0 2-2 4-2h1a4 4 0 1 0 0-8h-1a3 3 0 0 1-3-3V3z" stroke="currentColor" strokeWidth="2" />
-            <circle cx="7" cy="10" r="1.5" fill="currentColor" />
-            <circle cx="9" cy="14" r="1.5" fill="currentColor" />
-            <circle cx="13" cy="15" r="1.5" fill="currentColor" />
-            <circle cx="16" cy="11" r="1.5" fill="currentColor" />
-          </svg>
-        );
-      default:
-        return <span className="w-6 h-6" />;
-    }
+    return (
+      <span className="material-symbols-rounded text-zinc-300 text-2xl" style={{ fontSize: '24px' }}>
+        {name}
+      </span>
+    );
   }
 
   function ExifItem({
@@ -813,14 +743,14 @@ export default function Home() {
                 <div className="flex-1 flex items-center justify-center overflow-hidden">
                   <div className="flex w-full h-full items-center justify-center gap-4 px-4">
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 ${
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
                         isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
                       }`}
                       onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
                       disabled={activeIndex === 0}
                       aria-label="Previous photo"
                     >
-                      &#8592;
+                      <Icon name="arrow_back" />
                     </button>
                     <img
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
@@ -842,14 +772,14 @@ export default function Home() {
                       draggable={false}
                     />
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 ${
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-40 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
                         isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
                       }`}
                       onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
                       disabled={activeIndex === imageFiles.length - 1}
                       aria-label="Next photo"
                     >
-                      &#8594;
+                      <Icon name="arrow_forward" />
                     </button>
                   </div>
                 </div>
@@ -936,7 +866,7 @@ export default function Home() {
 
                     {/* Date taken */}
                     <ExifItem
-                      icon="calendar"
+                      icon="today"
                       label="Date/time"
                       values={[formatDate(exifData)]}
                     />
@@ -944,7 +874,7 @@ export default function Home() {
                     {/* Camera */}
                     <div className="flex gap-3 border-b border-white/5 pb-2">
                       <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="camera" />
+                        <Icon name="photo_camera" />
                       </div>
                       <div className="flex-1">
                         <div className="text-zinc-300 text-xs font-medium">
@@ -965,12 +895,12 @@ export default function Home() {
                     </div>
 
                     {/* Flash */}
-                    <ExifItem icon="flash" label="Flash" values={[formatFlash(exifData)]} />
+                    <ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
 
                     {/* Lens */}
                     <div className="flex gap-3 border-b border-white/5 pb-2">
                       <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="lens" />
+                        <Icon name="camera" />
                       </div>
                       <div className="flex-1">
                         <div className="text-zinc-300 text-xs font-medium">
@@ -991,7 +921,7 @@ export default function Home() {
                     </div>
 
                     {/* White balance */}
-                    <ExifItem icon="wb" label="White balance" values={[formatWhiteBalance(exifData)]} />
+                    <ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
 
                     {/* Exposure */}
                     <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
@@ -999,7 +929,7 @@ export default function Home() {
                     {/* File size */}
                     <div className="flex gap-3 border-b border-white/5 pb-2">
                       <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="file" />
+                        <Icon name="perm_media" />
                       </div>
                       <div className="flex-1">
                         <div className="text-zinc-300 text-xs font-medium">File</div>
@@ -1022,7 +952,7 @@ export default function Home() {
                       return (
                         <div className="flex gap-3 border-b border-white/5 pb-2">
                           <div className="w-14 min-w-14 flex items-center justify-center">
-                            <Icon name="palette" />
+                            <Icon name="colors" />
                           </div>
                           <div className="flex-1">
                             <div className="text-zinc-300 text-xs font-medium">Color</div>

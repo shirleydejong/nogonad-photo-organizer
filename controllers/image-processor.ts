@@ -23,7 +23,7 @@ class ImageWatcher {
 
   constructor(config: WatcherConfig) {
     this.sourcePath = config.sourcePath;
-    this.thumbsPath = path.join(config.sourcePath, CONFIG.THUMBNAILS_FOLDER);
+    this.thumbsPath = path.join(config.sourcePath, CONFIG.NPO_FOLDER, CONFIG.THUMBNAILS_FOLDER);
     this.config = {
       ...config,
       onError: config.onError || ((error) => console.error('ImageWatcher Error:', error)),
@@ -49,7 +49,7 @@ class ImageWatcher {
           (filepath: string) => {
             const filename = path.basename(filepath);
             // Ignore the thumbs folder itself
-            return filepath.includes(CONFIG.THUMBNAILS_FOLDER);
+            return filepath.includes(path.join(CONFIG.NPO_FOLDER, CONFIG.THUMBNAILS_FOLDER));
           },
           /node_modules/,
           /\./,

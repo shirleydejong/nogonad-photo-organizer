@@ -10,7 +10,7 @@ const progressStore = new Map<string, { total: number; processed: number; files:
 
 async function countExistingThumbnails(folderPath: string): Promise<number> {
   try {
-    const thumbsPath = path.join(folderPath, CONFIG.THUMBNAILS_FOLDER);
+    const thumbsPath = path.join(folderPath, CONFIG.NPO_FOLDER, CONFIG.THUMBNAILS_FOLDER);
     if (!fsSync.existsSync(thumbsPath)) {
       return 0;
     }

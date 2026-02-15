@@ -10,8 +10,8 @@ Local-first photo viewer/organizer built with Next.js 16, focusing on HDR render
 ### File System Access Pattern
 - Uses **local Windows file paths** (e.g., `C:\Users\Photos` or UNC `\\server\share`)
 - User enters paths via input, NOT file picker API (for direct directory access)
-- Thumbnails stored in `{folder}/nogonad-thumbs/` subdirectory
-- Config constants in [config.ts](../config.ts): `THUMBNAIL_WIDTH`, `THUMBNAIL_SUFFIX`, `THUMBNAILS_FOLDER`
+- Thumbnails stored in `{folder}/${NPO_FOLDER}/${THUMBNAILS_FOLDER}/` subdirectory
+- Config constants in [config.ts](../config.ts)
 
 ### API Routes Design
 All API routes in `app/api/*/route.ts` are POST-based and handle server-side file operations:
@@ -46,7 +46,7 @@ Controllers in `controllers/` handle business logic:
 - **[ImageWatcher](../controllers/image-processor.ts)**: File watcher class with lifecycle methods
   - `start()` → processes existing images + watches for changes
   - `stop()` → closes watcher
-  - Ignores files in `nogonad-thumbs/` folder
+  - Ignores files in `_npo/thumbs/` folder
   - Uses `awaitWriteFinish` (2s stability) to prevent processing partial writes
   - Event handlers: `onThumbnailCreated`, `onThumbnailDeleted`, `onError`
 
@@ -95,7 +95,7 @@ npm run lint     # ESLint check
 - Windows environment (file path handling assumes Windows)
 
 ### Testing Locally
-1. Use a folder with actual photos (not the `nogonad-thumbs` folder)
+1. Use a folder with actual photos (not the `_npo/thumbs` folder)
 2. First load generates thumbnails → progress bar UI
 3. Subsequent loads use cached thumbnails → instant display
 4. Test keyboard navigation (← →) and EXIF panel toggle
