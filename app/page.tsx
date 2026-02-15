@@ -28,6 +28,8 @@ export default function Home() {
   const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
+  const [isMainImageDragging, setIsMainImageDragging] = useState<boolean>(false);
+  const [isFilmstripDragging, setIsFilmstripDragging] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
@@ -60,6 +62,7 @@ export default function Home() {
 
     const el = e.currentTarget;
     isFilmstripDraggingRef.current = true;
+    setIsFilmstripDragging(true);
     filmstripDragStartXRef.current = e.clientX;
     filmstripStartScrollLeftRef.current = el.scrollLeft;
   }
@@ -76,6 +79,7 @@ export default function Home() {
     if (!isFilmstripDraggingRef.current) return;
 
     isFilmstripDraggingRef.current = false;
+    setIsFilmstripDragging(false);
   }
 
   function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
@@ -92,6 +96,7 @@ export default function Home() {
     mainImageStartYRef.current = e.clientY;
     mainImageSwipeTriggeredRef.current = false;
     setIsSwipingActive(true);
+    setIsMainImageDragging(true);
   }
 
   function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
@@ -124,6 +129,7 @@ export default function Home() {
   function handleMainImagePointerUp() {
     isMainImageSwipingRef.current = false;
     mainImageSwipeTriggeredRef.current = false;
+    setIsMainImageDragging(false);
     
     // Show buttons after 2 seconds
     if (swipeButtonTimeoutRef.current) {
@@ -755,7 +761,7 @@ export default function Home() {
                     <img
                       src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
                       alt={`Photo ${activeIndex + 1}`}
-                      className="main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full"
+                      className={`main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                       onPointerDown={handleMainImagePointerDown}
                       onPointerMove={handleMainImagePointerMove}
                       onPointerUp={handleMainImagePointerUp}
@@ -792,7 +798,7 @@ export default function Home() {
                   onPointerMove={handleFilmstripPointerMove}
                   onPointerUp={handleFilmstripPointerUp}
                   onPointerCancel={handleFilmstripPointerUp}
-                  className="flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0 cursor-grab active:cursor-grabbing touch-pan-x"
+                  className={`flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0 touch-pan-x ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                   style={{ maxHeight: '120px' }}
                 >
                   {imageFiles.map((imageData, idx) => (
@@ -800,14 +806,14 @@ export default function Home() {
                       key={idx}
                       onClick={() => setActiveIndex(idx)}
                       className={`border-2 rounded transition focus:outline-none flex-shrink-0 ${activeIndex === idx ? "border-zinc-300" : "border-transparent"}`}
-                      style={{ padding: 0, background: "none" }}
+                      style={{ padding: 0, background: "none", cursor: "inherit" }}
                       tabIndex={0}
                     >
                       <img
                         src={imageData.thumbnailPath}
                         alt={`Thumbnail ${idx + 1}`}
                         className={`h-20 w-auto rounded ${activeIndex === idx ? "ring-2 ring-zinc-300" : "opacity-70 hover:opacity-100"}`}
-                        style={{ maxWidth: 120 }}
+                        style={{ maxWidth: 120, cursor: "inherit" }}
                       />
                     </button>
                   ))}
