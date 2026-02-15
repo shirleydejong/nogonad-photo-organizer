@@ -33,6 +33,8 @@ body {
 #filmstrip img {
   user-select: none;
   pointer-events: none;
+  max-width: 120px;
+  cursor: inherit;
 }
 
 button {

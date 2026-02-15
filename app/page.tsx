@@ -1,7 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef, type PointerEvent, type WheelEvent } from "react";
+import { useRouter } from "next/navigation";
 import CONFIG from "@/config";
+import {
+  formatAperture,
+  formatExposureTime,
+  formatISO,
+  formatFocalLength,
+  formatCropFactor,
+  formatMegapixels,
+  formatDPI,
+  formatDate,
+  formatFlash,
+  formatWhiteBalance,
+  formatExposure,
+  formatFileSize,
+  formatColor,
+  isHDR,
+} from "@/utils/exif-formatters";
 
 interface ImageData {
   originalFile: File;
@@ -11,17 +28,13 @@ interface ImageData {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
   const [activeIndex, setActiveIndex] = useState<number>(0);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
   const [folderPath, setFolderPath] = useState<string>("");
-  const [inputPath, setInputPath] = useState<string>("");
-  const [pathHistory, setPathHistory] = useState<string[]>([]);
-  const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false);
-  const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExifOpen, setIsExifOpen] = useState<boolean>(false);
   const [exifData, setExifData] = useState<Record<string, any> | null>(null);
   const [exifError, setExifError] = useState<string | null>(null);
@@ -33,7 +46,6 @@ export default function Home() {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [panX, setPanX] = useState<number>(0);
   const [panY, setPanY] = useState<number>(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
@@ -51,6 +63,86 @@ export default function Home() {
 
   const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
+  // Load folder from localStorage on mount
+  useEffect(() => {
+    const activeFolder = localStorage.getItem('activeFolder');
+    if (activeFolder) {
+      loadFolder(activeFolder);
+      
+    } else {
+      router.push('/select-folder');
+    }
+  }, [router]);
+
+  // Load folder and images
+  async function loadFolder(path: string) {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const normalizedPath = path.replace(/\//g, '\\');
+      const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+      setFolderPath(normalizedPath);
+      
+      // Save to localStorage as activeFolder
+      localStorage.setItem('activeFolder', normalizedPath);
+      
+      // Get the folder name from the path
+      const parts = normalizedPath.split('\\');
+      const lastPart = parts[parts.length - 1];
+      setFolderName(lastPart || normalizedPath);
+
+      // Get list of files (thumbnails should already exist)
+      const startResponse = await fetch('/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
+      });
+
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json();
+        throw new Error(errorData.error || 'Could not load images');
+      }
+
+      const startData = await startResponse.json();
+
+      // If no images found
+      if (startData.total === 0) {
+        setError("No images found in this folder");
+        setIsLoading(false);
+        return;
+      }
+
+      const files = startData.files as string[];
+      
+      // Create ImageData objects
+      const imageData: ImageData[] = files.map((fileName) => {
+        const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
+        const encodedPath = encodeURIComponent(fileName);
+        return {
+          originalFile: null as any,
+          fileName: fileName,
+          thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+          originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
+        };
+      });
+
+      setImageFiles(imageData);
+      setIsLoading(false);
+
+    } catch (e: any) {
+      console.error('Error:', e);
+      setError(e.message || "Could not load folder.");
+      setIsLoading(false);
+    }
+  }
+
+  function getThumbnailFilename(filename: string): string {
+    const lastDot = filename.lastIndexOf('.');
+    if (lastDot === -1) return filename + '-thumb';
+    return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
+  }
+
   function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
     const el = e.currentTarget;
     if (el.scrollWidth <= el.clientWidth) return;
@@ -61,7 +153,6 @@ export default function Home() {
     const step = Math.round(window.innerWidth * 0.6);
     const direction = delta > 0 ? 1 : -1;
 
-    //e.preventDefault();
     el.scrollBy({ left: direction * step, behavior: "smooth" });
   }
 
@@ -256,38 +347,21 @@ export default function Home() {
     }
   }, [swipeDirection]);
 
-  // Load path history from localStorage on mount
-  useEffect(() => {
-    const savedPaths = localStorage.getItem('pathHistory');
-    if (savedPaths) {
-      try {
-        const paths = JSON.parse(savedPaths);
-        setPathHistory(paths);
-        // Auto-populate with the most recent path
-        if (paths.length > 0) {
-          setInputPath(paths[0]);
-        }
-      } catch (e) {
-        console.error('Failed to load path history:', e);
-      }
-    }
-  }, []);
-  
+  // Load last active index for this folder from localStorage
   useEffect(() => {
     const lsActiveIndex = localStorage.getItem('activeIndices');
-    if( lsActiveIndex ) {
+    if (lsActiveIndex) {
       try {
         const activeIndices = JSON.parse(lsActiveIndex);
-        if( folderPath in activeIndices ) {
+        if (folderPath in activeIndices) {
           const index = !isNaN(Number(activeIndices[folderPath])) ? Number(activeIndices[folderPath]) : 0;
           setActiveIndex(index);
         }
-        
       } catch (e) {
         console.error('Failed to load last index:', e);
       }
     }
-  }, [folderPath, setActiveIndex]);
+  }, [folderPath]);
 
   // Persist activeIndex per folderPath to localStorage
   useEffect(() => {
@@ -354,11 +428,11 @@ export default function Home() {
         if (!response.ok) {
           const error = await response.json();
           if (!canceled) {
-              setExifError(error?.error || 'No EXIF data found');
+            setExifError(error?.error || 'No EXIF data found');
           }
+          return;
         }
         const data = await response.json();
-        console.log(data)
         
         if (!canceled) {
           setExifData(data?.exifData ?? null);
@@ -380,337 +454,7 @@ export default function Home() {
     };
   }, [activeIndex, imageFiles, folderPath]);
 
-  // Save path to history
-  function savePathToHistory(path: string) {
-    const trimmedPath = path.trim();
-    if (!trimmedPath) return;
 
-    setPathHistory((prev) => {
-      // Remove duplicates and add to front
-      const filtered = prev.filter(p => p !== trimmedPath);
-      const newHistory = [trimmedPath, ...filtered].slice(0, 20); // Keep max 20
-      
-      // Save to localStorage
-      localStorage.setItem('pathHistory', JSON.stringify(newHistory));
-      
-      return newHistory;
-    });
-  }
-
-  // Handle input change with autocomplete
-  function handleInputChange(value: string) {
-    setInputPath(value);
-    
-    if (value.trim()) {
-      const matches = pathHistory.filter(p => 
-        p.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredPaths(matches);
-      setShowAutocomplete(matches.length > 0);
-    } else {
-      setFilteredPaths([]);
-      setShowAutocomplete(false);
-    }
-  }
-
-  // Handle autocomplete selection
-  function selectAutocompletePath(path: string) {
-    setInputPath(path);
-    setShowAutocomplete(false);
-    setFilteredPaths([]);
-  }
-
-  async function handlePickFolder() {
-    setError(null);
-    setShowAutocomplete(false);
-    
-    if (!inputPath.trim()) {
-      setError("Please enter a path");
-      return;
-    }
-
-    setIsProcessing(true);
-    setProgress(0);
-    
-    try {
-      // Valideer Windows pad format
-      const trimmedPath = inputPath.trim();
-      const trimmedThumbPath = `${trimmedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
-      
-      // Check if it's the thumbnails folder
-      if (trimmedPath.toLowerCase().includes(`${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`.toLowerCase())) {
-        setError("You cannot use a thumbnail directory. Choose the main folder with photos.");
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Basic validation: must start with drive letter (C:\\) or UNC path (\\\\)
-      if (!/^[a-zA-Z]:\\|^\\\\/.test(trimmedPath)) {
-        setError("Please enter a valid Windows path (e.g. C:\\Users\\Photos or \\\\server\\share)");
-        setIsProcessing(false);
-        return;
-      }
-
-      // Normalize the path (convert forward slashes to backslashes)
-      const normalizedPath = trimmedPath.replace(/\//g, '\\');
-      const normalizedThumbPath = trimmedThumbPath.replace(/\//g, '\\');
-      setFolderPath(normalizedPath);
-      
-      // Save to history
-      savePathToHistory(normalizedPath);
-
-      // Get the folder name from the path
-      const parts = normalizedPath.split('\\');
-      const lastPart = parts[parts.length - 1];
-      setFolderName(lastPart || normalizedPath);
-
-      // Start thumbnail generation on the server
-      const startResponse = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
-      });
-
-      if (!startResponse.ok) {
-        const errorData = await startResponse.json();
-        throw new Error(errorData.error || 'Could not generate thumbnails');
-      }
-
-      const startData = await startResponse.json();
-
-      // If no images found
-      if (startData.total === 0) {
-        setError("No images found in this folder");
-        setIsProcessing(false);
-        return;
-      }
-
-      const files = startData.files as string[];
-      
-      // Poll for progress
-      const pollInterval = setInterval(async () => {
-        try {
-          const progressResponse = await fetch('/api/image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folderPath: normalizedPath, action: 'progress' }),
-          });
-
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            setProgress(progressData.percentage);
-
-            // If done, stop polling and show images
-            if (progressData.processed >= progressData.total) {
-              clearInterval(pollInterval);
-              
-              // Create ImageData objects
-              
-              const imageData: ImageData[] = files.map((fileName) => {
-                const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
-                const encodedPath = encodeURIComponent(fileName);
-                return {
-                  originalFile: null as any, // Niet nodig voor server-side thumbnails
-                  fileName: fileName,
-                  thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
-                  originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
-                }
-              });
-
-              setImageFiles(imageData);
-              
-              setTimeout(() => {
-                setIsProcessing(false);
-              }, 300);
-            }
-          }
-        } catch (err) {
-          console.error('Progress poll error:', err);
-        }
-      }, 500);
-
-      // Safety timeout after 60 seconds
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (isProcessing) {
-          setError('Timeout while generating thumbnails');
-          setIsProcessing(false);
-        }
-      }, 60000);
-
-    } catch (e: any) {
-      console.error('Error:', e);
-      setError(e.message || "Could not process folder. Check the path and try again.");
-      setIsProcessing(false);
-    }
-  }
-
-  function getThumbnailFilename(filename: string): string {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1) return filename + '-thumb';
-    return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
-  }
-  
-  function baseName(name?: string | null) {
-    if (!name) return null;
-    const i = name.lastIndexOf(".");
-    return i > 0 ? name.slice(0, i) : name;
-  }
-
-  function formatAperture(v?: number | string | null) {
-    if (v == null || v === "") return null;
-    const n = typeof v === "string" ? Number(v) : v;
-    return Number.isFinite(n) ? `ƒ/${n}` : `ƒ/${v}`;
-  }
-
-  function formatExposureTime(v?: number | string | null) {
-    if (v == null || v === "") return null;
-    if (typeof v === "string") {
-      // exiftool may already give "1/50"
-      return v.includes("/") ? `${v} sec` : `${v} sec`;
-    }
-    const t = Number(v);
-    if (!Number.isFinite(t) || t <= 0) return null;
-    if (t >= 1) return `${t.toFixed(1)} sec`;
-    const denom = Math.round(1 / t);
-    return `1/${denom} sec`;
-  }
-
-  function formatISO(v?: number | null) {
-    return v != null ? `ISO ${v}` : null;
-  }
-
-  function formatFocalLength(v?: number | string | null) {
-    if (v == null || v === "") return null;
-    const n = typeof v === "string" ? Number(v) : v;
-    return Number.isFinite(n) ? `${n} mm` : `${v} mm`;
-  }
-
-  function formatCropFactor(exif: any) {
-    const f = exif?.FocalLength;
-    const f35 = exif?.FocalLengthIn35mmFormat;
-    if (!f || !f35) return null;
-    const nF = Number(f);
-    const nF35 = Number(f35);
-    if (!Number.isFinite(nF) || !Number.isFinite(nF35) || nF === 0) return null;
-    const cf = nF35 / nF;
-    return `Crop factor: ${cf.toFixed(1)}x`;
-  }
-
-  function formatMegapixels(w?: number, h?: number) {
-    if (!w || !h) return null;
-    const mp = (w * h) / 1_000_000;
-    return `${mp.toFixed(1)} MP`;
-  }
-
-  function formatDPI(exif: any) {
-    const xr = exif?.XResolution;
-    const yr = exif?.YResolution;
-    const unit = exif?.ResolutionUnit; // 2=inches, 3=cm (exiftool)
-    if (!xr && !yr) return null;
-    const dpiX = xr ? Number(xr) : null;
-    const dpiY = yr ? Number(yr) : null;
-    const label = unit === 3 ? "dpcm" : "dpi";
-    const v = dpiX || dpiY;
-    return v ? `${Math.round(v)} ${label}` : null;
-  }
-
-  function formatDate(exif: any) {
-    const s = exif?.DateTimeOriginal || exif?.CreateDate;
-    if (!s || typeof s !== "string") return null;
-    // EXIF format "YYYY:MM:DD HH:MM:SS"
-    const iso = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3").replace(" ", "T");
-    const offset = exif?.OffsetTimeOriginal || exif?.OffsetTime || "";
-    const d = new Date(iso + (typeof offset === "string" ? offset : ""));
-    if (isNaN(d.getTime())) return s; // fallback
-    const dt = new Intl.DateTimeFormat("nl-NL", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(d);
-    const tz = typeof offset === "string" && offset ? ` ${offset}` : "";
-    return `${dt}${tz}`;
-  }
-
-  function formatFlash(exif: any, asIcon = false) {
-    // exiftool -n returns numeric bitfield for Flash
-    const v = exif?.Flash;
-    const fired =
-      typeof v === "number" ? (v & 0x1) === 1 : String(exif?.Flash)?.toLowerCase().includes("fired");
-    if (asIcon) {
-      return fired ? "flash_on" : "flash_off";
-    }
-    return fired ? "On, Fired" : "Off";
-  }
-
-  function formatWhiteBalance(exif: any) {
-    const wb = exif?.WhiteBalance;
-    if (wb == null) return null;
-    // exiftool often returns "Auto", otherwise numeric
-    if (typeof wb === "string") return wb;
-    const map: Record<number, string> = { 0: "Auto", 1: "Manual" };
-    return map[wb] || String(wb);
-  }
-
-  function formatExposure(exif: any) {
-    const mode = exif?.ExposureMode;
-    const prog = exif?.ExposureProgram;
-    const modeMap: Record<number, string> = { 0: "Auto", 1: "Manual", 2: "Auto Bracket" };
-    const progMap: Record<number, string> = {
-      0: "Undefined",
-      1: "Manual",
-      2: "Normal",
-      3: "Aperture Priority",
-      4: "Shutter Priority",
-      5: "Creative",
-      6: "Action",
-      7: "Portrait",
-      8: "Landscape",
-    };
-    const left = mode != null ? modeMap[mode] ?? String(mode) : null;
-    const right = prog != null ? progMap[prog] ?? String(prog) : null;
-    if (left && right) return `Auto    Program AE`.replace("Auto", left).replace("Program AE", right);
-    return left || right || null;
-  }
-
-  function formatFileSize(exif: any) {
-    const bytes = exif?.FileSize;
-    if (!Number.isFinite(bytes)) return exif?.FileSize || null;
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function formatColor(exif: any) {
-    const profile = exif?.ProfileDescription;
-    const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ColorSpace;
-    let cs = null;
-    if (typeof colorSpace === "string") cs = colorSpace;
-    else if (colorSpace === 1) cs = "sRGB";
-    else if (colorSpace === 65535) cs = "Uncalibrated";
-    const bitsArr = exif?.BitsPerSample;
-    let bits = null;
-    if (Array.isArray(bitsArr) && bitsArr.length) bits = `${bitsArr[0]} bits/channel`;
-    else if (Number.isFinite(bitsArr)) bits = `${bitsArr} bits/channel`;
-    else bits = "";
-    
-    bits = isHDR(exif) ? bits + " - HDR" : bits;
-    
-    return {
-      left: cs || "",
-      right: profile || "",
-      extra: bits,
-    };
-  }
-  
-  function isHDR(exif: any) {
-    return Array.isArray(exif?.DirectoryItemSemantic) && exif?.DirectoryItemSemantic.map((el: string | null | undefined) => el?.toLowerCase()).includes('gainmap') ||
-    (exif?.HDREditMode === 1 || exif?.HDRMaxValue > 0)
-  }
 
   function Icon({ name }: { name: string }) {
     return (
@@ -751,97 +495,32 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <main className="flex-1 flex flex-col items-center justify-center w-full">
-        {isProcessing ? (
-          // Splash screen with progress bar
+        {isLoading ? (
+          // Loading state
           <div className="flex flex-col items-center gap-6 p-8">
-            <div className="text-zinc-200 text-2xl font-semibold">
-              Generating thumbnails...
-            </div>
-            <div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
-              <div
-                className="bg-zinc-400 h-full transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="text-zinc-400 text-sm">
-              {progress}% complete
-            </div>
-            {folderName && (
-              <div className="text-zinc-500 text-sm">
-                Folder: <b>{folderName}</b>
-              </div>
-            )}
+            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="text-zinc-400 text-sm">Loading images...</div>
           </div>
-        ) : imageFiles.length === 0 ? (
-          <div className="flex flex-col items-center gap-6 w-full max-w-2xl px-4">
-            <div className="text-zinc-200 text-2xl font-semibold">Enter a path</div>
-            
-            <div className="relative w-full">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputPath}
-                onChange={(e) => handleInputChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handlePickFolder();
-                  } else if (e.key === 'Escape') {
-                    setShowAutocomplete(false);
-                  }
-                }}
-                onFocus={() => {
-                  if (inputPath.trim() && filteredPaths.length > 0) {
-                    setShowAutocomplete(true);
-                  }
-                }}
-                onBlur={() => {
-                  // Delay to allow click on autocomplete item
-                  setTimeout(() => setShowAutocomplete(false), 200);
-                }}
-                placeholder="E.g: C:\Users\xxx\Pictures or \\server\share\photos"
-                className="w-full px-4 py-3 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded focus:outline-none focus:border-zinc-500 text-sm"
-              />
-              
-              {/* Autocomplete dropdown */}
-              {showAutocomplete && filteredPaths.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg max-h-60 overflow-y-auto z-10">
-                  {filteredPaths.map((path, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectAutocompletePath(path)}
-                      className="w-full px-4 py-2 text-left text-zinc-200 hover:bg-zinc-700 transition text-sm border-b border-zinc-700 last:border-b-0"
-                    >
-                      {path}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
+        ) : error ? (
+          // Error state
+          <div className="flex flex-col items-center gap-6 p-8">
+            <div className="text-red-500 text-lg">{error}</div>
             <button
-              className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
-              onClick={handlePickFolder}
+              className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition flex gap-2 items-center"
+              onClick={() => router.push('/select-folder')}
             >
-              Load photo strip
+              <Icon name="arrow_back" /> Choose another folder
             </button>
-            
-            {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           </div>
-        ) : (
+        ) : imageFiles.length > 0 ? (
           <div className="flex flex-col w-full h-screen">
             <div className="w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <button
-                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition"
-                  onClick={() => {
-                    setImageFiles([]);
-                    setFolderName(null);
-                    setActiveIndex(0);
-                    setExifData(null);
-                    setExifError(null);
-                  }}
+                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
+                  onClick={() => router.push('/select-folder')}
                 >
-                  &larr; Choose another folder
+                   <Icon name="arrow_back" /> Choose another folder
                 </button>
                 {folderName && <span className="text-zinc-500 text-sm truncate max-w-[12rem]">{folderName}</span>}
               </div>
@@ -852,7 +531,7 @@ export default function Home() {
                 >
                   {isExifOpen ? "Close EXIF" : "Show EXIF"}
                 </button>
-                <div className="text-zinc-400 text-sm">{imageFiles.length} images found</div>
+                <div className="text-zinc-400 text-sm">{imageFiles.length} images</div>
               </div>
             </div>
 
@@ -861,51 +540,52 @@ export default function Home() {
                 <div className="flex-1 flex items-center justify-center overflow-hidden">
                   <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
-                        isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center justify-center ${
+                        isSwipingActive ? 'opacity-0' : ''
                       }`}
-                      onClick={() => setActiveIndex((i) => (i > 0 ? i - 1 : i))}
-                      disabled={activeIndex === 0 || zoomLevel > 100}
-                      aria-label="Previous photo"
+                      disabled={activeIndex === 0}
+                      onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
                     >
-                      <Icon name="arrow_back" />
+                      <Icon name="chevron_backward" />
                     </button>
-                    <img
-                      src={(imageFiles[activeIndex]?.originalPath || "").replace('-thumb', '')}
-                      alt={`Photo ${activeIndex + 1}`}
-                      className={`main-image rounded shadow-lg object-contain bg-zinc-900 max-w-full max-h-full ${isMainImageDragging ? 'cursor-grabbing' : zoomLevel > 100 ? 'cursor-grab' : 'cursor-default'}`}
-                      onPointerDown={handleMainImagePointerDown}
-                      onPointerMove={handleMainImagePointerMove}
-                      onPointerUp={handleMainImagePointerUp}
-                      onPointerCancel={handleMainImagePointerUp}
-                      onPointerLeave={handleMainImagePointerUp}
-                      onWheel={handleImageWheel}
-                      onTouchStart={handleImageTouchStart}
-                      onTouchMove={handleImageTouchMove}
-                      onMouseDown={handleImageMouseDown}
-                      onMouseMove={handleImageMouseMove}
-                      style={{
-                        touchAction: zoomLevel > 100 ? "none" : "pan-y",
-                        transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
-                        transformOrigin: "center",
-                        transition: swipeDirection ? "none" : "transform 0.1s ease-out",
-                        animation: swipeDirection === 'left' 
-                          ? 'swipeOutLeft 0.25s ease-out forwards'
-                          : swipeDirection === 'right'
-                          ? 'swipeOutRight 0.25s ease-out forwards'
-                          : undefined,
-                      }}
-                      draggable={false}
-                    />
+                    <div className="flex-1 flex items-center justify-center h-full">
+                      {imageFiles[activeIndex] && (
+                        <img
+                          key={activeIndex}
+                          src={imageFiles[activeIndex].originalPath}
+                          alt={imageFiles[activeIndex].fileName}
+                          className={`main-image max-w-full max-h-full object-contain select-none ${
+                            swipeDirection === 'left'
+                              ? 'animate-[swipeOutLeft_0.2s_ease-out]'
+                              : swipeDirection === 'right'
+                              ? 'animate-[swipeOutRight_0.2s_ease-out]'
+                              : ''
+                          } ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                          style={{
+                            transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
+                            transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
+                          }}
+                          draggable={false}
+                          onPointerDown={handleMainImagePointerDown}
+                          onPointerMove={handleMainImagePointerMove}
+                          onPointerUp={handleMainImagePointerUp}
+                          onPointerCancel={handleMainImagePointerUp}
+                          onWheel={handleImageWheel}
+                          onTouchStart={handleImageTouchStart}
+                          onTouchMove={handleImageTouchMove}
+                          onMouseDown={handleImageMouseDown}
+                          onMouseMove={handleImageMouseMove}
+                        />
+                      )}
+                    </div>
                     <button
-                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center ${
-                        isSwipingActive ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                      className={`px-3 py-2 bg-zinc-500 rounded-full text-xl font-bold disabled:opacity-0 flex-shrink-0 photo-nav-button transition-opacity duration-150 flex h-12 w-12 items-center justify-center ${
+                        isSwipingActive ? 'opacity-0' : ''
                       }`}
-                      onClick={() => setActiveIndex((i) => (i < imageFiles.length - 1 ? i + 1 : i))}
-                      disabled={activeIndex === imageFiles.length - 1 || zoomLevel > 100}
-                      aria-label="Next photo"
+                      disabled={activeIndex === imageFiles.length - 1}
+                      onClick={() => setActiveIndex((i) => Math.min(imageFiles.length - 1, i + 1))}
                     >
-                      <Icon name="arrow_forward" />
+                      <Icon name="chevron_forward" />
                     </button>
                   </div>
                 </div>
@@ -913,27 +593,28 @@ export default function Home() {
                 <div
                   id="filmstrip"
                   ref={filmstripRef}
+                  className={`flex gap-2 px-4 py-4 overflow-x-auto border-t border-zinc-800 flex-shrink-0 ${
+                    isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
                   onWheel={handleFilmstripWheel}
                   onPointerDown={handleFilmstripPointerDown}
                   onPointerMove={handleFilmstripPointerMove}
                   onPointerUp={handleFilmstripPointerUp}
                   onPointerCancel={handleFilmstripPointerUp}
-                  className={`flex gap-2 overflow-x-auto w-full p-2 bg-zinc-900 flex-shrink-0 touch-pan-x ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                  style={{ maxHeight: '120px' }}
                 >
-                  {imageFiles.map((imageData, idx) => (
+                  {imageFiles.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setActiveIndex(idx)}
-                      className={`border-2 rounded transition focus:outline-none flex-shrink-0 ${activeIndex === idx ? "border-zinc-300" : "border-transparent"}`}
-                      style={{ padding: 0, background: "none", cursor: "inherit" }}
-                      tabIndex={0}
+                      className={`flex-shrink-0 rounded overflow-hidden transition ${
+                        idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
+                      }`}
                     >
                       <img
-                        src={imageData.thumbnailPath}
-                        alt={`Thumbnail ${idx + 1}`}
-                        className={`h-20 w-auto rounded ${activeIndex === idx ? "ring-2 ring-zinc-300" : "opacity-70 hover:opacity-100"}`}
-                        style={{ maxWidth: 120, cursor: "inherit" }}
+                        src={img.thumbnailPath}
+                        alt={img.fileName}
+                        className="h-24 w-auto object-cover"
+                        loading="lazy"
                       />
                     </button>
                   ))}
@@ -941,7 +622,7 @@ export default function Home() {
               </div>
 
               {isExifOpen && (
-              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-clip shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
+              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
                     {imageFiles[activeIndex] && (
@@ -1099,7 +780,7 @@ export default function Home() {
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   );

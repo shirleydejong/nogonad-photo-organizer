@@ -34,8 +34,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	try {
 		const { fileName, rating, folderPath } = await request.json();
-		
-		console.log('⭐', { fileName, rating, folderPath });
 
 		if (!fileName || !folderPath) {
 			return NextResponse.json({ error: 'File name and folder path are required' }, { status: 400 });
