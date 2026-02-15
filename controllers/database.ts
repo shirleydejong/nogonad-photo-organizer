@@ -86,36 +86,37 @@ function ensureRatingsTable(dbInfo?: DbInfo) {
 	}
 
 	dbInfo.db.prepare(
-		'CREATE TABLE ratings (id varchar(255) PRIMARY KEY, rating int, createdAt datetime)'
+		'CREATE TABLE ratings (id varchar(255) PRIMARY KEY, rating int, overRuleFileRating boolean,createdAt datetime)'
 	).run();
 	dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS ratings_id_unique ON ratings(id)').run();
 };
 
-export function upsertRating(fileId: string, folderPath: string, rating: number | null) {
+export function upsertRating(fileId: string, folderPath: string, rating: number | null, overRuleFileRating: boolean | null): { id: string; rating: number | null; overRuleFileRating: boolean | null; createdAt: string } {
 	const dbInfo = getDatabase(folderPath);
 	ensureRatingsTable(dbInfo);
 
 	const createdAt = new Date().toISOString();
 	dbInfo.db
 		.prepare(
-			`INSERT INTO ratings (id, rating, createdAt)
-			 VALUES (@id, @rating, @createdAt)
-			 ON CONFLICT(id) DO UPDATE SET rating=excluded.rating, createdAt=excluded.createdAt`
+			`INSERT INTO ratings (id, rating, overRuleFileRating, createdAt)
+			 VALUES (@id, @rating, @overRuleFileRating, @createdAt)
+			 ON CONFLICT(id) DO UPDATE SET rating=excluded.rating, overRuleFileRating=excluded.overRuleFileRating, createdAt=excluded.createdAt`
 		)
 		.run({
 			id: fileId,
 			rating,
+			overRuleFileRating: overRuleFileRating !== null ? (overRuleFileRating ? 1 : 0) : null,
 			createdAt,
 		});
 
-	return { id: fileId, rating, createdAt };
+	return { id: fileId, rating, overRuleFileRating, createdAt };
 };
 
-export function getAllRatings(folderPath: string): Array<{ id: string; rating: number | null; createdAt: string }> {
+export function getAllRatings(folderPath: string): Array<{ id: string; rating: number | null; overRuleFileRating: boolean | null; createdAt: string }> {
 	const dbInfo = getDatabase(folderPath);
 	ensureRatingsTable(dbInfo);
 
-	const rows = dbInfo.db.prepare('SELECT id, rating, createdAt FROM ratings').all();
-	return rows as Array<{ id: string; rating: number | null; createdAt: string }>;
+	const rows = dbInfo.db.prepare('SELECT id, rating, overRuleFileRating, createdAt FROM ratings').all();
+	return rows as Array<{ id: string; rating: number | null; overRuleFileRating: boolean | null; createdAt: string }>;
 };
 

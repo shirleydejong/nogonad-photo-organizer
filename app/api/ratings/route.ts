@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
 	try {
-		const { fileName, rating, folderPath } = await request.json();
+		const { fileName, rating, folderPath, overRuleFileRating } = await request.json();
 
 		if (!fileName || !folderPath) {
 			return NextResponse.json({ error: 'File name and folder path are required' }, { status: 400 });
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 				{ status: 400 }
 			);
 		}
-		const result = upsertRating(fileId, folderPath, isNullRating ? null : rating);
+		const result = upsertRating(fileId, folderPath, isNullRating ? null : rating, overRuleFileRating ?? false);
 
 		return NextResponse.json({ success: true, ...result });
 		

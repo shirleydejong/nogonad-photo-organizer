@@ -46,6 +46,10 @@ export default function Home() {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [panX, setPanX] = useState<number>(0);
   const [panY, setPanY] = useState<number>(0);
+  const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
+  const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
+  const [ratingConflictData, setRatingConflictData] = useState<{fileName: string, exifRating: number, dbRating: number | null} | null>(null);
+  const [hoveredButton, setHoveredButton] = useState<'exif' | 'db' | 'ignore' | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
@@ -128,6 +132,25 @@ export default function Home() {
       });
 
       setImageFiles(imageData);
+      
+      // Fetch ratings for this folder
+      try {
+        const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
+        
+        if (ratingsResponse.ok) {
+          const ratingsData = await ratingsResponse.json();
+          if (ratingsData.success && ratingsData.ratings) {
+            const ratingsMap = new Map<string, any | null>();
+            for (const rating of ratingsData.ratings) {
+              ratingsMap.set(rating.id, rating);
+            }
+            setRatings(ratingsMap);
+          }
+        }
+      } catch (ratingErr) {
+        console.error('Failed to fetch ratings:', ratingErr);
+      }
+      
       setIsLoading(false);
 
     } catch (e: any) {
@@ -141,6 +164,39 @@ export default function Home() {
     const lastDot = filename.lastIndexOf('.');
     if (lastDot === -1) return filename + '-thumb';
     return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
+  }
+
+  function getFileId(filename: string): string {
+    const lastDot = filename.lastIndexOf('.');
+    if (lastDot === -1) return filename;
+    return filename.substring(0, lastDot);
+  }
+
+  async function updateRatingInDatabase(fileName: string, rating: number | null, overRuleFileRating = false) {
+    try {
+      
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName,
+          rating,
+          folderPath,
+          overRuleFileRating,
+        }),
+      });
+
+      if (response.ok) {
+        const fileId = getFileId(fileName);
+        setRatings(prev => {
+          const newMap = new Map(prev);
+          newMap.set(fileId, { id: fileName, rating, overRuleFileRating });
+          return newMap;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update rating:', err);
+    }
   }
 
   function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
@@ -435,7 +491,35 @@ export default function Home() {
         const data = await response.json();
         
         if (!canceled) {
-          setExifData(data?.exifData ?? null);
+          const exifData = data?.exifData ?? null;
+          setExifData(exifData);
+          
+          // Compare EXIF rating with database rating
+          if (exifData) {
+            const exifRating = exifData?.Rating;
+            const fileId = getFileId(currentImage.fileName);
+            const dbRating = ratings.get(fileId) ?? null;
+            
+            console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);  
+            
+            // Only process if EXIF has a valid rating (1-5)
+            if (exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
+              // EXIF has rating, database doesn't → add to database
+              if (dbRating?.rating === null || dbRating?.rating === undefined) {
+                await updateRatingInDatabase(currentImage.fileName, exifRating);
+              }
+              // EXIF rating differs from database → show modal
+              else if (exifRating !== dbRating?.rating && !dbRating?.overRuleFileRating) {
+                setRatingConflictData({
+                  fileName: currentImage.fileName,
+                  exifRating,
+                  dbRating: dbRating?.rating,
+                });
+                setIsRatingConflictModalOpen(true);
+              }
+              // Else: ratings match, do nothing
+            }
+          }
         }
       } catch (err) {
         if (!canceled) {
@@ -452,7 +536,7 @@ export default function Home() {
     return () => {
       canceled = true;
     };
-  }, [activeIndex, imageFiles, folderPath]);
+  }, [activeIndex, imageFiles, folderPath, ratings]);
 
 
 
@@ -560,7 +644,6 @@ export default function Home() {
                   </button>
                   
                   <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
-                    
                     <div className="flex-1 flex items-center justify-center h-full">
                       {imageFiles[activeIndex] && (
                         <img
@@ -591,7 +674,6 @@ export default function Home() {
                         />
                       )}
                     </div>
-                    
                   </div>
                 </div>
 
@@ -607,22 +689,26 @@ export default function Home() {
                   onPointerUp={handleFilmstripPointerUp}
                   onPointerCancel={handleFilmstripPointerUp}
                 >
-                  {imageFiles.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveIndex(idx)}
-                      className={`flex-shrink-0 rounded overflow-hidden transition ${
-                        idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
-                      } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                    >
-                      <img
-                        src={img.thumbnailPath}
-                        alt={img.fileName}
-                        className="h-24 w-auto object-cover"
-                        loading="lazy"
-                      />
-                    </button>
-                  ))}
+                  {imageFiles.map((img, idx) => {
+                    const fileId = getFileId(img.fileName);
+                    const isRated = ratings.has(fileId) && ratings.get(fileId) !== null;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveIndex(idx)}
+                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${
+                          idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
+                        } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
+                      >
+                        <img
+                          src={img.thumbnailPath}
+                          alt={img.fileName}
+                          className="h-24 w-auto object-cover filmstrip-miniature"
+                          loading="lazy"
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -787,6 +873,86 @@ export default function Home() {
           </div>
         ) : null}
       </main>
+
+      {/* Rating Conflict Modal */}
+      {isRatingConflictModalOpen && ratingConflictData && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-8/12 w-full p-6 border border-zinc-700">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                <Icon name="warning" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-zinc-100 font-semibold text-lg mb-1">Rating conflict</h3>
+                <p className="text-zinc-400 text-sm">
+                  The rating in the EXIF data (image) doesn't match the rating in the database.
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-zinc-800/50 rounded p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">File:</span>
+                <span className="text-zinc-100 font-mono text-xs">{ratingConflictData.fileName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">EXIF rating (file):</span>
+                <span className="text-zinc-100 font-semibold">{ratingConflictData.exifRating} ⭐</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Database rating:</span>
+                <span className="text-zinc-100 font-semibold">{ratingConflictData.dbRating} ⭐</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <button
+                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
+                  onMouseEnter={() => setHoveredButton('exif')}
+                  onMouseLeave={() => setHoveredButton(null)}
+                  onClick={async () => {
+                    await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);
+                    setIsRatingConflictModalOpen(false);
+                    setRatingConflictData(null);
+                  }}
+                >
+                  Copy EXIF rating to database ({ratingConflictData.exifRating} ⭐)
+                </button>
+                <button
+                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
+                  onMouseEnter={() => setHoveredButton('db')}
+                  onMouseLeave={() => setHoveredButton(null)}
+                  onClick={async () => {
+                    await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.dbRating, true);
+                    setIsRatingConflictModalOpen(false);
+                    setRatingConflictData(null);
+                  }}
+                >
+                  Use database rating ({ratingConflictData.dbRating} ⭐)
+                </button>
+                </div>
+                <button
+                  className="w-full px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded font-medium transition"
+                  onMouseEnter={() => setHoveredButton('ignore')}
+                  onMouseLeave={() => setHoveredButton(null)}
+                  onClick={() => {
+                    setIsRatingConflictModalOpen(false);
+                    setRatingConflictData(null);
+                  }}
+                >
+                  Ignore
+                </button>
+            </div>
+            <p className="text-zinc-400 text-sm pt-4 h-12">
+              {hoveredButton === 'exif' && 'The rating in the database will be overwritten with the EXIF rating from the image file.'}
+              {hoveredButton === 'db' && 'The database rating will be retained and marked as authoritative. Future changes in the image EXIF data will be ignored.'}
+              {hoveredButton === 'ignore' && 'Close this window without making any changes. The notification will appear again on the next visit.'}
+              {!hoveredButton && ''}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,12 @@
   }
 }
 
+.noto-color-emoji-regular {
+  font-family: "Noto Color Emoji", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -90,5 +96,22 @@ button {
   .photo-nav-button:hover {
     background: rgb(0 0 0 / 70%);
     border-color: rgb(255 255 255 / 50%);
+  }
+
+  .rated::before {
+    content: "★";
+    pointer-events: none;
+    font-size: 1.5rem;
+    position: absolute;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    justify-content: end;
+    align-items: flex-end;
+    line-height: 1;
+    padding: 0.2rem;
+    color: white;
+    text-shadow: 0 0 2px rgb(0 0 0 / 0.6);
+    opacity: 0.5;
   }
 }
