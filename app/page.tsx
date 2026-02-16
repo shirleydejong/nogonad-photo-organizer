@@ -51,6 +51,9 @@ export default function Home() {
   const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null } | null>(null);
   const [hoveredButton, setHoveredButton] = useState<'exif' | 'db' | 'ignore' | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
+  const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
+  const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
@@ -67,6 +70,42 @@ export default function Home() {
   const pinchFactor = 1.5;
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Calculate filtered images based on current filter settings
+  const filteredImageFiles = imageFiles.filter((img) => {
+    const fileId = getFileId(img.fileName);
+    const rating = ratings.get(fileId)?.rating ?? null;
+
+    // If no filter is active (all ratings selected and unrated shown), show all
+    if (filterSelectedRatings.size === 5 && filterShowUnrated) {
+      return true;
+    }
+
+    // If image is unrated
+    if (rating === null || rating === undefined) {
+      return filterShowUnrated;
+    }
+
+    // If image has a rating, check if it's in the selected ratings
+    return filterSelectedRatings.has(rating);
+  });
+
+  // Adjust activeIndex if current image is filtered out
+  useEffect(() => {
+    if (imageFiles.length === 0 || filteredImageFiles.length === 0) {
+      setActiveIndex(0);
+      return;
+    }
+    
+    const currentImage = imageFiles[activeIndex];
+    if (currentImage && !filteredImageFiles.includes(currentImage)) {
+      // Current image is filtered out, find first filtered image
+      const firstFilteredIndex = imageFiles.findIndex(img => 
+        filteredImageFiles.includes(img)
+      );
+      setActiveIndex(firstFilteredIndex >= 0 ? firstFilteredIndex : 0);
+    }
+  }, [filteredImageFiles.length, imageFiles.length]);
 
   useEffect(() => {
     function onFullscreenChange() {
@@ -512,15 +551,29 @@ export default function Home() {
         return;
       }
 
-      if (imageFiles.length === 0 || zoomLevel > 100) return;
+      if (filteredImageFiles.length === 0 || zoomLevel > 100) return;
 
       switch (e.key) {
-        case "ArrowLeft":
-          setActiveIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        case "ArrowLeft": {
+          const currentIdx = filteredImageFiles.findIndex(
+            img => img.fileName === imageFiles[activeIndex]?.fileName
+          );
+          if (currentIdx > 0) {
+            const prevImg = filteredImageFiles[currentIdx - 1];
+            setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
+          }
           break;
-        case "ArrowRight":
-          setActiveIndex((prev) => (prev < imageFiles.length - 1 ? prev + 1 : prev));
+        }
+        case "ArrowRight": {
+          const currentIdx = filteredImageFiles.findIndex(
+            img => img.fileName === imageFiles[activeIndex]?.fileName
+          );
+          if (currentIdx < filteredImageFiles.length - 1) {
+            const nextImg = filteredImageFiles[currentIdx + 1];
+            setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+          }
           break;
+        }
         case "0":
           handleRatingClick(null);
           break;
@@ -547,7 +600,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [imageFiles.length, zoomLevel, handleRatingClick]);
+  }, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex]);
 
   // Reset zoom and pan when changing photos
   useEffect(() => {
@@ -711,6 +764,11 @@ export default function Home() {
                 </button>
                 {folderName && <span className="text-zinc-500 text-sm truncate max-w-[12rem]">{folderName}</span>}
               </div>
+              <div className="flex items-center justify-center flex-1">
+                {imageFiles[activeIndex] && (
+                  <span className="text-zinc-300 text-m font-bold truncate max-w-[20rem]">{imageFiles[activeIndex].fileName}</span>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <button
                   className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
@@ -720,12 +778,19 @@ export default function Home() {
                   <Icon name="open_in_new" />
                 </button>
                 <button
+                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
+                  onClick={() => setIsFilterModalOpen(true)}
+                  title="Filter images by rating"
+                >
+                  <Icon name="filter_list" />
+                </button>
+                <button
                   className={`px-4 py-2 rounded text-sm font-medium transition flex gap-2 items-center ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
                   onClick={() => setIsExifOpen((open) => !open)}
                 >
                   <Icon name="info" />
                 </button>
-                <div className="text-zinc-400 text-sm">{imageFiles.length} images</div>
+                <div className="text-zinc-400 text-sm">{filteredImageFiles.length}/{imageFiles.length} images</div>
               </div>
             </div>
 
@@ -734,19 +799,33 @@ export default function Home() {
                 <div className="main-image-container-wrapper flex-1 flex items-center justify-center overflow-hidden relative">
 
                   <button
-                    className={`photo-nav-button left-4 ${isSwipingActive ? 'opacity-0' : ''
-                      }`}
-                    disabled={activeIndex === 0}
-                    onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                    className={`photo-nav-button left-4 ${isSwipingActive ? 'opacity-0' : ''}`}
+                    disabled={filteredImageFiles.length === 0}
+                    onClick={() => {
+                      const currentIdx = filteredImageFiles.findIndex(
+                        img => img.fileName === imageFiles[activeIndex]?.fileName
+                      );
+                      if (currentIdx > 0) {
+                        const prevImg = filteredImageFiles[currentIdx - 1];
+                        setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
+                      }
+                    }}
                   >
                     <Icon name="chevron_backward" />
                   </button>
 
                   <button
-                    className={`photo-nav-button right-4 ${isSwipingActive ? 'opacity-0' : ''
-                      }`}
-                    disabled={activeIndex === imageFiles.length - 1}
-                    onClick={() => setActiveIndex((i) => Math.min(imageFiles.length - 1, i + 1))}
+                    className={`photo-nav-button right-4 ${isSwipingActive ? 'opacity-0' : ''}`}
+                    disabled={filteredImageFiles.length === 0}
+                    onClick={() => {
+                      const currentIdx = filteredImageFiles.findIndex(
+                        img => img.fileName === imageFiles[activeIndex]?.fileName
+                      );
+                      if (currentIdx < filteredImageFiles.length - 1) {
+                        const nextImg = filteredImageFiles[currentIdx + 1];
+                        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+                      }
+                    }}
                   >
                     <Icon name="chevron_forward" />
                   </button>
@@ -862,16 +941,16 @@ export default function Home() {
                   onPointerUp={handleFilmstripPointerUp}
                   onPointerCancel={handleFilmstripPointerUp}
                 >
-                  {imageFiles.map((img, idx) => {
+                  {filteredImageFiles.map((img) => {
                     const fileId = getFileId(img.fileName);
                     const ratingEntry = ratings.get(fileId);
                     const isRated = ratingEntry && ratingEntry.rating != null && ratingEntry.rating >= 1;
+                    const imgIdx = imageFiles.findIndex(item => item.fileName === img.fileName);
                     return (
                       <button
-                        key={idx}
-                        onClick={() => setActiveIndex(idx)}
-                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
-                          } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
+                        key={imgIdx}
+                        onClick={() => setActiveIndex(imgIdx)}
+                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${imgIdx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'} ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
                       >
                         <img
                           src={img.thumbnailPath}
@@ -1126,6 +1205,97 @@ export default function Home() {
               {hoveredButton === 'ignore' && 'Close this window without making any changes. The notification will appear again on the next visit.'}
               {!hoveredButton && ''}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Modal */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[600px] w-full p-8 border border-zinc-700">
+            <div className="flex items-start gap-4 mb-8">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Icon name="filter_list" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-zinc-100 font-semibold text-xl mb-2">Filter images</h3>
+                <p className="text-zinc-400 text-sm">Click ratings to filter. Hold Shift to select multiple.</p>
+              </div>
+            </div>
+
+            <div className="space-y-8 mb-8">
+              {/* Star ratings */}
+              <div>
+                <div className="text-zinc-300 text-sm font-medium mb-4">Star ratings</div>
+                <div className="flex gap-4 flex-wrap">
+                  {[1, 2, 3, 4, 5].map((rating) => {
+                    const emoji = rating === 1 ? '🗑️' : rating === 2 ? '😐' : rating === 3 ? '🤔' : rating === 4 ? '😀' : '🤩';
+                    const isSelected = filterSelectedRatings.has(rating);
+                    return (
+                      <button
+                        key={rating}
+                        onClick={(e) => {
+                          const newSet = new Set(filterSelectedRatings);
+                          if (e.shiftKey) {
+                            // Shift+click: toggle this rating
+                            if (isSelected) {
+                              newSet.delete(rating);
+                            } else {
+                              newSet.add(rating);
+                            }
+                          } else {
+                            // Normal click: select only this rating
+                            newSet.clear();
+                            newSet.add(rating);
+                          }
+                          setFilterSelectedRatings(newSet);
+                        }}
+                        className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl transition font-medium cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        }`}
+                        title={`${rating} star${rating === 1 ? '' : 's'}. Shift+click to select multiple.`}
+                      >
+                        <span className="text-4xl mb-1">{emoji}</span>
+                        <span className="text-xs">{rating} ⭐</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Unrated images */}
+              <div>
+                <label className="flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 p-4 rounded-lg transition w-fit">
+                  <input
+                    type="checkbox"
+                    checked={filterShowUnrated}
+                    onChange={(e) => setFilterShowUnrated(e.target.checked)}
+                    className="w-5 h-5 rounded cursor-pointer"
+                  />
+                  <span className="text-zinc-100 font-medium">Show unrated images</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-lg font-medium transition"
+                onClick={() => {
+                  setFilterShowUnrated(true);
+                  setFilterSelectedRatings(new Set([1, 2, 3, 4, 5]));
+                }}
+              >
+                Clear filters
+              </button>
+              <button
+                className="flex-1 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-lg font-medium transition"
+                onClick={() => setIsFilterModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
