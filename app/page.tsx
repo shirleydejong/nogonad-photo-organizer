@@ -83,8 +83,8 @@ export default function Home() {
       return true;
     }
 
-    // If image is unrated
-    if (rating === null || rating === undefined) {
+    // If image is unrated (null, undefined, 0, or less than 1)
+    if (rating === null || rating === undefined || rating < 1) {
       return filterShowUnrated;
     }
 
@@ -185,6 +185,17 @@ export default function Home() {
 
       setImageFiles(imageData);
 
+      // Load batch EXIF data from localStorage and merge with database ratings
+      let batchExifData: any[] = [];
+      try {
+        const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
+        if (storedExifData) {
+          batchExifData = JSON.parse(storedExifData);
+        }
+      } catch (exifErr) {
+        console.error('Failed to load batch EXIF data:', exifErr);
+      }
+
       // Fetch ratings for this folder
       try {
         const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
@@ -196,6 +207,24 @@ export default function Home() {
             for (const rating of ratingsData.ratings) {
               ratingsMap.set(rating.id, rating);
             }
+
+            // Merge EXIF ratings with database ratings
+            // EXIF ratings are used to pre-populate if there's no database rating
+            for (const exifFile of batchExifData) {
+              if (exifFile.FileName && exifFile.Rating != null) {
+                const fileId = getFileId(exifFile.FileName);
+                // Only pre-populate from EXIF if there's no database rating yet
+                if (!ratingsMap.has(fileId)) {
+                  ratingsMap.set(fileId, {
+                    id: fileId,
+                    rating: exifFile.Rating,
+                    overRuleFileRating: false,
+                    fromExif: true, // Mark as coming from EXIF for UI distinction
+                  });
+                }
+              }
+            }
+
             setRatings(ratingsMap);
           }
         }
@@ -283,6 +312,8 @@ export default function Home() {
 
     const exifRating = exifData?.Rating;
     const hasExifRating = exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5;
+    const fileId = getFileId(currentImage.fileName);
+    const currentDbRating = ratings.get(fileId)?.rating ?? null;
 
     // If no EXIF rating: save to database
     if (!hasExifRating) {
@@ -290,20 +321,23 @@ export default function Home() {
       return;
     }
 
-    // If EXIF rating equals clicked rating: save to database
-    if (exifRating === rating) {
-      updateRatingInDatabase(currentImage.fileName, rating);
+    // Conflict exists only if file has EXIF rating AND database rating differs
+    const hasConflict = currentDbRating !== null && exifRating !== currentDbRating;
+
+    if (hasConflict) {
+      // Show conflict modal if there's a mismatch between file and database
+      setRatingConflictData({
+        fileName: currentImage.fileName,
+        exifRating,
+        dbRating: currentDbRating,
+      });
+      setIsRatingConflictModalOpen(true);
       return;
     }
 
-    // If EXIF rating differs: show conflict modal
-    setRatingConflictData({
-      fileName: currentImage.fileName,
-      exifRating,
-      dbRating: rating,
-    });
-    setIsRatingConflictModalOpen(true);
-  }, [imageFiles, activeIndex, exifData, updateRatingInDatabase]);
+    // No conflict: save to database
+    updateRatingInDatabase(currentImage.fileName, rating);
+  }, [imageFiles, activeIndex, exifData, ratings, updateRatingInDatabase]);
 
   function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
     const el = e.currentTarget;
@@ -361,7 +395,7 @@ export default function Home() {
   }
 
   function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
-    if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || imageFiles.length === 0) return;
+    if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || filteredImageFiles.length === 0) return;
 
     // Don't trigger navigation swipe when zoomed in
     if (zoomLevel > 100) return;
@@ -372,17 +406,23 @@ export default function Home() {
     if (Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) return;
     if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
 
+    const currentIdx = filteredImageFiles.findIndex(
+      img => img.fileName === imageFiles[activeIndex]?.fileName
+    );
+
     if (deltaX < 0) {
       // Swipe left = next image, image goes left
-      if (activeIndex < imageFiles.length - 1) {
+      if (currentIdx < filteredImageFiles.length - 1) {
+        const nextImg = filteredImageFiles[currentIdx + 1];
         setSwipeDirection('left');
-        setActiveIndex((i) => i + 1);
+        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
       }
     } else {
       // Swipe right = previous image, image goes right
-      if (activeIndex > 0) {
+      if (currentIdx > 0) {
+        const prevImg = filteredImageFiles[currentIdx - 1];
         setSwipeDirection('right');
-        setActiveIndex((i) => i - 1);
+        setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
       }
     }
 

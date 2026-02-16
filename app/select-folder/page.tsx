@@ -156,10 +156,30 @@ export default function SelectFolder() {
             const progressData = await progressResponse.json();
             setProgress(progressData.percentage);
 
-            // If done, stop polling and navigate to viewer
+            // If done, stop polling and fetch batch EXIF data
             if (progressData.processed >= progressData.total) {
               clearInterval(pollInterval);
               
+              try {
+                // Fetch batch EXIF data for all files in the folder
+                const exifResponse = await fetch('/api/exif', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ folderPath: normalizedPath, action: 'batch' }),
+                });
+
+                if (exifResponse.ok) {
+                  const exifData = await exifResponse.json();
+                  if (exifData.success && exifData.exifData) {
+                    // Store batch EXIF data in localStorage
+                    localStorage.setItem(`batchExifData_${normalizedPath}`, JSON.stringify(exifData.exifData));
+                  }
+                }
+              } catch (exifErr) {
+                console.error('Failed to fetch batch EXIF data:', exifErr);
+                // Continue anyway, EXIF data is optional
+              }
+
               setTimeout(() => {
                 // Save to localStorage as activeFolder
                 localStorage.setItem('activeFolder', normalizedPath);
