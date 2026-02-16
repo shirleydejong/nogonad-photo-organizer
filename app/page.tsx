@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/icon";
+import { Header } from "@/components/header";
 import CONFIG from "@/config";
 import {
   formatAperture,
@@ -17,7 +19,6 @@ import {
   formatExposure,
   formatFileSize,
   formatColor,
-  isHDR,
 } from "@/utils/exif-formatters";
 
 interface ImageData {
@@ -696,13 +697,7 @@ export default function Home() {
 
 
 
-  function Icon({ name }: { name: string }) {
-    return (
-      <span className="material-symbols-rounded text-zinc-300 text-2xl" style={{ fontSize: '24px' }}>
-        {name}
-      </span>
-    );
-  }
+
 
   function ExifItem({
     icon,
@@ -754,45 +749,33 @@ export default function Home() {
           </div>
         ) : imageFiles.length > 0 ? (
           <div className="flex flex-col w-full h-screen">
-            <div id="top-toolbar" className={`w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0 ${isFullscreen ? 'hidden' : ''}`}>
-              <div className="flex items-center gap-3">
-                <button
-                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
-                  onClick={() => router.push('/select-folder')}
-                >
-                  <Icon name="arrow_back" /> Choose another folder
-                </button>
-                {folderName && <span className="text-zinc-500 text-sm truncate max-w-[12rem]">{folderName}</span>}
-              </div>
-              <div className="flex items-center justify-center flex-1">
-                {imageFiles[activeIndex] && (
-                  <span className="text-zinc-300 text-m font-bold truncate max-w-[20rem]">{imageFiles[activeIndex].fileName}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
-                  onClick={handleOpenWith}
-                  title="Open with default application"
-                >
-                  <Icon name="open_in_new" />
-                </button>
-                <button
-                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
-                  onClick={() => setIsFilterModalOpen(true)}
-                  title="Filter images by rating"
-                >
-                  <Icon name="filter_list" />
-                </button>
-                <button
-                  className={`px-4 py-2 rounded text-sm font-medium transition flex gap-2 items-center ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
-                  onClick={() => setIsExifOpen((open) => !open)}
-                >
-                  <Icon name="info" />
-                </button>
-                <div className="text-zinc-400 text-sm">{filteredImageFiles.length}/{imageFiles.length} images</div>
-              </div>
-            </div>
+            <Header 
+              folderName={folderName}
+              title={imageFiles[activeIndex]?.fileName}
+              isFullscreen={isFullscreen}
+            >
+              <button
+                className="header-button"
+                onClick={handleOpenWith}
+                title="Open with default application"
+              >
+                <Icon name="open_in_new" />
+              </button>
+              <button
+                className="header-button"
+                onClick={() => setIsFilterModalOpen(true)}
+                title="Filter images by rating"
+              >
+                <Icon name="filter_list" />
+              </button>
+              <button
+                className={`header-button ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
+                onClick={() => setIsExifOpen((open) => !open)}
+              >
+                <Icon name="info" />
+              </button>
+              <div className="text-zinc-400 text-sm">{filteredImageFiles.length}/{imageFiles.length} images</div>
+            </Header>
 
             <div className="flex flex-1 w-full overflow-hidden">
               <div className="flex-1 flex flex-col min-w-0">
@@ -1119,9 +1102,6 @@ export default function Home() {
                   ) : (
                     <div className="text-zinc-500 text-sm">No EXIF information available.</div>
                   )}
-                  <a href="photoshop://D:/Users/Shirley/Desktop/1x/Asset 2.png" >
-        Open afbeelding.jpg in Bridge
-    </a>
                 </aside>
               )}
             </div>

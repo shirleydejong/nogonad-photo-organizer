@@ -16,6 +16,8 @@ export default function SelectFolder() {
   const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [hasActiveFolder, setHasActiveFolder] = useState<boolean>(false);
+
   // Load path history from localStorage on mount
   useEffect(() => {
     const savedPaths = localStorage.getItem('pathHistory');
@@ -30,6 +32,12 @@ export default function SelectFolder() {
       } catch (e) {
         console.error('Failed to load path history:', e);
       }
+    }
+
+    // Check if there's an active folder
+    const activeFolder = localStorage.getItem('activeFolder');
+    if (activeFolder) {
+      setHasActiveFolder(true);
     }
   }, []);
 
@@ -73,7 +81,7 @@ export default function SelectFolder() {
     setFilteredPaths([]);
   }
 
-  async function handlePickFolder() {
+  async function handlePickFolder(targetRoute: '/' | '/list') {
     setError(null);
     setShowAutocomplete(false);
     
@@ -153,11 +161,10 @@ export default function SelectFolder() {
               clearInterval(pollInterval);
               
               setTimeout(() => {
-                setIsProcessing(false);
                 // Save to localStorage as activeFolder
                 localStorage.setItem('activeFolder', normalizedPath);
-                // Navigate to main viewer with folder path
-                router.push(`/`);
+                // Navigate to the selected view
+                router.push(targetRoute);
               }, 300);
             }
           }
@@ -252,12 +259,20 @@ export default function SelectFolder() {
               )}
             </div>
             
-            <button
-              className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
-              onClick={handlePickFolder}
-            >
-              Load photo strip
-            </button>
+            <div className="flex gap-4">
+              <button
+                className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
+                onClick={() => handlePickFolder('/')}
+              >
+                View as Strip
+              </button>
+              <button
+                className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
+                onClick={() => handlePickFolder('/list')}
+              >
+                View as List
+              </button>
+            </div>
             
             {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           </div>
