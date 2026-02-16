@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type PointerEvent, type WheelEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
 import CONFIG from "@/config";
 import {
@@ -48,8 +48,9 @@ export default function Home() {
   const [panY, setPanY] = useState<number>(0);
   const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
   const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
-  const [ratingConflictData, setRatingConflictData] = useState<{fileName: string, exifRating: number, dbRating: number | null} | null>(null);
+  const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null } | null>(null);
   const [hoveredButton, setHoveredButton] = useState<'exif' | 'db' | 'ignore' | null>(null);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
@@ -65,6 +66,16 @@ export default function Home() {
   const maxZoom = 400;
   const pinchFactor = 1.5;
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
   // Load folder from localStorage on mount
@@ -72,7 +83,7 @@ export default function Home() {
     const activeFolder = localStorage.getItem('activeFolder');
     if (activeFolder) {
       loadFolder(activeFolder);
-      
+
     } else {
       router.push('/select-folder');
     }
@@ -82,15 +93,15 @@ export default function Home() {
   async function loadFolder(path: string) {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const normalizedPath = path.replace(/\//g, '\\');
       const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
       setFolderPath(normalizedPath);
-      
+
       // Save to localStorage as activeFolder
       localStorage.setItem('activeFolder', normalizedPath);
-      
+
       // Get the folder name from the path
       const parts = normalizedPath.split('\\');
       const lastPart = parts[parts.length - 1];
@@ -118,7 +129,7 @@ export default function Home() {
       }
 
       const files = startData.files as string[];
-      
+
       // Create ImageData objects
       const imageData: ImageData[] = files.map((fileName) => {
         const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
@@ -132,11 +143,11 @@ export default function Home() {
       });
 
       setImageFiles(imageData);
-      
+
       // Fetch ratings for this folder
       try {
         const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
-        
+
         if (ratingsResponse.ok) {
           const ratingsData = await ratingsResponse.json();
           if (ratingsData.success && ratingsData.ratings) {
@@ -150,7 +161,7 @@ export default function Home() {
       } catch (ratingErr) {
         console.error('Failed to fetch ratings:', ratingErr);
       }
-      
+
       setIsLoading(false);
 
     } catch (e: any) {
@@ -172,9 +183,9 @@ export default function Home() {
     return filename.substring(0, lastDot);
   }
 
-  async function updateRatingInDatabase(fileName: string, rating: number | null, overRuleFileRating = false) {
+  const updateRatingInDatabase = useCallback(async (fileName: string, rating: number | null, overRuleFileRating = false) => {
     try {
-      
+
       const response = await fetch('/api/ratings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +208,61 @@ export default function Home() {
     } catch (err) {
       console.error('Failed to update rating:', err);
     }
-  }
+  }, [folderPath]);
+
+  const handleOpenWith = useCallback(async () => {
+    if (imageFiles.length === 0 || !folderPath) return;
+
+    const currentImage = imageFiles[activeIndex];
+    if (!currentImage) return;
+
+    const fullPath = `${folderPath}\\${currentImage.fileName}`;
+
+    try {
+      const response = await fetch('/api/open-with', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: fullPath }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Failed to open with dialog:', error);
+      }
+    } catch (err) {
+      console.error('Failed to open with dialog:', err);
+    }
+  }, [imageFiles, activeIndex, folderPath]);
+
+  const handleRatingClick = useCallback((rating: number | null) => {
+    if (imageFiles.length === 0) return;
+
+    const currentImage = imageFiles[activeIndex];
+    if (!currentImage) return;
+
+    const exifRating = exifData?.Rating;
+    const hasExifRating = exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5;
+
+    // If no EXIF rating: save to database
+    if (!hasExifRating) {
+      updateRatingInDatabase(currentImage.fileName, rating);
+      return;
+    }
+
+    // If EXIF rating equals clicked rating: save to database
+    if (exifRating === rating) {
+      updateRatingInDatabase(currentImage.fileName, rating);
+      return;
+    }
+
+    // If EXIF rating differs: show conflict modal
+    setRatingConflictData({
+      fileName: currentImage.fileName,
+      exifRating,
+      dbRating: rating,
+    });
+    setIsRatingConflictModalOpen(true);
+  }, [imageFiles, activeIndex, exifData, updateRatingInDatabase]);
 
   function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
     const el = e.currentTarget;
@@ -288,7 +353,7 @@ export default function Home() {
     isMainImageSwipingRef.current = false;
     mainImageSwipeTriggeredRef.current = false;
     setIsMainImageDragging(false);
-    
+
     // Show buttons after 2 seconds
     if (swipeButtonTimeoutRef.current) {
       clearTimeout(swipeButtonTimeoutRef.current);
@@ -301,14 +366,14 @@ export default function Home() {
 
   function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
     if (zoomLevel === 100 && e.deltaY > 0) return; // Don't zoom out below 100%
-    
+
     //e.preventDefault();
-    
+
     const zoomStep = 20;
     const newZoom = Math.max(100, Math.min(maxZoom, zoomLevel - (e.deltaY > 0 ? zoomStep : -zoomStep)));
-    
+
     if (newZoom === zoomLevel) return;
-    
+
     // Reset pan when zooming back to 100%
     if (newZoom === 100) {
       setZoomLevel(100);
@@ -344,13 +409,13 @@ export default function Home() {
       const delta = newDistance - touchPinchRef.current.distance;
       const zoomChange = (delta / 100) * 10;
       const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom + zoomChange));
-      
+
       if (newZoom === 100) {
         setPanX(0);
         setPanY(0);
       }
       setZoomLevel(newZoom);
-      
+
     } else if (e.touches.length === 1 && zoomLevel > 100) {
       pan(e);
     }
@@ -370,7 +435,7 @@ export default function Home() {
       pan(e);
     }
   }
-  
+
   function pan(e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) {
     const z = 'touches' in e ? e.touches[0] : e;
 
@@ -432,27 +497,65 @@ export default function Home() {
     }
   }, [activeIndex, folderPath]);
 
-  // Keyboard navigation
+  // Keyboard navigation and rating
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "F11") {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch((err) => {
+            console.error(`Error attempting to enable fullscreen mode: ${err.message}`);
+          });
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen();
+        }
+        return;
+      }
+
       if (imageFiles.length === 0 || zoomLevel > 100) return;
-      if (e.key === "ArrowLeft") {
-        setActiveIndex((prev) => (prev > 0 ? prev - 1 : prev));
-      } else if (e.key === "ArrowRight") {
-        setActiveIndex((prev) => (prev < imageFiles.length - 1 ? prev + 1 : prev));
+
+      switch (e.key) {
+        case "ArrowLeft":
+          setActiveIndex((prev) => (prev > 0 ? prev - 1 : prev));
+          break;
+        case "ArrowRight":
+          setActiveIndex((prev) => (prev < imageFiles.length - 1 ? prev + 1 : prev));
+          break;
+        case "0":
+          handleRatingClick(null);
+          break;
+        case "1":
+          handleRatingClick(1);
+          break;
+        case "2":
+          handleRatingClick(2);
+          break;
+        case "3":
+          handleRatingClick(3);
+          break;
+        case "4":
+          handleRatingClick(4);
+          break;
+        case "5":
+          handleRatingClick(5);
+          break;
+        case "Delete":
+        case "Backspace":
+          handleRatingClick(1);
+          break;
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [imageFiles.length, zoomLevel]);
-  
+  }, [imageFiles.length, zoomLevel, handleRatingClick]);
+
   // Reset zoom and pan when changing photos
   useEffect(() => {
     setZoomLevel(100);
     setPanX(0);
     setPanY(0);
   }, [activeIndex]);
-  
+
   // Fetch EXIF data when active image changes
   useEffect(() => {
     if (imageFiles.length === 0 || !folderPath) {
@@ -489,23 +592,23 @@ export default function Home() {
           return;
         }
         const data = await response.json();
-        
+
         if (!canceled) {
           const exifData = data?.exifData ?? null;
           setExifData(exifData);
-          
+
           // Compare EXIF rating with database rating
           if (exifData) {
             const exifRating = exifData?.Rating;
             const fileId = getFileId(currentImage.fileName);
             const dbRating = ratings.get(fileId) ?? null;
-            
-            console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);  
-            
+
+            console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);
+
             // Only process if EXIF has a valid rating (1-5)
             if (exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
               // EXIF has rating, database doesn't → add to database
-              if (dbRating?.rating === null || dbRating?.rating === undefined) {
+              if ((dbRating?.rating === null || dbRating?.rating === undefined) && !dbRating?.overRuleFileRating) {
                 await updateRatingInDatabase(currentImage.fileName, exifRating);
               }
               // EXIF rating differs from database → show modal
@@ -598,22 +701,29 @@ export default function Home() {
           </div>
         ) : imageFiles.length > 0 ? (
           <div className="flex flex-col w-full h-screen">
-            <div className="w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0">
+            <div id="top-toolbar" className={`w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0 ${isFullscreen ? 'hidden' : ''}`}>
               <div className="flex items-center gap-3">
                 <button
                   className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
                   onClick={() => router.push('/select-folder')}
                 >
-                   <Icon name="arrow_back" /> Choose another folder
+                  <Icon name="arrow_back" /> Choose another folder
                 </button>
                 {folderName && <span className="text-zinc-500 text-sm truncate max-w-[12rem]">{folderName}</span>}
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  className={`px-4 py-2 rounded text-sm font-medium transition ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
+                  className="px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center"
+                  onClick={handleOpenWith}
+                  title="Open with default application"
+                >
+                  <Icon name="open_in_new" />
+                </button>
+                <button
+                  className={`px-4 py-2 rounded text-sm font-medium transition flex gap-2 items-center ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
                   onClick={() => setIsExifOpen((open) => !open)}
                 >
-                  {isExifOpen ? "Close EXIF" : "Show EXIF"}
+                  <Icon name="info" />
                 </button>
                 <div className="text-zinc-400 text-sm">{imageFiles.length} images</div>
               </div>
@@ -621,28 +731,94 @@ export default function Home() {
 
             <div className="flex flex-1 w-full overflow-hidden">
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 flex items-center justify-center overflow-hidden relative">
-                  
+                <div className="main-image-container-wrapper flex-1 flex items-center justify-center overflow-hidden relative">
+
                   <button
-                    className={`photo-nav-button left-4 ${
-                      isSwipingActive ? 'opacity-0' : ''
-                    }`}
+                    className={`photo-nav-button left-4 ${isSwipingActive ? 'opacity-0' : ''
+                      }`}
                     disabled={activeIndex === 0}
                     onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
                   >
                     <Icon name="chevron_backward" />
                   </button>
-                  
+
                   <button
-                    className={`photo-nav-button right-4 ${
-                      isSwipingActive ? 'opacity-0' : ''
-                    }`}
+                    className={`photo-nav-button right-4 ${isSwipingActive ? 'opacity-0' : ''
+                      }`}
                     disabled={activeIndex === imageFiles.length - 1}
                     onClick={() => setActiveIndex((i) => Math.min(imageFiles.length - 1, i + 1))}
                   >
                     <Icon name="chevron_forward" />
                   </button>
-                  
+
+                  <div id="rating-panel" className={`rating-panel ${isFullscreen ? 'hidden' : ''}`} aria-label="Rating panel">
+                    <div className="rating-star-row" aria-hidden="true" data-current-rating={hoveredRating ?? (imageFiles[activeIndex] ? (ratings.get(getFileId(imageFiles[activeIndex].fileName))?.rating ?? 0) : 0)}>
+                      <span className="rating-star">★</span>
+                      <span className="rating-star">★</span>
+                      <span className="rating-star">★</span>
+                      <span className="rating-star">★</span>
+                      <span className="rating-star">★</span>
+                    </div>
+                    <div className="rating-emoji-row noto-color-emoji-regular">
+                      <button
+                        type="button"
+                        className="rating-emoji"
+                        data-rating="1"
+                        aria-label="Rating 1"
+                        onMouseEnter={() => setHoveredRating(1)}
+                        onMouseLeave={() => setHoveredRating(null)}
+                        onClick={() => handleRatingClick(1)}
+                      >
+                        🗑️
+                      </button>
+                      <button
+                        type="button"
+                        className="rating-emoji"
+                        data-rating="2"
+                        aria-label="Rating 2"
+                        onMouseEnter={() => setHoveredRating(2)}
+                        onMouseLeave={() => setHoveredRating(null)}
+                        onClick={() => handleRatingClick(2)}
+                      >
+                        😐
+                      </button>
+                      <button
+                        type="button"
+                        className="rating-emoji"
+                        data-rating="3"
+                        aria-label="Rating 3"
+                        onMouseEnter={() => setHoveredRating(3)}
+                        onMouseLeave={() => setHoveredRating(null)}
+                        onClick={() => handleRatingClick(3)}
+                      >
+                        🤔
+                      </button>
+                      <button
+                        type="button"
+                        className="rating-emoji"
+                        data-rating="4"
+                        aria-label="Rating 4"
+                        onMouseEnter={() => setHoveredRating(4)}
+                        onMouseLeave={() => setHoveredRating(null)}
+                        onClick={() => handleRatingClick(4)}
+                      >
+                        😀
+                      </button>
+                      <button
+                        type="button"
+                        className="rating-emoji"
+                        data-rating="5"
+                        aria-label="Rating 5"
+                        onMouseEnter={() => setHoveredRating(5)}
+                        onMouseLeave={() => setHoveredRating(null)}
+                        onClick={() => handleRatingClick(5)}
+                      >
+                        🤩
+                      </button>
+                    </div>
+
+                  </div>
+
                   <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
                     <div className="flex-1 flex items-center justify-center h-full">
                       {imageFiles[activeIndex] && (
@@ -650,13 +826,12 @@ export default function Home() {
                           key={activeIndex}
                           src={imageFiles[activeIndex].originalPath}
                           alt={imageFiles[activeIndex].fileName}
-                          className={`main-image max-w-full max-h-full object-contain select-none ${
-                            swipeDirection === 'left'
-                              ? 'animate-[swipeOutLeft_0.2s_ease-out]'
-                              : swipeDirection === 'right'
+                          className={`main-image max-w-full max-h-full object-contain select-none ${swipeDirection === 'left'
+                            ? 'animate-[swipeOutLeft_0.2s_ease-out]'
+                            : swipeDirection === 'right'
                               ? 'animate-[swipeOutRight_0.2s_ease-out]'
                               : ''
-                          } ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                            } ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                           style={{
                             transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
                             transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
@@ -680,9 +855,7 @@ export default function Home() {
                 <div
                   id="filmstrip"
                   ref={filmstripRef}
-                  className={`flex gap-2 px-4 py-4 overflow-x-auto border-t border-zinc-800 flex-shrink-0 ${
-                    isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'
-                  }`}
+                  className={`flex gap-2 px-4 py-4 overflow-x-auto border-t border-zinc-800 flex-shrink-0 ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isFullscreen ? 'hidden' : ''}`}
                   onWheel={handleFilmstripWheel}
                   onPointerDown={handleFilmstripPointerDown}
                   onPointerMove={handleFilmstripPointerMove}
@@ -691,14 +864,14 @@ export default function Home() {
                 >
                   {imageFiles.map((img, idx) => {
                     const fileId = getFileId(img.fileName);
-                    const isRated = ratings.has(fileId) && ratings.get(fileId) !== null;
+                    const ratingEntry = ratings.get(fileId);
+                    const isRated = ratingEntry && ratingEntry.rating != null && ratingEntry.rating >= 1;
                     return (
                       <button
                         key={idx}
                         onClick={() => setActiveIndex(idx)}
-                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${
-                          idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
-                        } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
+                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${idx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'
+                          } ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
                       >
                         <img
                           src={img.thumbnailPath}
@@ -713,161 +886,164 @@ export default function Home() {
               </div>
 
               {isExifOpen && (
-              <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div>
-                    {imageFiles[activeIndex] && (
-                      <div className="text-zinc-200 font-semibold text-base">
-                        {imageFiles[activeIndex].fileName}
-                      </div>
-                    )}
+                <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      {imageFiles[activeIndex] && (
+                        <div className="text-zinc-200 font-semibold text-base">
+                          {imageFiles[activeIndex].fileName}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-zinc-500 text-xs">
+                      {activeIndex + 1}/{imageFiles.length}
+                    </span>
                   </div>
-                  <span className="text-zinc-500 text-xs">
-                    {activeIndex + 1}/{imageFiles.length}
-                  </span>
-                </div>
 
-                {isExifLoading ? (
-                  <div className="flex flex-col items-center py-10 text-center">
-                    <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
-                    <span className="text-zinc-400 text-sm">Loading EXIF...</span>
-                  </div>
-                ) : exifError ? (
-                  <div className="text-red-400 text-sm">{exifError}</div>
-                ) : exifData ? (
-                  <div className="space-y-4">
-
-                    {/* Image info */}
-                    <div className="flex gap-3 border-b border-white/5 pb-2">
-                      <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="image" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-zinc-300 text-xs font-medium">
-                          {exifData?.FileName || imageFiles[activeIndex]?.fileName}
-                        </div>
-                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                          {[
-                            exifData?.ImageWidth && exifData?.ImageHeight
-                              ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
-                              : null,
-                            formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
-                            formatDPI(exifData),
-                          ]
-                            .filter(Boolean)
-                            .map((v, i) => (
-                              <span key={i} className="truncate">{v as string}</span>
-                            ))}
-                        </div>
-                      </div>
+                  {isExifLoading ? (
+                    <div className="flex flex-col items-center py-10 text-center">
+                      <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
+                      <span className="text-zinc-400 text-sm">Loading EXIF...</span>
                     </div>
+                  ) : exifError ? (
+                    <div className="text-red-400 text-sm">{exifError}</div>
+                  ) : exifData ? (
+                    <div className="space-y-4">
 
-                    {/* Date taken */}
-                    <ExifItem
-                      icon="today"
-                      label="Date/time"
-                      values={[formatDate(exifData)]}
-                    />
-
-                    {/* Camera */}
-                    <div className="flex gap-3 border-b border-white/5 pb-2">
-                      <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="photo_camera" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-zinc-300 text-xs font-medium">
-                          {[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
+                      {/* Image info */}
+                      <div className="flex gap-3 border-b border-white/5 pb-2">
+                        <div className="w-14 min-w-14 flex items-center justify-center">
+                          <Icon name="image" />
                         </div>
-                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                          {[
-                            formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                            formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
-                            formatISO(exifData?.ISO),
-                          ]
-                            .filter(Boolean)
-                            .map((v, i) => (
-                              <span key={i} className="truncate">{v as string}</span>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Flash */}
-                    <ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
-
-                    {/* Lens */}
-                    <div className="flex gap-3 border-b border-white/5 pb-2">
-                      <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="camera" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-zinc-300 text-xs font-medium">
-                          {exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
-                        </div>
-                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                          {[
-                            formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                            formatFocalLength(exifData?.FocalLength),
-                            formatCropFactor(exifData),
-                          ]
-                            .filter(Boolean)
-                            .map((v, i) => (
-                              <span key={i} className="truncate">{v as string}</span>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* White balance */}
-                    <ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
-
-                    {/* Exposure */}
-                    <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
-
-                    {/* File size */}
-                    <div className="flex gap-3 border-b border-white/5 pb-2">
-                      <div className="w-14 min-w-14 flex items-center justify-center">
-                        <Icon name="perm_media" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-zinc-300 text-xs font-medium">File</div>
-                        <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                          {[
-                            formatFileSize(exifData),
-                            exifData?.MIMEType || null,
-                          ]
-                            .filter(Boolean)
-                            .map((v, i) => (
-                              <span key={i} className="truncate">{v as string}</span>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Color */}
-                    {(() => {
-                      const c = formatColor(exifData);
-                      return (
-                        <div className="flex gap-3 border-b border-white/5 pb-2">
-                          <div className="w-14 min-w-14 flex items-center justify-center">
-                            <Icon name="colors" />
+                        <div className="flex-1">
+                          <div className="text-zinc-300 text-xs font-medium">
+                            {exifData?.FileName || imageFiles[activeIndex]?.fileName}
                           </div>
-                          <div className="flex-1">
-                            <div className="text-zinc-300 text-xs font-medium">Color</div>
-                            <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                              {[c.left, c.right, c.extra].filter(Boolean).map((v, i) => (
+                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                            {[
+                              exifData?.ImageWidth && exifData?.ImageHeight
+                                ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
+                                : null,
+                              formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
+                              formatDPI(exifData),
+                            ]
+                              .filter(Boolean)
+                              .map((v, i) => (
                                 <span key={i} className="truncate">{v as string}</span>
                               ))}
-                            </div>
                           </div>
                         </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="text-zinc-500 text-sm">No EXIF information available.</div>
-                )}
-              </aside>
+                      </div>
+
+                      {/* Date taken */}
+                      <ExifItem
+                        icon="today"
+                        label="Date/time"
+                        values={[formatDate(exifData)]}
+                      />
+
+                      {/* Camera */}
+                      <div className="flex gap-3 border-b border-white/5 pb-2">
+                        <div className="w-14 min-w-14 flex items-center justify-center">
+                          <Icon name="photo_camera" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-zinc-300 text-xs font-medium">
+                            {[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
+                          </div>
+                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                            {[
+                              formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                              formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
+                              formatISO(exifData?.ISO),
+                            ]
+                              .filter(Boolean)
+                              .map((v, i) => (
+                                <span key={i} className="truncate">{v as string}</span>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Flash */}
+                      <ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
+
+                      {/* Lens */}
+                      <div className="flex gap-3 border-b border-white/5 pb-2">
+                        <div className="w-14 min-w-14 flex items-center justify-center">
+                          <Icon name="camera" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-zinc-300 text-xs font-medium">
+                            {exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
+                          </div>
+                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                            {[
+                              formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                              formatFocalLength(exifData?.FocalLength),
+                              formatCropFactor(exifData),
+                            ]
+                              .filter(Boolean)
+                              .map((v, i) => (
+                                <span key={i} className="truncate">{v as string}</span>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* White balance */}
+                      <ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
+
+                      {/* Exposure */}
+                      <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
+
+                      {/* File size */}
+                      <div className="flex gap-3 border-b border-white/5 pb-2">
+                        <div className="w-14 min-w-14 flex items-center justify-center">
+                          <Icon name="perm_media" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-zinc-300 text-xs font-medium">File</div>
+                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                            {[
+                              formatFileSize(exifData),
+                              exifData?.MIMEType || null,
+                            ]
+                              .filter(Boolean)
+                              .map((v, i) => (
+                                <span key={i} className="truncate">{v as string}</span>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Color */}
+                      {(() => {
+                        const c = formatColor(exifData);
+                        return (
+                          <div className="flex gap-3 border-b border-white/5 pb-2">
+                            <div className="w-14 min-w-14 flex items-center justify-center">
+                              <Icon name="colors" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-zinc-300 text-xs font-medium">Color</div>
+                              <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
+                                {[c.left, c.right, c.extra].filter(Boolean).map((v, i) => (
+                                  <span key={i} className="truncate">{v as string}</span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="text-zinc-500 text-sm">No EXIF information available.</div>
+                  )}
+                  <a href="photoshop://D:/Users/Shirley/Desktop/1x/Asset 2.png" >
+        Open afbeelding.jpg in Bridge
+    </a>
+                </aside>
               )}
             </div>
           </div>
@@ -877,7 +1053,7 @@ export default function Home() {
       {/* Rating Conflict Modal */}
       {isRatingConflictModalOpen && ratingConflictData && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-8/12 w-full p-6 border border-zinc-700">
+          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[800px] w-8/12 p-6 border border-zinc-700">
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
                 <Icon name="warning" />
@@ -889,7 +1065,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            
+
             <div className="bg-zinc-800/50 rounded p-4 mb-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">File:</span>
@@ -931,18 +1107,18 @@ export default function Home() {
                 >
                   Use database rating ({ratingConflictData.dbRating} ⭐)
                 </button>
-                </div>
-                <button
-                  className="w-full px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded font-medium transition"
-                  onMouseEnter={() => setHoveredButton('ignore')}
-                  onMouseLeave={() => setHoveredButton(null)}
-                  onClick={() => {
-                    setIsRatingConflictModalOpen(false);
-                    setRatingConflictData(null);
-                  }}
-                >
-                  Ignore
-                </button>
+              </div>
+              <button
+                className="w-full px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded font-medium transition"
+                onMouseEnter={() => setHoveredButton('ignore')}
+                onMouseLeave={() => setHoveredButton(null)}
+                onClick={() => {
+                  setIsRatingConflictModalOpen(false);
+                  setRatingConflictData(null);
+                }}
+              >
+                Ignore
+              </button>
             </div>
             <p className="text-zinc-400 text-sm pt-4 h-12">
               {hoveredButton === 'exif' && 'The rating in the database will be overwritten with the EXIF rating from the image file.'}

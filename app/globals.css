@@ -114,4 +114,61 @@ button {
     text-shadow: 0 0 2px rgb(0 0 0 / 0.6);
     opacity: 0.5;
   }
+
+  .rating-panel {
+    @apply absolute z-10 left-4 bottom-4 flex flex-col gap-2 px-3.5 py-3 rounded-2xl;
+    background: linear-gradient(145deg, rgb(18 18 18 / 85%), rgb(8 8 8 / 90%));
+    border: 1px solid rgb(255 255 255 / 12%);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 45%), inset 0 0 0 1px rgb(255 255 255 / 5%);
+    backdrop-filter: blur(8px);
+  }
+
+  .rating-emoji-row,
+  .rating-star-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.45rem;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .rating-emoji {
+    @apply h-10 w-10 rounded-xl flex items-center justify-center text-xl;
+    background: rgb(255 255 255 / 6%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  }
+
+  .rating-emoji:hover {
+    transform: translateY(-1px);
+    background: rgb(255 255 255 / 12%);
+    border-color: rgb(255 255 255 / 20%);
+  }
+
+  .rating-star {
+    @apply text-lg;
+    color: #f4c430;
+    text-shadow: 0 0 6px rgb(244 196 48 / 40%);
+    opacity: 0.25;
+    transition: opacity 120ms ease, text-shadow 120ms ease;
+  }
+
+  /* Show stars based on data-current-rating attribute */
+  .rating-star-row[data-current-rating="1"] .rating-star:nth-child(-n + 1),
+  .rating-star-row[data-current-rating="2"] .rating-star:nth-child(-n + 2),
+  .rating-star-row[data-current-rating="3"] .rating-star:nth-child(-n + 3),
+  .rating-star-row[data-current-rating="4"] .rating-star:nth-child(-n + 4),
+  .rating-star-row[data-current-rating="5"] .rating-star:nth-child(-n + 5) {
+    opacity: 1;
+    text-shadow: 0 0 10px rgb(244 196 48 / 70%);
+  }
+
+  .rating-panel:has(.rating-emoji[data-rating="1"]:hover) .rating-star:nth-child(-n + 1),
+  .rating-panel:has(.rating-emoji[data-rating="2"]:hover) .rating-star:nth-child(-n + 2),
+  .rating-panel:has(.rating-emoji[data-rating="3"]:hover) .rating-star:nth-child(-n + 3),
+  .rating-panel:has(.rating-emoji[data-rating="4"]:hover) .rating-star:nth-child(-n + 4),
+  .rating-panel:has(.rating-emoji[data-rating="5"]:hover) .rating-star:nth-child(-n + 5) {
+    opacity: 1;
+    text-shadow: 0 0 10px rgb(244 196 48 / 70%);
+  }
 }
