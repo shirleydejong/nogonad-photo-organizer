@@ -39,5 +39,3 @@ export async function getExifJson(imagePath: string): Promise<any> {
     throw new Error('Could not parse exiftool output as JSON');
   }
 }
-
-export default getExifJson;

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, type PointerEvent, type Wheel
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Header } from "@/components/header";
+import { FilterModal } from "@/components/filter-modal";
+import { ConflictModal } from "@/components/conflict-modal";
 import CONFIG from "@/config";
 import {
   formatAperture,
@@ -50,7 +52,6 @@ export default function Home() {
   const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
   const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
   const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null } | null>(null);
-  const [hoveredButton, setHoveredButton] = useState<'exif' | 'db' | 'ignore' | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
@@ -1109,176 +1110,37 @@ export default function Home() {
         ) : null}
       </main>
 
-      {/* Rating Conflict Modal */}
-      {isRatingConflictModalOpen && ratingConflictData && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[800px] w-8/12 p-6 border border-zinc-700">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <Icon name="warning" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-zinc-100 font-semibold text-lg mb-1">Rating conflict</h3>
-                <p className="text-zinc-400 text-sm">
-                  The rating in the EXIF data (image) doesn't match the rating in the database.
-                </p>
-              </div>
-            </div>
+      <ConflictModal
+        isOpen={isRatingConflictModalOpen}
+        conflictData={ratingConflictData}
+        onUseExifRating={async () => {
+          if (ratingConflictData) {
+            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);
+            setIsRatingConflictModalOpen(false);
+            setRatingConflictData(null);
+          }
+        }}
+        onUseDatabaseRating={async () => {
+          if (ratingConflictData) {
+            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.dbRating, true);
+            setIsRatingConflictModalOpen(false);
+            setRatingConflictData(null);
+          }
+        }}
+        onIgnore={() => {
+          setIsRatingConflictModalOpen(false);
+          setRatingConflictData(null);
+        }}
+      />
 
-            <div className="bg-zinc-800/50 rounded p-4 mb-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">File:</span>
-                <span className="text-zinc-100 font-mono text-xs">{ratingConflictData.fileName}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">EXIF rating (file):</span>
-                <span className="text-zinc-100 font-semibold">{ratingConflictData.exifRating} ⭐</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Database rating:</span>
-                <span className="text-zinc-100 font-semibold">{ratingConflictData.dbRating} ⭐</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <button
-                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
-                  onMouseEnter={() => setHoveredButton('exif')}
-                  onMouseLeave={() => setHoveredButton(null)}
-                  onClick={async () => {
-                    await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);
-                    setIsRatingConflictModalOpen(false);
-                    setRatingConflictData(null);
-                  }}
-                >
-                  Copy EXIF rating to database ({ratingConflictData.exifRating} ⭐)
-                </button>
-                <button
-                  className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
-                  onMouseEnter={() => setHoveredButton('db')}
-                  onMouseLeave={() => setHoveredButton(null)}
-                  onClick={async () => {
-                    await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.dbRating, true);
-                    setIsRatingConflictModalOpen(false);
-                    setRatingConflictData(null);
-                  }}
-                >
-                  Use database rating ({ratingConflictData.dbRating} ⭐)
-                </button>
-              </div>
-              <button
-                className="w-full px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded font-medium transition"
-                onMouseEnter={() => setHoveredButton('ignore')}
-                onMouseLeave={() => setHoveredButton(null)}
-                onClick={() => {
-                  setIsRatingConflictModalOpen(false);
-                  setRatingConflictData(null);
-                }}
-              >
-                Ignore
-              </button>
-            </div>
-            <p className="text-zinc-400 text-sm pt-4 h-12">
-              {hoveredButton === 'exif' && 'The rating in the database will be overwritten with the EXIF rating from the image file.'}
-              {hoveredButton === 'db' && 'The database rating will be retained and marked as authoritative. Future changes in the image EXIF data will be ignored.'}
-              {hoveredButton === 'ignore' && 'Close this window without making any changes. The notification will appear again on the next visit.'}
-              {!hoveredButton && ''}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Modal */}
-      {isFilterModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[600px] w-full p-8 border border-zinc-700">
-            <div className="flex items-start gap-4 mb-8">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <Icon name="filter_list" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-zinc-100 font-semibold text-xl mb-2">Filter images</h3>
-                <p className="text-zinc-400 text-sm">Click ratings to filter. Hold Shift to select multiple.</p>
-              </div>
-            </div>
-
-            <div className="space-y-8 mb-8">
-              {/* Star ratings */}
-              <div>
-                <div className="text-zinc-300 text-sm font-medium mb-4">Star ratings</div>
-                <div className="flex gap-4 flex-wrap">
-                  {[1, 2, 3, 4, 5].map((rating) => {
-                    const emoji = rating === 1 ? '🗑️' : rating === 2 ? '😐' : rating === 3 ? '🤔' : rating === 4 ? '😀' : '🤩';
-                    const isSelected = filterSelectedRatings.has(rating);
-                    return (
-                      <button
-                        key={rating}
-                        onClick={(e) => {
-                          const newSet = new Set(filterSelectedRatings);
-                          if (e.shiftKey) {
-                            // Shift+click: toggle this rating
-                            if (isSelected) {
-                              newSet.delete(rating);
-                            } else {
-                              newSet.add(rating);
-                            }
-                          } else {
-                            // Normal click: select only this rating
-                            newSet.clear();
-                            newSet.add(rating);
-                          }
-                          setFilterSelectedRatings(newSet);
-                        }}
-                        className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl transition font-medium cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                        }`}
-                        title={`${rating} star${rating === 1 ? '' : 's'}. Shift+click to select multiple.`}
-                      >
-                        <span className="text-4xl mb-1">{emoji}</span>
-                        <span className="text-xs">{rating} ⭐</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Unrated images */}
-              <div>
-                <label className="flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 p-4 rounded-lg transition w-fit">
-                  <input
-                    type="checkbox"
-                    checked={filterShowUnrated}
-                    onChange={(e) => setFilterShowUnrated(e.target.checked)}
-                    className="w-5 h-5 rounded cursor-pointer"
-                  />
-                  <span className="text-zinc-100 font-medium">Show unrated images</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                className="flex-1 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-lg font-medium transition"
-                onClick={() => {
-                  setFilterShowUnrated(true);
-                  setFilterSelectedRatings(new Set([1, 2, 3, 4, 5]));
-                }}
-              >
-                Clear filters
-              </button>
-              <button
-                className="flex-1 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-lg font-medium transition"
-                onClick={() => setIsFilterModalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        showUnrated={filterShowUnrated}
+        setShowUnrated={setFilterShowUnrated}
+        selectedRatings={filterSelectedRatings}
+        setSelectedRatings={setFilterSelectedRatings}
+      />
     </div>
   );
 }
