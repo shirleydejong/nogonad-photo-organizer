@@ -29,6 +29,7 @@ export default function ListPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
   const [exifData, setExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to EXIF Rating
+  const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
   const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null } | null>(null);
 
   // Load folder from localStorage on mount
@@ -129,6 +130,31 @@ export default function ListPage() {
         }
       } catch (ratingErr) {
         console.error('Failed to fetch ratings:', ratingErr);
+      }
+
+      // Fetch RAW files from raw subfolder
+      try {
+        const rawResponse = await fetch('/api/raw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderPath: normalizedPath }),
+        });
+
+        if (rawResponse.ok) {
+          const rawData = await rawResponse.json();
+          if (rawData.success && rawData.hasRawFolder && rawData.ratings) {
+            const rawFilesMap = new Map<string, string>();
+            for (const rawFile of rawData.ratings) {
+              if (rawFile.FileName) {
+                const fileId = getFileId(rawFile.FileName);
+                rawFilesMap.set(fileId, rawFile.FileName);
+              }
+            }
+            setRawFiles(rawFilesMap);
+          }
+        }
+      } catch (rawErr) {
+        console.error('Failed to fetch RAW files:', rawErr);
       }
 
       setIsLoading(false);
@@ -377,12 +403,13 @@ export default function ListPage() {
         ) : imageFiles.length === 0 ? (
           <div className="text-zinc-400 text-center py-8">No images found</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-8/12 mx-auto rounded border border-zinc-700">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-zinc-700">
                   <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-24">Thumbnail</th>
-                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold">Filename</th>
+                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-48">Filename</th>
+                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold">RAW</th>
                   <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-40">Rating</th>
                   <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-56">Conflict</th>
                 </tr>
@@ -406,6 +433,9 @@ export default function ListPage() {
                     </td>
                     <td className="py-3 px-4 text-zinc-300 text-sm break-all">
                       {image.fileName}
+                    </td>
+                    <td className="py-3 px-4 text-zinc-400 text-sm">
+                      {rawFiles.get(getFileId(image.fileName)) || '-'}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {renderRatingStars(image.fileName)}
