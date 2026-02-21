@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
+import { ExifItem } from "@/components/exif-item";
 import { Header } from "@/components/header";
 import { FilterModal } from "@/components/filter-modal";
 import { ConflictModal } from "@/components/conflict-modal";
@@ -737,37 +738,6 @@ export default function Home() {
   }, [activeIndex, imageFiles, folderPath, ratings]);
 
 
-
-
-
-  function ExifItem({
-    icon,
-    label,
-    values,
-  }: {
-    icon: string;
-    label: string;
-    values: Array<string | null>;
-  }) {
-    const clean = values.filter(Boolean) as string[];
-    if (clean.length === 0) return null;
-    return (
-      <div className="flex gap-3 border-b border-white/5 pb-2">
-        <div className="w-14 min-w-14 flex items-center justify-center">
-          <Icon name={icon} />
-        </div>
-        <div className="flex-1">
-          <div className="text-zinc-300 text-xs font-medium">{label}</div>
-          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-            {clean.map((v, i) => (
-              <span key={i} className="truncate">{v}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <main className="flex-1 flex flex-col items-center justify-center w-full">
@@ -1014,29 +984,17 @@ export default function Home() {
                     <div className="space-y-4">
 
                       {/* Image info */}
-                      <div className="flex gap-3 border-b border-white/5 pb-2">
-                        <div className="w-14 min-w-14 flex items-center justify-center">
-                          <Icon name="image" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-zinc-300 text-xs font-medium">
-                            {exifData?.FileName || imageFiles[activeIndex]?.fileName}
-                          </div>
-                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                            {[
-                              exifData?.ImageWidth && exifData?.ImageHeight
-                                ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
-                                : null,
-                              formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
-                              formatDPI(exifData),
-                            ]
-                              .filter(Boolean)
-                              .map((v, i) => (
-                                <span key={i} className="truncate">{v as string}</span>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
+                      <ExifItem
+                        icon="image"
+                        label={exifData?.FileName || imageFiles[activeIndex]?.fileName}
+                        values={[
+                          exifData?.ImageWidth && exifData?.ImageHeight
+                            ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
+                            : null,
+                          formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
+                          formatDPI(exifData),
+                        ]}
+                      />
 
                       {/* Date taken */}
                       <ExifItem
@@ -1046,53 +1004,29 @@ export default function Home() {
                       />
 
                       {/* Camera */}
-                      <div className="flex gap-3 border-b border-white/5 pb-2">
-                        <div className="w-14 min-w-14 flex items-center justify-center">
-                          <Icon name="photo_camera" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-zinc-300 text-xs font-medium">
-                            {[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
-                          </div>
-                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                            {[
-                              formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                              formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
-                              formatISO(exifData?.ISO),
-                            ]
-                              .filter(Boolean)
-                              .map((v, i) => (
-                                <span key={i} className="truncate">{v as string}</span>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
+                      <ExifItem
+                        icon="photo_camera"
+                        label={[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
+                        values={[
+                          formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                          formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
+                          formatISO(exifData?.ISO),
+                        ]}
+                      />
 
                       {/* Flash */}
                       <ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
 
                       {/* Lens */}
-                      <div className="flex gap-3 border-b border-white/5 pb-2">
-                        <div className="w-14 min-w-14 flex items-center justify-center">
-                          <Icon name="camera" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-zinc-300 text-xs font-medium">
-                            {exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
-                          </div>
-                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                            {[
-                              formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                              formatFocalLength(exifData?.FocalLength),
-                              formatCropFactor(exifData),
-                            ]
-                              .filter(Boolean)
-                              .map((v, i) => (
-                                <span key={i} className="truncate">{v as string}</span>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
+                      <ExifItem
+                        icon="camera"
+                        label={exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
+                        values={[
+                          formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+                          formatFocalLength(exifData?.FocalLength),
+                          formatCropFactor(exifData),
+                        ]}
+                      />
 
                       {/* White balance */}
                       <ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
@@ -1101,42 +1035,24 @@ export default function Home() {
                       <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
 
                       {/* File size */}
-                      <div className="flex gap-3 border-b border-white/5 pb-2">
-                        <div className="w-14 min-w-14 flex items-center justify-center">
-                          <Icon name="perm_media" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-zinc-300 text-xs font-medium">File</div>
-                          <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                            {[
-                              formatFileSize(exifData),
-                              exifData?.MIMEType || null,
-                            ]
-                              .filter(Boolean)
-                              .map((v, i) => (
-                                <span key={i} className="truncate">{v as string}</span>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
+                      <ExifItem
+                        icon="perm_media"
+                        label="File"
+                        values={[
+                          formatFileSize(exifData),
+                          exifData?.MIMEType || null,
+                        ]}
+                      />
 
                       {/* Color */}
                       {(() => {
                         const c = formatColor(exifData);
                         return (
-                          <div className="flex gap-3 border-b border-white/5 pb-2">
-                            <div className="w-14 min-w-14 flex items-center justify-center">
-                              <Icon name="colors" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-zinc-300 text-xs font-medium">Color</div>
-                              <div className="text-zinc-100 text-sm flex flex-wrap gap-x-6 mt-1">
-                                {[c.left, c.right, c.extra].filter(Boolean).map((v, i) => (
-                                  <span key={i} className="truncate">{v as string}</span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                          <ExifItem
+                            icon="colors"
+                            label="Color"
+                            values={[c.left, c.right, c.extra]}
+                          />
                         );
                       })()}
                     </div>
