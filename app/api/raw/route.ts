@@ -48,8 +48,18 @@ export async function POST(request: NextRequest) {
       (file) => {
         if (!file.isFile()) return false;
         const ext = path.extname(file.name).toLowerCase();
-        return ext === '.raw' || ext === '.arw' || ext === '.dng';
+        return ext === '.raw' || ext === '.arw' || ext === '.dng' || ext === '.xmp';
       }
+    );
+
+    // Create a set of XMP file basenames for quick lookup
+    const xmpFiles = new Set(
+      rawFiles
+        .filter((file) => {
+          const ext = path.extname(file.name).toLowerCase();
+          return ext === '.xmp';
+        })
+        .map((file) => path.parse(file.name).name.toLowerCase())
     );
 
     // If no RAW files found
@@ -67,11 +77,17 @@ export async function POST(request: NextRequest) {
     // Get EXIF data with ratings
     const exifData = await getBatchExifJson(rawFolderPath);
 
-    // Filter only RAW file extensions from EXIF results
+    // Filter only RAW file extensions from EXIF results and add hasXmp field
     const filteredExifData = exifData.filter((data) => {
       if (!data.FileName) return false;
       const ext = path.extname(data.FileName).toLowerCase();
-      return ext === '.raw' || ext === '.arw' || ext === '.dng';
+      return ext === '.raw' || ext === '.arw' || ext === '.dng' || ext === '.xmp';
+    }).map((data) => {
+      const baseName = path.parse(data.FileName).name.toLowerCase();
+      return {
+        ...data,
+        hasXmp: xmpFiles.has(baseName),
+      };
     });
 
     return NextResponse.json({

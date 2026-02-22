@@ -9,6 +9,9 @@ interface FilterModalProps {
   setShowUnrated: (value: boolean) => void;
   selectedRatings: Set<number>;
   setSelectedRatings: (ratings: Set<number>) => void;
+  conflictOption?: boolean;
+  showConflictsOnly?: boolean;
+  setShowConflictsOnly?: (value: boolean) => void;
 }
 
 export function FilterModal({
@@ -18,12 +21,16 @@ export function FilterModal({
   setShowUnrated,
   selectedRatings,
   setSelectedRatings,
+  conflictOption,
+  showConflictsOnly,
+  setShowConflictsOnly,
 }: FilterModalProps) {
   if (!isOpen) return null;
 
   const handleClearFilters = () => {
     setShowUnrated(true);
     setSelectedRatings(new Set([1, 2, 3, 4, 5]));
+    setShowConflictsOnly?.(false);
   };
 
   return (
@@ -81,17 +88,31 @@ export function FilterModal({
             </div>
           </div>
           
-          {/* Unrated images */}
+          {/* Unrated images and Conflicts */}
           <div>
-            <label className="flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 p-4 rounded-lg transition w-fit">
-              <input
-                type="checkbox"
-                checked={showUnrated}
-                onChange={(e) => setShowUnrated(e.target.checked)}
-                className="w-5 h-5 rounded cursor-pointer"
-              />
-              <span className="text-zinc-100 font-medium">Show unrated images</span>
-            </label>
+            <div className="text-zinc-300 text-sm font-medium mb-4">Filter options</div>
+            <div className="space-y-3">
+                {conflictOption && (
+                <label className="flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 p-3 rounded-lg transition">
+                  <input
+                  type="checkbox"
+                  checked={showConflictsOnly || false}
+                  onChange={(e) => setShowConflictsOnly?.(e.target.checked)}
+                  className="w-5 h-5 rounded cursor-pointer"
+                  />
+                  <span className="text-zinc-100 font-medium">Show conflicts only</span>
+                </label>
+                )}
+              <label className="flex items-center gap-4 cursor-pointer hover:bg-zinc-800/50 p-3 rounded-lg transition">
+                <input
+                  type="checkbox"
+                  checked={showUnrated}
+                  onChange={(e) => setShowUnrated(e.target.checked)}
+                  className="w-5 h-5 rounded cursor-pointer"
+                />
+                <span className="text-zinc-100 font-medium">Show unrated images</span>
+              </label>
+            </div>
           </div>
         </div>
 

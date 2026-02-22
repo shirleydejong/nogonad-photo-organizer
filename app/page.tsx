@@ -1096,6 +1096,7 @@ export default function Home() {
         setShowUnrated={setFilterShowUnrated}
         selectedRatings={filterSelectedRatings}
         setSelectedRatings={setFilterSelectedRatings}
+        conflictOption={false}
       />
     </div>
   );

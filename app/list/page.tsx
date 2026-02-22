@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { ConflictModal } from "@/components/conflict-modal";
+import { FilterModal } from "@/components/filter-modal";
 import Link from "next/link";
 import CONFIG from "@/config";
+import { Icon } from "@/components/icon";
+import { aggregateRatings } from "@/utils/ratings-aggregator";
 
 interface ImageData {
   fileName: string;
@@ -30,7 +33,13 @@ export default function ListPage() {
   const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
   const [exifData, setExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to EXIF Rating
   const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
+  const [hasXmpMap, setHasXmpMap] = useState<Map<string, boolean>>(new Map()); // Map of fileId to hasXmp
+  const [rawExifData, setRawExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to RAW EXIF Rating
   const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null } | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [showUnrated, setShowUnrated] = useState<boolean>(true);
+  const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
 
   // Load folder from localStorage on mount
   useEffect(() => {
@@ -144,13 +153,23 @@ export default function ListPage() {
           const rawData = await rawResponse.json();
           if (rawData.success && rawData.hasRawFolder && rawData.ratings) {
             const rawFilesMap = new Map<string, string>();
+            const xmpMap = new Map<string, boolean>();
+            const rawExifDataMap = new Map<string, number | null>();
             for (const rawFile of rawData.ratings) {
               if (rawFile.FileName) {
                 const fileId = getFileId(rawFile.FileName);
                 rawFilesMap.set(fileId, rawFile.FileName);
+                if (rawFile.hasXmp !== undefined) {
+                  xmpMap.set(fileId, rawFile.hasXmp);
+                }
+                if (rawFile.Rating != null) {
+                  rawExifDataMap.set(fileId, rawFile.Rating);
+                }
               }
             }
             setRawFiles(rawFilesMap);
+            setHasXmpMap(xmpMap);
+            setRawExifData(rawExifDataMap);
           }
         }
       } catch (rawErr) {
@@ -176,6 +195,32 @@ export default function ListPage() {
     const lastDot = filename.lastIndexOf('.');
     if (lastDot === -1) return filename;
     return filename.substring(0, lastDot);
+  }
+
+  function shouldShowImage(fileName: string): boolean {
+    const fileId = getFileId(fileName);
+    const ratingData = ratings.get(fileId);
+    const currentRating = ratingData?.rating ?? null;
+
+    // Check if conflicts-only filter is enabled
+    if (showConflictsOnly) {
+      const hasConflict = hasRatingConflict(fileName) || hasJpgRawMismatch(fileName) || hasRawRatingConflict(fileName);
+      if (!hasConflict) {
+        return false;
+      }
+    }
+
+    // If no rating and showUnrated is true, show it
+    if (currentRating === null && showUnrated) {
+      return true;
+    }
+
+    // If has rating and it's in selectedRatings, show it
+    if (currentRating !== null && selectedRatings.has(currentRating)) {
+      return true;
+    }
+
+    return false;
   }
 
   const updateRatingInDatabase = useCallback(async (fileName: string, rating: number | null) => {
@@ -289,6 +334,117 @@ export default function ListPage() {
     return false;
   }
 
+  function hasRawRatingConflict(fileName: string): boolean {
+    const fileId = getFileId(fileName);
+    const rawRating = rawExifData.get(fileId);
+    const dbRating = ratings.get(fileId)?.rating ?? null;
+    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+
+    // Conflict exists only if RAW file has EXIF rating AND database rating differs
+    // No RAW rating = no conflict, even if database has a rating
+    if (rawRating != null && rawRating !== 0 && dbRating !== null && rawRating !== dbRating && !dbOverRule) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function hasJpgRawMismatch(fileName: string): boolean {
+    const fileId = getFileId(fileName);
+    const exifRating = exifData.get(fileId);
+    const rawRating = rawExifData.get(fileId);
+    const dbRating = ratings.get(fileId)?.rating ?? null;
+
+    // Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
+    if (exifRating != null && exifRating !== 0 && rawRating != null && rawRating !== 0 && !dbRating && exifRating !== rawRating) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function hasAllRatingsMatch(fileName: string): boolean {
+    const fileId = getFileId(fileName);
+    const exifRating = exifData.get(fileId);
+    const rawRating = rawExifData.get(fileId);
+    const dbRating = ratings.get(fileId)?.rating ?? null;
+
+    return (
+      exifRating != null &&
+      exifRating !== 0 &&
+      rawRating != null &&
+      rawRating !== 0 &&
+      dbRating != null &&
+      exifRating === rawRating &&
+      exifRating === dbRating
+    );
+  }
+
+  function hasAnyConflicts(): boolean {
+    // Check if any image has a conflict
+    for (const image of imageFiles) {
+      if (hasRatingConflict(image.fileName) || hasRawRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const handleApplyRatings = useCallback(async () => {
+    try {
+      // Transform ratings Map to match the expected format
+      const dbRatingsMap = new Map();
+      ratings.forEach((rating, fileId) => {
+        if (rating && rating.rating !== null && rating.rating !== 0) {
+          dbRatingsMap.set(fileId, { rating: rating.rating });
+        }
+      });
+
+      // Filter out 0 values from JPG ratings
+      const jpgRatingsMap = new Map();
+      exifData.forEach((rating, fileId) => {
+        if (rating !== null && rating !== 0) {
+          jpgRatingsMap.set(fileId, rating);
+        }
+      });
+
+      // Filter out 0 values from RAW ratings
+      const rawRatingsMap = new Map();
+      rawExifData.forEach((rating, fileId) => {
+        if (rating !== null && rating !== 0) {
+          rawRatingsMap.set(fileId, rating);
+        }
+      });
+
+      console.log('DB Ratings Map:', dbRatingsMap);
+      console.log('JPG Ratings Map:', jpgRatingsMap);
+      console.log('RAW Ratings Map:', rawRatingsMap);
+
+      const aggregated = aggregateRatings(dbRatingsMap, jpgRatingsMap, rawRatingsMap, hasAnyConflicts());
+      
+      console.log('Aggregated ratings to apply:', aggregated);
+
+      const response = await fetch('/api/set-ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...aggregated,
+          folderPath,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Ratings applied successfully');
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to apply ratings:', errorData);
+      }
+      
+    } catch (err) {
+      console.error('Failed to apply ratings:', err);
+    }
+  }, [ratings, exifData, rawExifData, imageFiles, folderPath]);
+
   function renderConflictIndicator(fileName: string) {
     const fileId = getFileId(fileName);
     const exifRating = exifData.get(fileId);
@@ -298,7 +454,7 @@ export default function ListPage() {
     // No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
     if (!dbRating && !exifRating) {
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-col">
           <div className="text-zinc-500 text-xs">
             No rating
           </div>
@@ -309,7 +465,7 @@ export default function ListPage() {
     // Ratings differ = conflict
     if ((dbRating && exifRating) && exifRating !== dbRating && !dbOverRule) {
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-col">
           <button
             onClick={() => setSelectedConflict({ fileName, exifRating, dbRating })}
             className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
@@ -317,7 +473,7 @@ export default function ListPage() {
             ≠ Conflict
           </button>
           <div className="text-zinc-500 text-xs">
-            File: {exifRating} ★ / DB: {dbRating} ★
+            JPG: {exifRating} ★ / DB: {dbRating} ★
           </div>
         </div>
       );
@@ -326,12 +482,12 @@ export default function ListPage() {
     // Ratings differ = conflict
     if ((dbRating && exifRating) && exifRating !== dbRating && dbOverRule) {
       return (
-        <div className="flex items-center gap-2">
-          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ Resolved
           </div>
           <div className="text-zinc-500 text-xs">
-            File: {exifRating} ★ / DB: {dbRating} ★
+            JPG: {exifRating} ★ / DB: {dbRating} ★
           </div>
         </div>
       );
@@ -340,12 +496,12 @@ export default function ListPage() {
     // No conflict (either no DB rating, or ratings match)
     if ((dbRating && exifRating) && exifRating === dbRating) {
       return (
-        <div className="flex items-center gap-2">
-          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
             = match
           </div>
           <div className="text-zinc-500 text-xs">
-            File: {exifRating} ★ / DB: {dbRating} ★
+            JPG: {exifRating} ★ / DB: {dbRating} ★
           </div>
         </div>
       )
@@ -354,12 +510,12 @@ export default function ListPage() {
     // No conflict (either no DB rating, or ratings match)
     if ((dbRating && !exifRating)) {
       return (
-        <div className="flex items-center gap-2">
-          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ db only
           </div>
           <div className="text-zinc-500 text-xs">
-            File: {exifRating} ★ / DB: {dbRating} ★
+            JPG: {exifRating} ★ / DB: {dbRating} ★
           </div>
         </div>
       )
@@ -367,12 +523,101 @@ export default function ListPage() {
     
     // No conflict (either no DB rating, or ratings match)
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-col">
         <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
           file only
         </div>
         <div className="text-zinc-500 text-xs">
-          File: {exifRating} ★ / DB: {dbRating} ★
+          JPG: {exifRating} ★ / DB: {dbRating} ★
+        </div>
+      </div>
+    )
+  }
+
+  function renderRawConflictIndicator(fileName: string) {
+    const fileId = getFileId(fileName);
+    const rawRating = rawExifData.get(fileId);
+    const dbRating = ratings.get(fileId)?.rating ?? null;
+    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+    
+    // No ratings at all (neither RAW nor DB) = no conflict, show "No rating"
+    if (!dbRating && !rawRating) {
+      return (
+        <div className="flex items-center gap-2 flex-col">
+          <div className="text-zinc-500 text-xs">
+            No rating
+          </div>
+        </div>
+      )
+    }
+
+    // Ratings differ = conflict
+    if ((dbRating && rawRating) && rawRating !== dbRating && !dbOverRule) {
+      return (
+        <div className="flex items-center gap-2 flex-col">
+          <button
+            onClick={() => setSelectedConflict({ fileName, exifRating: rawRating, dbRating })}
+            className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
+          >
+            ≠ Conflict
+          </button>
+          <div className="text-zinc-500 text-xs">
+            RAW: {rawRating} ★ / DB: {dbRating} ★
+          </div>
+        </div>
+      );
+    }
+    
+    // Ratings differ but overruled = resolved
+    if ((dbRating && rawRating) && rawRating !== dbRating && dbOverRule) {
+      return (
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+            ✓ Resolved
+          </div>
+          <div className="text-zinc-500 text-xs">
+            RAW: {rawRating} ★ / DB: {dbRating} ★
+          </div>
+        </div>
+      );
+    }
+
+    // No conflict (ratings match)
+    if ((dbRating && rawRating) && rawRating === dbRating) {
+      return (
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
+            = match
+          </div>
+          <div className="text-zinc-500 text-xs">
+            RAW: {rawRating} ★ / DB: {dbRating} ★
+          </div>
+        </div>
+      )
+    }
+    
+    // Only DB rating (no RAW rating)
+    if ((dbRating && !rawRating)) {
+      return (
+        <div className="flex items-center gap-2 flex-col">
+          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+            ✓ db only
+          </div>
+          <div className="text-zinc-500 text-xs">
+            RAW: {rawRating} ★ / DB: {dbRating} ★
+          </div>
+        </div>
+      )
+    }
+    
+    // Only RAW rating (no DB rating)
+    return (
+      <div className="flex items-center gap-2 flex-col">
+        <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+          file only
+        </div>
+        <div className="text-zinc-500 text-xs">
+          RAW: {rawRating} ★ / DB: {dbRating} ★
         </div>
       </div>
     )
@@ -394,7 +639,24 @@ export default function ListPage() {
         folderName={folderName}
         title={folderPath}
       >
-        <div className="text-zinc-400 text-sm">{imageFiles.length} images</div>
+        <div className="flex items-center gap-4">
+          <div className="text-zinc-400 text-sm">{imageFiles.filter(img => shouldShowImage(img.fileName)).length} / {imageFiles.length} images</div>
+          <button
+            className="header-button"
+            onClick={() => setShowFilterModal(true)}
+            title="Filter images by rating"
+          >
+            <Icon name="filter_list" />
+          </button>
+          <button
+            className={`header-button ${hasAnyConflicts() ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={handleApplyRatings}
+            disabled={hasAnyConflicts()}
+            title={hasAnyConflicts() ? 'Cannot apply ratings with conflicts' : 'Apply ratings'}
+          >
+            Apply
+          </button>
+        </div>
       </Header>
 
       <main className="flex-1 px-6 py-6">
@@ -410,16 +672,21 @@ export default function ListPage() {
                   <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-24">Thumbnail</th>
                   <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-48">Filename</th>
                   <th className="text-left py-3 px-4 text-zinc-300 font-semibold">RAW</th>
-                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-40">Rating</th>
-                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-56">Conflict</th>
+                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-40">DB Rating</th>
+                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">JPG Conflict</th>
+                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">RAW Conflict</th>
                 </tr>
               </thead>
               <tbody>
-                {imageFiles.map((image, idx) => (
+                {imageFiles.filter(image => shouldShowImage(image.fileName)).map((image, idx) => (
                   <tr
                     key={idx}
                     className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${
-                      hasRatingConflict(image.fileName) ? 'bg-red-950 bg-opacity-20' : ''
+                      hasAllRatingsMatch(image.fileName)
+                        ? 'bg-green-950 bg-opacity-20'
+                        : hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
+                          ? 'bg-red-950 bg-opacity-20 conflict'
+                          : 'no-conflict'
                     }`}
                   >
                     <td className="py-3 px-4">
@@ -435,13 +702,25 @@ export default function ListPage() {
                       {image.fileName}
                     </td>
                     <td className="py-3 px-4 text-zinc-400 text-sm">
-                      {rawFiles.get(getFileId(image.fileName)) || '-'}
+                      {rawFiles.get(getFileId(image.fileName)) ? (
+                        <div className="flex items-center gap-2">
+                          <span>{rawFiles.get(getFileId(image.fileName))}</span>
+                          {hasXmpMap.get(getFileId(image.fileName)) && (
+                            <Icon name="settings_photo_camera" size={16} />
+                          )}
+                        </div>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {renderRatingStars(image.fileName)}
                     </td>
                     <td className="py-3 px-4">
                       {renderConflictIndicator(image.fileName)}
+                    </td>
+                    <td className="py-3 px-4">
+                      {renderRawConflictIndicator(image.fileName)}
                     </td>
                   </tr>
                 ))}
@@ -457,6 +736,18 @@ export default function ListPage() {
         onUseExifRating={handleUseExifRating}
         onUseDatabaseRating={handleUseDatabaseRating}
         onIgnore={handleIgnoreConflict}
+      />
+
+      <FilterModal
+        isOpen={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        showUnrated={showUnrated}
+        setShowUnrated={setShowUnrated}
+        selectedRatings={selectedRatings}
+        setSelectedRatings={setSelectedRatings}
+        conflictOption={true}
+        showConflictsOnly={showConflictsOnly}
+        setShowConflictsOnly={setShowConflictsOnly}
       />
     </div>
   );

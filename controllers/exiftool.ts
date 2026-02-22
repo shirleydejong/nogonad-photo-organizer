@@ -14,6 +14,8 @@
 
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
+import { extname, dirname, basename } from 'path';
+import path from 'path';
 
 /**
  * Spawns the exiftool process and executes EXIF extraction on a single image
@@ -129,7 +131,7 @@ export async function getBatchExifJson(folderPath: string): Promise<any[]> {
   await fs.access(folderPath);
 
   return new Promise((resolve, reject) => {
-    const proc = spawn('exiftool', ['-json', '-filename', '-Rating', folderPath], { windowsHide: true });
+    const proc = spawn('exiftool', ['-srcfile', '%d%f.xmp', '-srcfile', '%d%f.%e', '-json', '-FileName', '-Rating', folderPath], { windowsHide: true });
 
     let stdout = '';
     let stderr = '';
