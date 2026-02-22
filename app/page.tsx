@@ -52,7 +52,7 @@ export default function Home() {
   const [panY, setPanY] = useState<number>(0);
   const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
   const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
-  const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null } | null>(null);
+  const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null, newRating: number | null } | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
@@ -331,6 +331,7 @@ export default function Home() {
         fileName: currentImage.fileName,
         exifRating,
         dbRating: currentDbRating,
+        newRating: rating,
       });
       setIsRatingConflictModalOpen(true);
       return;
@@ -713,6 +714,7 @@ export default function Home() {
                   fileName: currentImage.fileName,
                   exifRating,
                   dbRating: dbRating?.rating,
+                  newRating: null,
                 });
                 setIsRatingConflictModalOpen(true);
               }
@@ -1069,6 +1071,13 @@ export default function Home() {
       <ConflictModal
         isOpen={isRatingConflictModalOpen}
         conflictData={ratingConflictData}
+        onUseNewRating={async () => {
+          if (ratingConflictData && ratingConflictData.newRating !== null) {
+            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.newRating, true);
+            setIsRatingConflictModalOpen(false);
+            setRatingConflictData(null);
+          }
+        }}
         onUseExifRating={async () => {
           if (ratingConflictData) {
             await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);

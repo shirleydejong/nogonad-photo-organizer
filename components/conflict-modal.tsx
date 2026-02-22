@@ -9,7 +9,9 @@ interface ConflictModalProps {
     fileName: string;
     exifRating: number;
     dbRating: number | null;
+    newRating: number | null;
   } | null;
+  onUseNewRating: () => void;
   onUseExifRating: () => void;
   onUseDatabaseRating: () => void;
   onIgnore: () => void;
@@ -18,13 +20,17 @@ interface ConflictModalProps {
 export function ConflictModal({
   isOpen,
   conflictData,
+  onUseNewRating,
   onUseExifRating,
   onUseDatabaseRating,
   onIgnore,
 }: ConflictModalProps) {
-  const [hoveredButton, setHoveredButton] = useState<'exif' | 'db' | 'ignore' | null>(null);
+  const [hoveredButton, setHoveredButton] = useState<'new' | 'exif' | 'db' | 'ignore' | null>(null);
 
   if (!isOpen || !conflictData) return null;
+
+  const hasNewRating = conflictData.newRating !== null;
+  const displayDbRating = hasNewRating ? conflictData.newRating : conflictData.dbRating;
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -52,7 +58,7 @@ export function ConflictModal({
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-zinc-400">Database rating:</span>
-            <span className="text-zinc-100 font-semibold">{conflictData.dbRating} ⭐</span>
+            <span className="text-zinc-100 font-semibold">{displayDbRating} ⭐</span>
           </div>
         </div>
 
@@ -70,9 +76,9 @@ export function ConflictModal({
               className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
               onMouseEnter={() => setHoveredButton('db')}
               onMouseLeave={() => setHoveredButton(null)}
-              onClick={onUseDatabaseRating}
+              onClick={hasNewRating ? onUseNewRating : onUseDatabaseRating}
             >
-              Use database rating ({conflictData.dbRating} ⭐)
+              Use database rating ({displayDbRating} ⭐)
             </button>
           </div>
           <button
@@ -81,13 +87,14 @@ export function ConflictModal({
             onMouseLeave={() => setHoveredButton(null)}
             onClick={onIgnore}
           >
-            Ignore
+            {hasNewRating ? 'Cancel' : 'Ignore'}
           </button>
         </div>
         <p className="text-zinc-400 text-sm pt-4 h-12">
           {hoveredButton === 'exif' && 'The rating in the database will be overwritten with the EXIF rating from the image file.'}
           {hoveredButton === 'db' && 'The database rating will be retained and marked as authoritative. Future changes in the image EXIF data will be ignored.'}
-          {hoveredButton === 'ignore' && 'Close this window without making any changes. The notification will appear again on the next visit.'}
+          {hoveredButton === 'ignore' && hasNewRating && 'Cancel and don\'t change the rating.'}
+          {hoveredButton === 'ignore' && !hasNewRating && 'Close this window without making any changes. The notification will appear again on the next visit.'}
           {!hoveredButton && ''}
         </p>
       </div>

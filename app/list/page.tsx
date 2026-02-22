@@ -37,7 +37,7 @@ export default function ListPage() {
   const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
   const [hasXmpMap, setHasXmpMap] = useState<Map<string, boolean>>(new Map()); // Map of fileId to hasXmp
   const [rawExifData, setRawExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to RAW EXIF Rating
-  const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null } | null>(null);
+  const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null; newRating: number | null } | null>(null);
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
@@ -279,6 +279,34 @@ export default function ListPage() {
       console.error('Failed to use EXIF rating:', err);
     }
   }, [selectedConflict, updateRatingInDatabase]);
+
+  const handleUseNewRating = useCallback(async () => {
+    if (!selectedConflict || selectedConflict.newRating === null) return;
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: selectedConflict.fileName,
+          rating: selectedConflict.newRating,
+          folderPath,
+          overRuleFileRating: true,
+        }),
+      });
+
+      if (response.ok) {
+        const fileId = getFileId(selectedConflict.fileName);
+        setRatings(prev => {
+          const newMap = new Map(prev);
+          newMap.set(fileId, { id: fileId, rating: selectedConflict.newRating, overRuleFileRating: true, createdAt: new Date().toISOString() });
+          return newMap;
+        });
+        setSelectedConflict(null);
+      }
+    } catch (err) {
+      console.error('Failed to use new rating:', err);
+    }
+  }, [selectedConflict, folderPath]);
 
   const handleUseDatabaseRating = useCallback(async () => {
     if (!selectedConflict) return;
@@ -620,7 +648,7 @@ export default function ListPage() {
       return (
         <div className="flex items-center gap-2 flex-col">
           <button
-            onClick={() => setSelectedConflict({ fileName, exifRating, dbRating })}
+            onClick={() => setSelectedConflict({ fileName, exifRating, dbRating, newRating: null })}
             className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
           >
             ≠ Conflict
@@ -709,7 +737,7 @@ export default function ListPage() {
       return (
         <div className="flex items-center gap-2 flex-col">
           <button
-            onClick={() => setSelectedConflict({ fileName, exifRating: rawRating, dbRating })}
+            onClick={() => setSelectedConflict({ fileName, exifRating: rawRating, dbRating, newRating: null })}
             className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
           >
             ≠ Conflict
@@ -904,6 +932,7 @@ export default function ListPage() {
       <ConflictModal
         isOpen={selectedConflict !== null}
         conflictData={selectedConflict}
+        onUseNewRating={handleUseNewRating}
         onUseExifRating={handleUseExifRating}
         onUseDatabaseRating={handleUseDatabaseRating}
         onIgnore={handleIgnoreConflict}
