@@ -21,17 +21,19 @@ export interface AggregatedRatings {
  */
 export interface DbRating {
   rating: number | null;
+  overRuleFileRating: boolean;
 }
 
 /**
  * Aggregates ratings from multiple sources into organized buckets.
  * 
  * Rules:
- * - Database ratings: Only included if there's no JPG AND no RAW rating
- * - JPG ratings: Only included if there's no RAW rating AND no DB rating
- * - RAW ratings: Only included if there's no JPG rating AND no DB rating
+ * - Database overRuleFileRating: If true, the database rating ALWAYS takes precedence over JPG and RAW ratings
+ * - Database ratings: Only included if there's no JPG AND no RAW rating (and overRule is false)
+ * - JPG ratings: Only included if there's no RAW rating AND no DB rating (and overRule is false)
+ * - RAW ratings: Only included if there's no JPG rating AND no DB rating (and overRule is false)
  * 
- * @param dbRatingsMap - Map<fileId, DbRating | null> - database ratings
+ * @param dbRatingsMap - Map<fileId, DbRating | null> - database ratings (rating and overRuleFileRating boolean)
  * @param jpgRatingsMap - Map<fileId, number | null> - EXIF ratings from JPG
  * @param rawRatingsMap - Map<fileId, number | null> - EXIF ratings from RAW
  * @param hasConflicts - Optional flag to prevent use if conflicts exist. If true, function returns empty result.
@@ -85,12 +87,21 @@ export function aggregateRatings(
 
   // Process each file
   for (const fileId of allFileIds) {
-    const dbRating = dbRatingsMap.get(fileId)?.rating ?? null;
+    const dbData = dbRatingsMap.get(fileId);
+    const dbRating = dbData?.rating ?? null;
+    const overRuleFlag = dbData?.overRuleFileRating ?? false;
     const jpgRating = jpgRatingsMap.get(fileId) ?? null;
     const rawRating = rawRatingsMap.get(fileId) ?? null;
 
+    // OverRule flag: if true, database rating ALWAYS takes precedence
+    if (overRuleFlag && dbRating !== null && dbRating !== 0) {
+      result.dbRatings.push({
+        fileName: fileId,
+        rating: dbRating,
+      });
+    }
     // Database rating: only if no JPG AND no RAW rating (and rating is not 0)
-    if (dbRating !== null && dbRating !== 0 && jpgRating === null && rawRating === null) {
+    else if (dbRating !== null && dbRating !== 0 && (jpgRating === null || rawRating === null)) {
       result.dbRatings.push({
         fileName: fileId,
         rating: dbRating,

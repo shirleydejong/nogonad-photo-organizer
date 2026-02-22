@@ -255,3 +255,23 @@ export function getAllRatings(folderPath: string): Array<{ id: string; rating: n
 	return rows as Array<{ id: string; rating: number | null; overRuleFileRating: boolean | null; createdAt: string }>;
 };
 
+/**
+ * Resets the overrule flag for all rating records
+ * 
+ * Sets the overRuleFileRating value to false (0) for all records in the ratings table.
+ * This effectively removes any manual overrides on embedded file ratings for the entire collection.
+ * Creates the ratings table if it doesn't exist.
+ * 
+ * @param {string} folderPath - The folder path where the photo collection is stored
+ * 
+ * @example
+ * resetOverRuleFlag('C:\\Users\\Photos');
+ * // All overRuleFileRating flags are now set to false
+ */
+export function resetOverRuleFlag(folderPath: string): void {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+
+	dbInfo.db.prepare('UPDATE ratings SET overRuleFileRating = 0').run();
+};
+

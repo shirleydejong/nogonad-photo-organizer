@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { ConflictModal } from "@/components/conflict-modal";
 import { FilterModal } from "@/components/filter-modal";
+import { StatusModal } from "@/components/status-modal";
 import Link from "next/link";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
@@ -19,7 +20,7 @@ interface ImageData {
 interface Rating {
   id: string;
   rating: number | null;
-  overRuleFileRating: boolean | null;
+  overRuleFileRating: boolean;
   createdAt: string;
 }
 
@@ -30,6 +31,7 @@ export default function ListPage() {
   const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
   const [folderPath, setFolderPath] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadProgress, setLoadProgress] = useState<number>(0);
   const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
   const [exifData, setExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to EXIF Rating
   const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
@@ -40,6 +42,18 @@ export default function ListPage() {
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
+  
+  // Status modal state
+  const [statusModal, setStatusModal] = useState<{
+    isOpen: boolean;
+    status: 'loading' | 'success' | 'error';
+    message: string;
+    errorDetails?: string;
+  }>({
+    isOpen: false,
+    status: 'loading',
+    message: '',
+  });
 
   // Load folder from localStorage on mount
   useEffect(() => {
@@ -54,6 +68,7 @@ export default function ListPage() {
   // Load folder and images
   async function loadFolder(path: string) {
     setIsLoading(true);
+    setLoadProgress(0);
     setError(null);
 
     try {
@@ -67,6 +82,7 @@ export default function ListPage() {
       setFolderName(lastPart || normalizedPath);
 
       // Get list of files (thumbnails should already exist)
+      setLoadProgress(10);
       const startResponse = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,6 +106,7 @@ export default function ListPage() {
       const files = startData.files as string[];
 
       // Create ImageData objects
+      setLoadProgress(25);
       const imageData: ImageData[] = files.map((fileName) => {
         const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
         const encodedPath = encodeURIComponent(fileName);
@@ -103,6 +120,7 @@ export default function ListPage() {
       setImageFiles(imageData);
 
       // Load batch EXIF data from localStorage
+      setLoadProgress(40);
       let batchExifData: any[] = [];
       try {
         const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
@@ -124,6 +142,7 @@ export default function ListPage() {
       setExifData(exifDataMap);
 
       // Fetch ratings for this folder
+      setLoadProgress(55);
       try {
         const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
 
@@ -142,6 +161,7 @@ export default function ListPage() {
       }
 
       // Fetch RAW files from raw subfolder
+      setLoadProgress(75);
       try {
         const rawResponse = await fetch('/api/raw', {
           method: 'POST',
@@ -176,6 +196,7 @@ export default function ListPage() {
         console.error('Failed to fetch RAW files:', rawErr);
       }
 
+      setLoadProgress(95);
       setIsLoading(false);
 
     } catch (e: any) {
@@ -391,12 +412,22 @@ export default function ListPage() {
   }
 
   const handleApplyRatings = useCallback(async () => {
+    // Show modal immediately
+    setStatusModal({
+      isOpen: true,
+      status: 'loading',
+      message: 'Applying ratings to all images...',
+    });
+
     try {
       // Transform ratings Map to match the expected format
       const dbRatingsMap = new Map();
       ratings.forEach((rating, fileId) => {
         if (rating && rating.rating !== null && rating.rating !== 0) {
-          dbRatingsMap.set(fileId, { rating: rating.rating });
+          dbRatingsMap.set(fileId, { 
+            rating: rating.rating,
+            overRuleFileRating: rating.overRuleFileRating ?? false
+          });
         }
       });
 
@@ -435,15 +466,66 @@ export default function ListPage() {
 
       if (response.ok) {
         console.log('Ratings applied successfully');
+        setStatusModal({
+          isOpen: true,
+          status: 'success',
+          message: 'All ratings have been applied successfully!',
+        });
       } else {
         const errorData = await response.json();
         console.error('Failed to apply ratings:', errorData);
+        setStatusModal({
+          isOpen: true,
+          status: 'error',
+          message: 'Failed to apply ratings',
+          errorDetails: errorData.error || 'An unexpected error occurred',
+        });
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to apply ratings:', err);
+      setStatusModal({
+        isOpen: true,
+        status: 'error',
+        message: 'Failed to apply ratings',
+        errorDetails: err.message || 'An unexpected error occurred',
+      });
     }
   }, [ratings, exifData, rawExifData, imageFiles, folderPath]);
+
+  const handleStatusModalClose = useCallback(async () => {
+    try {
+      // Fetch fresh batch EXIF data - same as select-folder does
+      const exifResponse = await fetch('/api/exif', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath, action: 'batch' }),
+      });
+
+      if (exifResponse.ok) {
+        const exifData = await exifResponse.json();
+        if (exifData.success && exifData.exifData) {
+          // Store batch EXIF data in localStorage (same way as select-folder)
+          localStorage.setItem(`batchExifData_${folderPath}`, JSON.stringify(exifData.exifData));
+        }
+      }
+    } catch (exifErr) {
+      console.error('Failed to fetch batch EXIF data:', exifErr);
+      // Continue anyway, loadFolder will use cached data
+    }
+
+    // Reload the folder to refresh all data (will use fresh EXIF data from localStorage)
+    if (folderPath) {
+      await loadFolder(folderPath);
+    }
+
+    // Close the modal
+    setStatusModal({
+      isOpen: false,
+      status: 'loading',
+      message: '',
+    });
+  }, [folderPath]);
 
   function renderConflictIndicator(fileName: string) {
     const fileId = getFileId(fileName);
@@ -626,8 +708,26 @@ export default function ListPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col bg-black font-sans">
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-zinc-400">Loading...</div>
+        <main className="flex-1 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center gap-6 p-8">
+            <div className="text-zinc-200 text-2xl font-semibold">
+              Loading images...
+            </div>
+            <div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
+              <div
+                className="bg-zinc-400 h-full transition-all duration-300 ease-out"
+                style={{ width: `${loadProgress}%` }}
+              />
+            </div>
+            <div className="text-zinc-400 text-sm">
+              {loadProgress}% complete
+            </div>
+            {folderName && (
+              <div className="text-zinc-500 text-sm">
+                Folder: <b>{folderName}</b>
+              </div>
+            )}
+          </div>
         </main>
       </div>
     );
@@ -645,13 +745,14 @@ export default function ListPage() {
             className="header-button"
             onClick={() => setShowFilterModal(true)}
             title="Filter images by rating"
+            disabled={statusModal.isOpen}
           >
             <Icon name="filter_list" />
           </button>
           <button
             className={`header-button ${hasAnyConflicts() ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={handleApplyRatings}
-            disabled={hasAnyConflicts()}
+            disabled={hasAnyConflicts() || statusModal.isOpen}
             title={hasAnyConflicts() ? 'Cannot apply ratings with conflicts' : 'Apply ratings'}
           >
             Apply
@@ -659,7 +760,7 @@ export default function ListPage() {
         </div>
       </Header>
 
-      <main className="flex-1 px-6 py-6">
+      <main className={`flex-1 px-6 py-6 ${statusModal.isOpen ? 'pointer-events-none opacity-50' : ''}`}>
         {error ? (
           <div className="text-red-500 text-center py-8">{error}</div>
         ) : imageFiles.length === 0 ? (
@@ -748,6 +849,14 @@ export default function ListPage() {
         conflictOption={true}
         showConflictsOnly={showConflictsOnly}
         setShowConflictsOnly={setShowConflictsOnly}
+      />
+
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        status={statusModal.status}
+        message={statusModal.message}
+        errorDetails={statusModal.errorDetails}
+        onClose={handleStatusModalClose}
       />
     </div>
   );
