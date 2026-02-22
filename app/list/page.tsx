@@ -42,7 +42,7 @@ export default function ListPage() {
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
-  
+
   // Status modal state
   const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
@@ -326,11 +326,10 @@ export default function ListPage() {
               const newRating = currentRating === star ? null : star;
               updateRatingInDatabase(fileName, newRating);
             }}
-            className={`text-xl transition-colors ${
-              currentRating !== null && star <= currentRating
-                ? 'text-yellow-400'
-                : 'text-zinc-600 hover:text-zinc-500'
-            }`}
+            className={`text-xl transition-colors ${currentRating !== null && star <= currentRating
+              ? 'text-yellow-400'
+              : 'text-zinc-600 hover:text-zinc-500'
+              }`}
             title={`Rate ${star} stars`}
           >
             ★
@@ -424,7 +423,7 @@ export default function ListPage() {
       const dbRatingsMap = new Map();
       ratings.forEach((rating, fileId) => {
         if (rating && rating.rating !== null && rating.rating !== 0) {
-          dbRatingsMap.set(fileId, { 
+          dbRatingsMap.set(fileId, {
             rating: rating.rating,
             overRuleFileRating: rating.overRuleFileRating ?? false
           });
@@ -452,7 +451,7 @@ export default function ListPage() {
       console.log('RAW Ratings Map:', rawRatingsMap);
 
       const aggregated = aggregateRatings(dbRatingsMap, jpgRatingsMap, rawRatingsMap, hasAnyConflicts());
-      
+
       console.log('Aggregated ratings to apply:', aggregated);
 
       const response = await fetch('/api/set-ratings', {
@@ -466,11 +465,17 @@ export default function ListPage() {
 
       if (response.ok) {
         console.log('Ratings applied successfully');
-        setStatusModal({
-          isOpen: true,
-          status: 'success',
-          message: 'All ratings have been applied successfully!',
-        });
+        // Automatically move 1-star files to trash if any exist
+        const oneStarCount = getOneStarCount();
+        if (oneStarCount > 0) {
+          await handleMoveToTrash();
+        } else {
+          setStatusModal({
+            isOpen: true,
+            status: 'success',
+            message: 'All ratings have been applied successfully!',
+          });
+        }
       } else {
         const errorData = await response.json();
         console.error('Failed to apply ratings:', errorData);
@@ -481,7 +486,7 @@ export default function ListPage() {
           errorDetails: errorData.error || 'An unexpected error occurred',
         });
       }
-      
+
     } catch (err: any) {
       console.error('Failed to apply ratings:', err);
       setStatusModal({
@@ -492,6 +497,72 @@ export default function ListPage() {
       });
     }
   }, [ratings, exifData, rawExifData, imageFiles, folderPath]);
+
+  const getOneStarCount = useCallback(() => {
+    let count = 0;
+    ratings.forEach((rating) => {
+      if (rating && rating.rating === 1) {
+        count++;
+      }
+    });
+    return count;
+  }, [ratings]);
+
+  const handleMoveToTrash = useCallback(async () => {
+    const count = getOneStarCount();
+    if (count === 0) return;
+
+    setStatusModal({
+      isOpen: true,
+      status: 'loading',
+      message: `Moving ${count} 1-star files (and variants) to trash...`,
+    });
+
+    try {
+      const response = await fetch('/api/trash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Remove moved files from the local ratings map so the UI updates
+        setRatings(prev => {
+          const newMap = new Map(prev);
+          data.movedFiles.forEach((fullPath: string) => {
+            const fileName = fullPath.split(/[\\/]/).pop() || '';
+            const fileId = getFileId(fileName);
+            newMap.delete(fileId);
+          });
+          return newMap;
+        });
+
+        setStatusModal({
+          isOpen: true,
+          status: 'success',
+          message: `All ratings applied and ${data.movedFiles.length} files moved to trash.`,
+        });
+      } else {
+        const errorData = await response.json();
+        setStatusModal({
+          isOpen: true,
+          status: 'error',
+          message: 'Failed to move files to trash',
+          errorDetails: errorData.error || 'An unexpected error occurred',
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to move files to trash:', err);
+      setStatusModal({
+        isOpen: true,
+        status: 'error',
+        message: 'Failed to move files to trash',
+        errorDetails: err.message || 'An unexpected error occurred',
+      });
+    }
+  }, [folderPath, getOneStarCount]);
 
   const handleStatusModalClose = useCallback(async () => {
     try {
@@ -532,7 +603,7 @@ export default function ListPage() {
     const exifRating = exifData.get(fileId);
     const dbRating = ratings.get(fileId)?.rating ?? null;
     const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
-    
+
     // No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
     if (!dbRating && !exifRating) {
       return (
@@ -560,7 +631,7 @@ export default function ListPage() {
         </div>
       );
     }
-    
+
     // Ratings differ = conflict
     if ((dbRating && exifRating) && exifRating !== dbRating && dbOverRule) {
       return (
@@ -588,7 +659,7 @@ export default function ListPage() {
         </div>
       )
     }
-    
+
     // No conflict (either no DB rating, or ratings match)
     if ((dbRating && !exifRating)) {
       return (
@@ -602,7 +673,7 @@ export default function ListPage() {
         </div>
       )
     }
-    
+
     // No conflict (either no DB rating, or ratings match)
     return (
       <div className="flex items-center gap-2 flex-col">
@@ -621,7 +692,7 @@ export default function ListPage() {
     const rawRating = rawExifData.get(fileId);
     const dbRating = ratings.get(fileId)?.rating ?? null;
     const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
-    
+
     // No ratings at all (neither RAW nor DB) = no conflict, show "No rating"
     if (!dbRating && !rawRating) {
       return (
@@ -649,7 +720,7 @@ export default function ListPage() {
         </div>
       );
     }
-    
+
     // Ratings differ but overruled = resolved
     if ((dbRating && rawRating) && rawRating !== dbRating && dbOverRule) {
       return (
@@ -677,7 +748,7 @@ export default function ListPage() {
         </div>
       )
     }
-    
+
     // Only DB rating (no RAW rating)
     if ((dbRating && !rawRating)) {
       return (
@@ -691,7 +762,7 @@ export default function ListPage() {
         </div>
       )
     }
-    
+
     // Only RAW rating (no DB rating)
     return (
       <div className="flex items-center gap-2 flex-col">
@@ -735,7 +806,7 @@ export default function ListPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
-      <Header 
+      <Header
         folderName={folderName}
         title={folderPath}
       >
@@ -782,13 +853,12 @@ export default function ListPage() {
                 {imageFiles.filter(image => shouldShowImage(image.fileName)).map((image, idx) => (
                   <tr
                     key={idx}
-                    className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${
-                      hasAllRatingsMatch(image.fileName)
-                        ? 'bg-green-950 bg-opacity-20'
-                        : hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
-                          ? 'bg-red-950 bg-opacity-20 conflict'
-                          : 'no-conflict'
-                    }`}
+                    className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${hasAllRatingsMatch(image.fileName)
+                      ? 'bg-green-950 bg-opacity-20'
+                      : hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
+                        ? 'bg-red-950 bg-opacity-20 conflict'
+                        : 'no-conflict'
+                      }`}
                   >
                     <td className="py-3 px-4">
                       <div className="w-20 h-20 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
@@ -857,6 +927,7 @@ export default function ListPage() {
         message={statusModal.message}
         errorDetails={statusModal.errorDetails}
         onClose={handleStatusModalClose}
+        showProgress={statusModal.isOpen && (statusModal.message.includes('Applying') || statusModal.message.includes('Moving')) && statusModal.status === 'loading'}
       />
     </div>
   );

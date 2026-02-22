@@ -4,5 +4,6 @@ export default {
 	NPO_FOLDER: '_npo',
 	THUMBNAILS_FOLDER: 'thumbs',
 	RAW_FOLDER: 'raw',
+	TRASH_FOLDER: 'trash',
 	DB: 'npo.db',
 };
