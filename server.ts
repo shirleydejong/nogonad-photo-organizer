@@ -7,6 +7,7 @@ import FolderWatcher, { FileChangeEvent } from './controllers/watcher';
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = 3000;
+const socketPort = 3001; // Separate port for Socket.IO to avoid conflicts with Next.js HMR
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -26,8 +27,11 @@ app.prepare().then(() => {
     }
   });
 
-  // Initialize Socket.IO
-  const io = new SocketIOServer(httpServer, {
+  // Create separate HTTP server for Socket.IO
+  const socketServer = createServer();
+
+  // Initialize Socket.IO on separate server
+  const io = new SocketIOServer(socketServer, {
     cors: {
       origin: '*',
       methods: ['GET', 'POST'],
@@ -36,6 +40,46 @@ app.prepare().then(() => {
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+
+    // Handle thumbnail generation
+    socket.on('generate-thumbnails', async (folderPath: string) => {
+      console.log('Generate thumbnails request:', folderPath);
+
+      try {
+        const watcher = new FolderWatcher(folderPath, {
+          onThumbnailProgress: (processed: number, total: number) => {
+            const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+            console.log(`Progress: ${processed}/${total} (${percentage}%)`);
+            socket.emit('thumbnail-progress', { processed, total, percentage, folderPath });
+          },
+          onThumbnailCreated: (fileName: string) => {
+            console.log('Thumbnail created:', fileName);
+          },
+          onError: (error: Error) => {
+            console.error('Thumbnail generation error:', error);
+            socket.emit('thumbnail-error', { error: error.message, folderPath });
+          },
+        });
+
+        // Process existing images - this will call onThumbnailProgress for each created thumbnail
+        const result = await watcher.processExistingImages();
+        
+        console.log(`Thumbnail processing complete: ${result.total} total, ${result.existingThumbnails} existing`);
+
+        // Emit completion
+        socket.emit('thumbnail-complete', { 
+          total: result.total, 
+          files: result.files, 
+          folderPath 
+        });
+      } catch (error) {
+        console.error('Failed to generate thumbnails:', error);
+        socket.emit('thumbnail-error', { 
+          error: error instanceof Error ? error.message : 'Failed to generate thumbnails', 
+          folderPath 
+        });
+      }
+    });
 
     // Handle folder watching
     socket.on('watch-folder', async (folderPath: string) => {
@@ -111,6 +155,14 @@ app.prepare().then(() => {
     })
     .listen(port, () => {
       console.log(`> Ready on http://${hostname}:${port}`);
-      console.log('> Socket.IO server is running');
+    });
+
+  socketServer
+    .once('error', (err) => {
+      console.error('Socket.IO server error:', err);
+      process.exit(1);
+    })
+    .listen(socketPort, () => {
+      console.log(`> Socket.IO server running on http://${hostname}:${socketPort}`);
     });
 });

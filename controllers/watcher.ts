@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import chokidar, { FSWatcher } from 'chokidar';
 import sharp from 'sharp';
 import CONFIG from '@/config';
@@ -12,6 +13,8 @@ interface WatcherCallbacks {
   onFileAdded?: (fileName: string, hasRating: boolean) => void;
   onFileChanged?: (fileName: string) => void;
   onFileDeleted?: (fileName: string) => void;
+  onThumbnailProgress?: (processed: number, total: number) => void;
+  onThumbnailCreated?: (fileName: string) => void;
   onError?: (error: Error) => void;
 }
 
@@ -34,6 +37,8 @@ class FolderWatcher {
       onFileAdded: callbacks.onFileAdded || (() => {}),
       onFileChanged: callbacks.onFileChanged || (() => {}),
       onFileDeleted: callbacks.onFileDeleted || (() => {}),
+      onThumbnailProgress: callbacks.onThumbnailProgress || (() => {}),
+      onThumbnailCreated: callbacks.onThumbnailCreated || (() => {}),
       onError: callbacks.onError || ((error) => console.error('FolderWatcher Error:', error)),
     };
   }
@@ -88,6 +93,65 @@ class FolderWatcher {
       await this.watcher.close();
       this.watcher = null;
       console.log('FolderWatcher stopped');
+    }
+  }
+
+  /**
+   * Process all existing images in the folder and generate thumbnails
+   * Returns the total number of images and list of filenames
+   */
+  async processExistingImages(): Promise<{ total: number; files: string[]; existingThumbnails: number }> {
+    try {
+      // Ensure thumbnails folder exists
+      await fs.mkdir(this.thumbsPath, { recursive: true });
+
+      // Get all files in the folder
+      const files = await fs.readdir(this.folderPath);
+      const imageFiles = files.filter((file) => this.isSupportedImage(file));
+
+      // Count existing thumbnails
+      let existingThumbnails = 0;
+      for (const file of imageFiles) {
+        const thumbName = this.getThumbnailFilename(file);
+        const thumbPath = path.join(this.thumbsPath, thumbName);
+        try {
+          await fs.access(thumbPath);
+          existingThumbnails++;
+        } catch {
+          // Thumbnail doesn't exist
+        }
+      }
+
+      // Send initial progress with existing thumbnails
+      if (imageFiles.length > 0) {
+        this.callbacks.onThumbnailProgress(existingThumbnails, imageFiles.length);
+      }
+
+      // Process images that don't have thumbnails
+      let processed = existingThumbnails;
+      for (const file of imageFiles) {
+        const thumbName = this.getThumbnailFilename(file);
+        const thumbPath = path.join(this.thumbsPath, thumbName);
+        
+        try {
+          // Check if thumbnail already exists
+          await fs.access(thumbPath);
+          // Thumbnail exists, skip
+        } catch {
+          // Thumbnail doesn't exist, create it
+          const filepath = path.join(this.folderPath, file);
+          await this.createThumbnail(filepath);
+          processed++;
+          this.callbacks.onThumbnailCreated(file);
+          this.callbacks.onThumbnailProgress(processed, imageFiles.length);
+        }
+      }
+
+      return { total: imageFiles.length, files: imageFiles, existingThumbnails };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.callbacks.onError(err);
+      throw err;
     }
   }
 

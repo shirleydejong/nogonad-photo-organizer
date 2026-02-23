@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
-import { io, Socket } from "socket.io-client";
+import { getSocket } from "@/utils/socket";
+import { Socket } from "socket.io-client";
 import { Icon } from "@/components/icon";
 import { ExifItem } from "@/components/exif-item";
 import { Header } from "@/components/header";
@@ -125,50 +126,63 @@ export default function Home() {
 
   // Initialize Socket.IO connection
   useEffect(() => {
-    const socket = io('http://localhost:3000', {
-      transports: ['websocket', 'polling'],
-    });
-
+    const socket = getSocket();
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const handleConnect = () => {
       console.log('Socket.IO connected:', socket.id);
-    });
+    };
 
-    socket.on('disconnect', () => {
+    const handleDisconnect = () => {
       console.log('Socket.IO disconnected');
-    });
+    };
 
-    socket.on('watch-started', ({ folderPath }: { folderPath: string }) => {
+    const handleWatchStarted = ({ folderPath }: { folderPath: string }) => {
       console.log('Watch started for:', folderPath);
       setIsWatcherActive(true);
-    });
+    };
 
-    socket.on('watch-stopped', ({ folderPath }: { folderPath: string }) => {
+    const handleWatchStopped = ({ folderPath }: { folderPath: string }) => {
       console.log('Watch stopped for:', folderPath);
       setIsWatcherActive(false);
-    });
+    };
 
-    socket.on('file-added', ({ fileName, hasRating, folderPath }: { fileName: string; hasRating: boolean; folderPath: string }) => {
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('watch-started', handleWatchStarted);
+    socket.on('watch-stopped', handleWatchStopped);
+
+    const handleFileAdded = ({ fileName, hasRating, folderPath }: { fileName: string; hasRating: boolean; folderPath: string }) => {
       handleWatcherEvent({ type: 'added', fileName, hasRating }, folderPath);
-    });
+    };
 
-    socket.on('file-changed', ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+    const handleFileChanged = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
       handleWatcherEvent({ type: 'changed', fileName }, folderPath);
-    });
+    };
 
-    socket.on('file-deleted', ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+    const handleFileDeleted = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
       handleWatcherEvent({ type: 'deleted', fileName }, folderPath);
-    });
+    };
 
-    socket.on('watcher-error', ({ error, folderPath }: { error: string; folderPath: string }) => {
+    const handleWatcherError = ({ error, folderPath }: { error: string; folderPath: string }) => {
       console.error('Watcher error:', error);
-    });
+    };
+
+    socket.on('file-added', handleFileAdded);
+    socket.on('file-changed', handleFileChanged);
+    socket.on('file-deleted', handleFileDeleted);
+    socket.on('watcher-error', handleWatcherError);
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
+      // Remove only our listeners, don't disconnect the socket
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('watch-started', handleWatchStarted);
+      socket.off('watch-stopped', handleWatchStopped);
+      socket.off('file-added', handleFileAdded);
+      socket.off('file-changed', handleFileChanged);
+      socket.off('file-deleted', handleFileDeleted);
+      socket.off('watcher-error', handleWatcherError);
     };
   }, []);
 

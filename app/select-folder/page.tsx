@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getSocket } from "@/utils/socket";
+import { Socket } from "socket.io-client";
 import CONFIG from "@/config";
 
 export default function SelectFolder() {
@@ -15,6 +17,8 @@ export default function SelectFolder() {
   const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false);
   const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const isSocketReady = useRef<boolean>(false);
 
   const [hasActiveFolder, setHasActiveFolder] = useState<boolean>(false);
 
@@ -39,6 +43,38 @@ export default function SelectFolder() {
     if (activeFolder) {
       setHasActiveFolder(true);
     }
+  }, []);
+
+  // Setup socket.io connection
+  useEffect(() => {
+    // Get or create the global socket instance
+    const socket = getSocket();
+    socketRef.current = socket;
+
+    // Check if already connected
+    if (socket.connected) {
+      isSocketReady.current = true;
+    }
+
+    // Listen for connection events
+    const handleConnect = () => {
+      console.log('Socket connected:', socket.id);
+      isSocketReady.current = true;
+    };
+
+    const handleDisconnect = () => {
+      console.log('Socket disconnected');
+      isSocketReady.current = false;
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+
+    return () => {
+      // Remove only our listeners, don't disconnect the socket
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
   }, []);
 
   // Save path to history
@@ -90,6 +126,17 @@ export default function SelectFolder() {
       return;
     }
 
+    if (!socketRef.current) {
+      setError("Socket connection not available");
+      return;
+    }
+
+    // Wait for socket to be ready
+    if (!isSocketReady.current) {
+      setError("Socket not connected yet, please wait...");
+      return;
+    }
+
     setIsProcessing(true);
     setProgress(0);
     
@@ -122,81 +169,87 @@ export default function SelectFolder() {
       const lastPart = parts[parts.length - 1];
       setFolderName(lastPart || normalizedPath);
 
-      // Start thumbnail generation on the server
-      const startResponse = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
-      });
+      // Setup socket event listeners
+      const socket = socketRef.current;
 
-      if (!startResponse.ok) {
-        const errorData = await startResponse.json();
-        throw new Error(errorData.error || 'Could not generate thumbnails');
-      }
-
-      const startData = await startResponse.json();
-
-      // If no images found
-      if (startData.total === 0) {
-        setError("No images found in this folder");
-        setIsProcessing(false);
-        return;
-      }
-
-      // Poll for progress
-      const pollInterval = setInterval(async () => {
-        try {
-          const progressResponse = await fetch('/api/image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folderPath: normalizedPath, action: 'progress' }),
-          });
-
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            setProgress(progressData.percentage);
-
-            // If done, stop polling and fetch batch EXIF data
-            if (progressData.processed >= progressData.total) {
-              clearInterval(pollInterval);
-              
-              try {
-                // Fetch batch EXIF data for all files in the folder
-                const exifResponse = await fetch('/api/exif', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ folderPath: normalizedPath, action: 'batch' }),
-                });
-
-                if (exifResponse.ok) {
-                  const exifData = await exifResponse.json();
-                  if (exifData.success && exifData.exifData) {
-                    // Store batch EXIF data in localStorage
-                    localStorage.setItem(`batchExifData_${normalizedPath}`, JSON.stringify(exifData.exifData));
-                  }
-                }
-              } catch (exifErr) {
-                console.error('Failed to fetch batch EXIF data:', exifErr);
-                // Continue anyway, EXIF data is optional
-              }
-
-              setTimeout(() => {
-                // Save to localStorage as activeFolder
-                localStorage.setItem('activeFolder', normalizedPath);
-                // Navigate to the selected view
-                router.push(targetRoute);
-              }, 300);
-            }
-          }
-        } catch (err) {
-          console.error('Progress poll error:', err);
+      const handleProgress = (data: { processed: number; total: number; percentage: number; folderPath: string }) => {
+        console.log('Received thumbnail-progress:', data);
+        if (data.folderPath === normalizedPath) {
+          setProgress(data.percentage);
         }
-      }, 500);
+      };
+
+      const handleComplete = async (data: { total: number; files: string[]; folderPath: string }) => {
+        console.log('Received thumbnail-complete:', data);
+        if (data.folderPath === normalizedPath) {
+          // Clean up listeners
+          socket.off('thumbnail-progress', handleProgress);
+          socket.off('thumbnail-complete', handleComplete);
+          socket.off('thumbnail-error', handleError);
+
+          if (data.total === 0) {
+            setError("No images found in this folder");
+            setIsProcessing(false);
+            return;
+          }
+
+          try {
+            // Fetch batch EXIF data for all files in the folder
+            const exifResponse = await fetch('/api/exif', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folderPath: normalizedPath, action: 'batch' }),
+            });
+
+            if (exifResponse.ok) {
+              const exifData = await exifResponse.json();
+              if (exifData.success && exifData.exifData) {
+                // Store batch EXIF data in localStorage
+                localStorage.setItem(`batchExifData_${normalizedPath}`, JSON.stringify(exifData.exifData));
+              }
+            }
+          } catch (exifErr) {
+            console.error('Failed to fetch batch EXIF data:', exifErr);
+            // Continue anyway, EXIF data is optional
+          }
+
+          setTimeout(() => {
+            // Save to localStorage as activeFolder
+            localStorage.setItem('activeFolder', normalizedPath);
+            // Navigate to the selected view
+            router.push(targetRoute);
+          }, 300);
+        }
+      };
+
+      const handleError = (data: { error: string; folderPath: string }) => {
+        console.log('Received thumbnail-error:', data);
+        if (data.folderPath === normalizedPath) {
+          // Clean up listeners
+          socket.off('thumbnail-progress', handleProgress);
+          socket.off('thumbnail-complete', handleComplete);
+          socket.off('thumbnail-error', handleError);
+
+          setError(data.error || 'Could not generate thumbnails');
+          setIsProcessing(false);
+        }
+      };
+
+      // Register event listeners
+      socket.on('thumbnail-progress', handleProgress);
+      socket.on('thumbnail-complete', handleComplete);
+      socket.on('thumbnail-error', handleError);
+
+      // Emit generate-thumbnails event
+      console.log('Emitting generate-thumbnails:', normalizedPath);
+      socket.emit('generate-thumbnails', normalizedPath);
 
       // Safety timeout after 60 seconds
       setTimeout(() => {
-        clearInterval(pollInterval);
         if (isProcessing) {
+          socket.off('thumbnail-progress', handleProgress);
+          socket.off('thumbnail-complete', handleComplete);
+          socket.off('thumbnail-error', handleError);
           setError('Timeout while generating thumbnails');
           setIsProcessing(false);
         }

@@ -33,16 +33,16 @@ export function StatusModal({
         {/* Icon and heading */}
         <div className="flex items-start gap-4 mb-6">
           <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${status === 'loading' ? 'bg-blue-500/20' :
-            status === 'success' ? 'bg-green-500/20' :
+            status === 'success' ? 'bg-green-700' :
               'bg-red-500/20'
             }`}>
             {status === 'loading' && (
               <div className="animate-spin">
-                <Icon name="hourglass_top" />
+                <Icon name="hourglass_top" color="white" />
               </div>
             )}
-            {status === 'success' && <Icon name="check_circle" />}
-            {status === 'error' && <Icon name="error" />}
+            {status === 'success' && <Icon name="check_circle" color="white" />}
+            {status === 'error' && <Icon name="error" color="white" />}
           </div>
           <div className="flex-1">
             <h3 className="text-zinc-100 font-semibold text-lg mb-1">
@@ -85,7 +85,7 @@ export function StatusModal({
                 onClick={onSecondaryAction}
                 className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition cursor-pointer flex items-center justify-center gap-2"
               >
-                <Icon name="delete" />
+                <Icon name="delete" color="white" />
                 {secondaryActionLabel}
               </button>
             )}
