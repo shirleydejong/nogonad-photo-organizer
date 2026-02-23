@@ -6,4 +6,6 @@ export default {
 	RAW_FOLDER: 'raw',
 	TRASH_FOLDER: 'trash',
 	DB: 'npo.db',
+	HTTP_PORT: 3000,
+	SOCKET_PORT: 3001,
 };

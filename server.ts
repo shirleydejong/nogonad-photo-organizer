@@ -1,13 +1,14 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
+import config from './config';
 import { Server as SocketIOServer } from 'socket.io';
 import FolderWatcher, { FileChangeEvent } from './controllers/watcher';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
-const port = 3000;
-const socketPort = 3001; // Separate port for Socket.IO to avoid conflicts with Next.js HMR
+const port = config.HTTP_PORT;
+const socketPort = config.SOCKET_PORT; // Separate port for Socket.IO to avoid conflicts with Next.js HMR
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
