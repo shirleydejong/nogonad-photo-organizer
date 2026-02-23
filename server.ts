@@ -3,7 +3,7 @@ import { parse } from 'url';
 import next from 'next';
 import config from './config';
 import { Server as SocketIOServer } from 'socket.io';
-import FolderWatcher, { FileChangeEvent } from './controllers/watcher';
+import FileWatcher, { FileChangeEvent } from './controllers/file-watcher';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -14,7 +14,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Store active watchers per folder
-const activeWatchers = new Map<string, FolderWatcher>();
+const activeWatchers = new Map<string, FileWatcher>();
 
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
@@ -47,7 +47,7 @@ app.prepare().then(() => {
       console.log('Generate thumbnails request:', folderPath);
 
       try {
-        const watcher = new FolderWatcher(folderPath, {
+        const watcher = new FileWatcher(folderPath, {
           onThumbnailProgress: (processed: number, total: number) => {
             const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
             console.log(`Progress: ${processed}/${total} (${percentage}%)`);
@@ -94,8 +94,8 @@ app.prepare().then(() => {
         }
 
         // Create new watcher
-        const watcher = new FolderWatcher(folderPath, {
-          onFileAdded: (fileName: string, hasRating: boolean) => {
+        const watcher = new FileWatcher(folderPath, {
+          onFileAdded: (fileName: string, hasRating?: boolean) => {
             console.log('File added:', fileName, 'hasRating:', hasRating);
             io.emit('file-added', { fileName, hasRating, folderPath });
           },

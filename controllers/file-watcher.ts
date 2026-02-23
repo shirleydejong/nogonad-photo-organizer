@@ -9,12 +9,13 @@ import { getRating } from './database';
 // Supported image extensions
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
-interface WatcherCallbacks {
-  onFileAdded?: (fileName: string, hasRating: boolean) => void;
+interface FileWatcherCallbacks {
+  onFileAdded?: (fileName: string, hasRating?: boolean) => void;
   onFileChanged?: (fileName: string) => void;
   onFileDeleted?: (fileName: string) => void;
   onThumbnailProgress?: (processed: number, total: number) => void;
   onThumbnailCreated?: (fileName: string) => void;
+  onThumbnailDeleted?: (fileName: string) => void;
   onError?: (error: Error) => void;
 }
 
@@ -24,13 +25,13 @@ export interface FileChangeEvent {
   hasRating?: boolean;
 }
 
-class FolderWatcher {
+class FileWatcher {
   private watcher: FSWatcher | null = null;
   private folderPath: string;
   private thumbsPath: string;
-  private callbacks: Required<WatcherCallbacks>;
+  private callbacks: Required<FileWatcherCallbacks>;
 
-  constructor(folderPath: string, callbacks: WatcherCallbacks = {}) {
+  constructor(folderPath: string, callbacks: FileWatcherCallbacks = {}) {
     this.folderPath = folderPath;
     this.thumbsPath = path.join(folderPath, CONFIG.NPO_FOLDER, CONFIG.THUMBNAILS_FOLDER);
     this.callbacks = {
@@ -39,19 +40,20 @@ class FolderWatcher {
       onFileDeleted: callbacks.onFileDeleted || (() => {}),
       onThumbnailProgress: callbacks.onThumbnailProgress || (() => {}),
       onThumbnailCreated: callbacks.onThumbnailCreated || (() => {}),
-      onError: callbacks.onError || ((error) => console.error('FolderWatcher Error:', error)),
+      onThumbnailDeleted: callbacks.onThumbnailDeleted || (() => {}),
+      onError: callbacks.onError || ((error) => console.error('FileWatcher Error:', error)),
     };
   }
 
   /**
-   * Start watching the folder
+   * Start watching the folder and begin processing existing images
    */
   async start(): Promise<void> {
     try {
       // Ensure thumbnails folder exists
       await fs.mkdir(this.thumbsPath, { recursive: true });
 
-      // Start the watcher
+      // Start the chokidar watcher
       this.watcher = chokidar.watch(this.folderPath, {
         ignored: [
           (filepath: string) => {
@@ -62,7 +64,7 @@ class FolderWatcher {
           /node_modules/,
         ],
         persistent: true,
-        ignoreInitial: true, // Don't trigger events for existing files
+        ignoreInitial: true,
         awaitWriteFinish: {
           stabilityThreshold: 2000,
           pollInterval: 100,
@@ -77,7 +79,7 @@ class FolderWatcher {
         this.callbacks.onError(err);
       });
 
-      console.log(`FolderWatcher started for: ${this.folderPath}`);
+      console.log(`FileWatcher started for: ${this.folderPath}`);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.callbacks.onError(err);
@@ -92,7 +94,7 @@ class FolderWatcher {
     if (this.watcher) {
       await this.watcher.close();
       this.watcher = null;
-      console.log('FolderWatcher stopped');
+      console.log('FileWatcher stopped');
     }
   }
 
@@ -132,7 +134,7 @@ class FolderWatcher {
       for (const file of imageFiles) {
         const thumbName = this.getThumbnailFilename(file);
         const thumbPath = path.join(this.thumbsPath, thumbName);
-        
+
         try {
           // Check if thumbnail already exists
           await fs.access(thumbPath);
@@ -156,11 +158,11 @@ class FolderWatcher {
   }
 
   /**
-   * Handle file addition
+   * Handle file addition event
    */
   private async handleFileAdd(filepath: string): Promise<void> {
     const filename = path.basename(filepath);
-    
+
     if (!this.isSupportedImage(filename)) {
       return;
     }
@@ -182,11 +184,11 @@ class FolderWatcher {
   }
 
   /**
-   * Handle file change
+   * Handle file change event
    */
   private async handleFileChange(filepath: string): Promise<void> {
     const filename = path.basename(filepath);
-    
+
     if (!this.isSupportedImage(filename)) {
       return;
     }
@@ -194,7 +196,6 @@ class FolderWatcher {
     try {
       // Regenerate thumbnail
       await this.createThumbnail(filepath);
-
       this.callbacks.onFileChanged(filename);
     } catch (error) {
       console.error(`Error handling file change for ${filename}:`, error);
@@ -203,26 +204,18 @@ class FolderWatcher {
   }
 
   /**
-   * Handle file deletion
+   * Handle file deletion event
    */
   private async handleFileDelete(filepath: string): Promise<void> {
     const filename = path.basename(filepath);
-    
+
     if (!this.isSupportedImage(filename)) {
       return;
     }
 
     try {
       // Delete thumbnail
-      const thumbName = this.getThumbnailFilename(filename);
-      const thumbPath = path.join(this.thumbsPath, thumbName);
-      
-      try {
-        await fs.unlink(thumbPath);
-      } catch (err) {
-        // Thumbnail might not exist, ignore error
-      }
-
+      await this.deleteThumbnail(filename);
       this.callbacks.onFileDeleted(filename);
     } catch (error) {
       console.error(`Error handling file delete for ${filename}:`, error);
@@ -238,15 +231,44 @@ class FolderWatcher {
     const thumbName = this.getThumbnailFilename(filename);
     const thumbPath = path.join(this.thumbsPath, thumbName);
 
-    await sharp(filepath)
-      .resize(CONFIG.THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
-      .toFile(thumbPath);
+    // Skip if thumbnail already exists
+    if (fsSync.existsSync(thumbPath)) {
+      return;
+    }
 
-    console.log(`Thumbnail created: ${thumbName}`);
+    try {
+      await sharp(filepath)
+        .resize(CONFIG.THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
+        .toFile(thumbPath);
+
+      console.log(`Thumbnail created: ${thumbName}`);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      throw err;
+    }
   }
 
   /**
-   * Check if a file is a supported image
+   * Delete a thumbnail
+   */
+  private async deleteThumbnail(filename: string): Promise<void> {
+    const thumbName = this.getThumbnailFilename(filename);
+    const thumbPath = path.join(this.thumbsPath, thumbName);
+
+    try {
+      if (fsSync.existsSync(thumbPath)) {
+        await fs.unlink(thumbPath);
+        console.log(`Thumbnail deleted: ${thumbName}`);
+        this.callbacks.onThumbnailDeleted(filename);
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      throw err;
+    }
+  }
+
+  /**
+   * Check if file is a supported image
    */
   private isSupportedImage(filename: string): boolean {
     const ext = path.extname(filename).toLowerCase();
@@ -254,7 +276,7 @@ class FolderWatcher {
   }
 
   /**
-   * Get thumbnail filename
+   * Get thumbnail filename from original filename
    */
   private getThumbnailFilename(filename: string): string {
     const lastDot = filename.lastIndexOf('.');
@@ -272,4 +294,5 @@ class FolderWatcher {
   }
 }
 
-export default FolderWatcher;
+export default FileWatcher;
+export type { FileWatcherCallbacks };
