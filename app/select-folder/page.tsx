@@ -245,7 +245,7 @@ export default function SelectFolder() {
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handlePickFolder();
+                    handlePickFolder('/');
                   } else if (e.key === 'Escape') {
                     setShowAutocomplete(false);
                   }

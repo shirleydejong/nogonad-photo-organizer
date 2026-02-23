@@ -256,6 +256,28 @@ export function getAllRatings(folderPath: string): Array<{ id: string; rating: n
 };
 
 /**
+ * Retrieves a single rating record from the database
+ * 
+ * Fetches the rating for a specific file by its ID.
+ * Returns null if no rating exists for the given file.
+ * 
+ * @param {string} fileId - The file identifier (filename without extension)
+ * @param {string} folderPath - The folder path where the photo collection is stored
+ * @returns {number | null} The rating value (1-5) or null if not found
+ * 
+ * @example
+ * const rating = getRating('photo-001', 'C:\\Users\\Photos');
+ * console.log(rating); // 5 or null
+ */
+export function getRating(fileId: string, folderPath: string): number | null {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+
+	const row = dbInfo.db.prepare('SELECT rating FROM ratings WHERE id = ?').get(fileId) as { rating: number | null } | undefined;
+	return row?.rating ?? null;
+};
+
+/**
  * Resets the overrule flag for all rating records
  * 
  * Sets the overRuleFileRating value to false (0) for all records in the ratings table.

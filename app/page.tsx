@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
+import { io, Socket } from "socket.io-client";
 import { Icon } from "@/components/icon";
 import { ExifItem } from "@/components/exif-item";
 import { Header } from "@/components/header";
@@ -57,6 +58,8 @@ export default function Home() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
   const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  const [isWatcherActive, setIsWatcherActive] = useState<boolean>(false);
+  const socketRef = useRef<Socket | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
   const filmstripDragStartXRef = useRef(0);
@@ -119,6 +122,55 @@ export default function Home() {
   }, []);
 
   const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
+
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    const socket = io('http://localhost:3000', {
+      transports: ['websocket', 'polling'],
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('Socket.IO connected:', socket.id);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Socket.IO disconnected');
+    });
+
+    socket.on('watch-started', ({ folderPath }: { folderPath: string }) => {
+      console.log('Watch started for:', folderPath);
+      setIsWatcherActive(true);
+    });
+
+    socket.on('watch-stopped', ({ folderPath }: { folderPath: string }) => {
+      console.log('Watch stopped for:', folderPath);
+      setIsWatcherActive(false);
+    });
+
+    socket.on('file-added', ({ fileName, hasRating, folderPath }: { fileName: string; hasRating: boolean; folderPath: string }) => {
+      handleWatcherEvent({ type: 'added', fileName, hasRating }, folderPath);
+    });
+
+    socket.on('file-changed', ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+      handleWatcherEvent({ type: 'changed', fileName }, folderPath);
+    });
+
+    socket.on('file-deleted', ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+      handleWatcherEvent({ type: 'deleted', fileName }, folderPath);
+    });
+
+    socket.on('watcher-error', ({ error, folderPath }: { error: string; folderPath: string }) => {
+      console.error('Watcher error:', error);
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // Load folder from localStorage on mount
   useEffect(() => {
@@ -235,10 +287,121 @@ export default function Home() {
 
       setIsLoading(false);
 
+      // Start folder watcher via Socket.IO
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('watch-folder', normalizedPath);
+      }
+
     } catch (e: any) {
       console.error('Error:', e);
       setError(e.message || "Could not load folder.");
       setIsLoading(false);
+    }
+  }
+
+
+
+  // Handle watcher events
+  function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted'; fileName: string; hasRating?: boolean }, path: string) {
+    const normalizedThumbPath = `${path}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+
+    if (event.type === 'added') {
+      console.log('File added:', event.fileName);
+
+      // Check if file already exists
+      const exists = imageFiles.some(img => img.fileName === event.fileName);
+      if (exists) return;
+
+      // Add new image to the list
+      const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+      const encodedPath = encodeURIComponent(event.fileName);
+      const newImage = {
+        originalFile: null as any,
+        fileName: event.fileName,
+        thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+        originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}`,
+      };
+
+      // Update state and set new image as active
+      setImageFiles(prev => {
+        const newList = [...prev, newImage];
+        // Use setTimeout to ensure activeIndex is set after state updates
+        setTimeout(() => {
+          setActiveIndex(newList.length - 1);
+        }, 0);
+        return newList;
+      });
+
+      // Update ratings if file has rating
+      if (event.hasRating) {
+        const fileId = getFileId(event.fileName);
+        // Refresh ratings for this file
+        fetchRatingForFile(event.fileName, path);
+      }
+
+    } else if (event.type === 'changed') {
+      console.log('File changed:', event.fileName);
+      // Force reload of the thumbnail by updating the path with a timestamp
+      setImageFiles(prev => prev.map(img => {
+        if (img.fileName === event.fileName) {
+          const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+          const encodedPath = encodeURIComponent(event.fileName);
+          const timestamp = Date.now();
+          return {
+            ...img,
+            thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}&t=${timestamp}`,
+            originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}&t=${timestamp}`,
+          };
+        }
+        return img;
+      }));
+
+    } else if (event.type === 'deleted') {
+      console.log('File deleted:', event.fileName);
+      
+      // Find the index of the deleted file
+      const deletedIndex = imageFiles.findIndex(img => img.fileName === event.fileName);
+      
+      // Remove from list
+      setImageFiles(prev => prev.filter(img => img.fileName !== event.fileName));
+
+      // Adjust activeIndex if needed
+      if (deletedIndex !== -1) {
+        setActiveIndex(prev => {
+          if (deletedIndex === prev) {
+            // The active image was deleted, show previous or stay at same position
+            return Math.max(0, Math.min(prev, imageFiles.length - 2));
+          } else if (deletedIndex < prev) {
+            // An image before the active one was deleted, shift index down
+            return prev - 1;
+          }
+          // deletedIndex > prev, no change needed
+          return prev;
+        });
+      }
+    }
+  }
+
+  // Fetch rating for a single file
+  async function fetchRatingForFile(fileName: string, path: string) {
+    try {
+      const response = await fetch(`/api/ratings?folderPath=${encodeURIComponent(path)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.ratings) {
+          const fileId = getFileId(fileName);
+          const rating = data.ratings.find((r: any) => r.id === fileId);
+          if (rating) {
+            setRatings(prev => {
+              const newMap = new Map(prev);
+              newMap.set(fileId, rating);
+              return newMap;
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch rating:', error);
     }
   }
 

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import fsSync from 'fs';
-import chokidar from 'chokidar';
+import chokidar, { FSWatcher } from 'chokidar';
 import sharp from 'sharp';
 import CONFIG from '@/config';
 
@@ -16,7 +16,7 @@ interface WatcherConfig {
 }
 
 class ImageWatcher {
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private sourcePath: string;
   private thumbsPath: string;
   private config: Required<WatcherConfig>;
@@ -63,7 +63,10 @@ class ImageWatcher {
       this.watcher.on('add', (filepath) => this.handleFileAdd(filepath));
       this.watcher.on('change', (filepath) => this.handleFileChange(filepath));
       this.watcher.on('unlink', (filepath) => this.handleFileDelete(filepath));
-      this.watcher.on('error', (error) => this.config.onError(error));
+      this.watcher.on('error', (error) => {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.config.onError(err);
+      });
 
       console.log(`ImageWatcher started for: ${this.sourcePath}`);
     } catch (error) {
