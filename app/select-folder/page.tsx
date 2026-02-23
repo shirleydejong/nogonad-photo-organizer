@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSocket } from "@/utils/socket";
 import { Socket } from "socket.io-client";
 import CONFIG from "@/config";
+import { Icon } from "@/components/icon";
 
 export default function SelectFolder() {
   const router = useRouter();
@@ -334,15 +335,17 @@ export default function SelectFolder() {
             
             <div className="flex gap-4">
               <button
-                className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
+                className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
                 onClick={() => handlePickFolder('/')}
               >
+                <Icon name="camera_roll" />
                 View as Strip
               </button>
               <button
-                className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg"
+                className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
                 onClick={() => handlePickFolder('/list')}
               >
+                <Icon name="list_alt" />
                 View as List
               </button>
             </div>
