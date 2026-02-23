@@ -42,6 +42,39 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
+    // Handle display session joining
+    socket.on('join-display-session', (sessionId: string) => {
+      console.log(`🔌Display joined session: ${sessionId} (socket: ${socket.id})`);
+      socket.join(`display-session-${sessionId}`);
+      // Notify all viewers in this session that a display joined
+      socket.to(`viewer-session-${sessionId}`).emit('display-joined', { sessionId });
+    });
+
+    // Handle viewer session joining
+    socket.on('join-viewer-session', (sessionId: string) => {
+      console.log(`Viewer joined session: ${sessionId} (socket: ${socket.id})`);
+      socket.join(`viewer-session-${sessionId}`);
+    });
+
+    // Handle display session leaving
+    socket.on('leave-display-session', (sessionId: string) => {
+      console.log(`Display left session: ${sessionId} (socket: ${socket.id})`);
+      socket.leave(`display-session-${sessionId}`);
+    });
+
+    // Handle viewer session leaving
+    socket.on('leave-viewer-session', (sessionId: string) => {
+      console.log(`Viewer left session: ${sessionId} (socket: ${socket.id})`);
+      socket.leave(`viewer-session-${sessionId}`);
+    });
+
+    // Handle image sync from main viewer to displays
+    socket.on('sync-image-to-display', ({ sessionId, folderPath, fileName }: { sessionId: string; folderPath: string; fileName: string }) => {
+      console.log(`Syncing image to display session ${sessionId}:`, fileName);
+      // Broadcast to all displays in this session
+      io.to(`display-session-${sessionId}`).emit('display-image-sync', { folderPath, fileName });
+    });
+
     // Handle thumbnail generation
     socket.on('generate-thumbnails', async (folderPath: string) => {
       console.log('Generate thumbnails request:', folderPath);

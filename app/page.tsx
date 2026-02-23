@@ -60,6 +60,7 @@ export default function Home() {
   const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
   const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [isWatcherActive, setIsWatcherActive] = useState<boolean>(false);
+  const [sessionId, setSessionId] = useState<string>("");
   const socketRef = useRef<Socket | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
@@ -73,6 +74,10 @@ export default function Home() {
   const touchPinchRef = useRef({ distance: 0, startZoom: 100 });
   const panStartXRef = useRef(0);
   const panStartYRef = useRef(0);
+  const sessionIdRef = useRef<string>("");
+  const folderPathRef = useRef<string>("");
+  const imageFilesRef = useRef<ImageData[]>([]);
+  const activeIndexRef = useRef<number>(0);
   const maxZoom = 400;
   const pinchFactor = 1.5;
 
@@ -122,6 +127,35 @@ export default function Home() {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  // Initialize session ID for display synchronization
+  useEffect(() => {
+    let storedSessionId = localStorage.getItem('displaySessionId');
+    if (!storedSessionId) {
+      // Generate a simple session ID
+      storedSessionId = Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('displaySessionId', storedSessionId);
+    }
+    setSessionId(storedSessionId);
+    sessionIdRef.current = storedSessionId;
+  }, []);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    folderPathRef.current = folderPath;
+  }, [folderPath]);
+
+  useEffect(() => {
+    imageFilesRef.current = imageFiles;
+  }, [imageFiles]);
+
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
   const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
   // Initialize Socket.IO connection
@@ -131,6 +165,11 @@ export default function Home() {
 
     const handleConnect = () => {
       console.log('Socket.IO connected:', socket.id);
+      // Join viewer session when connected
+      if (sessionIdRef.current) {
+        console.log('Joining viewer session:', sessionIdRef.current);
+        socket.emit('join-viewer-session', sessionIdRef.current);
+      }
     };
 
     const handleDisconnect = () => {
@@ -173,6 +212,34 @@ export default function Home() {
     socket.on('file-deleted', handleFileDeleted);
     socket.on('watcher-error', handleWatcherError);
 
+    // Handle display joined event - send current image
+    const handleDisplayJoined = () => {
+      console.log('Display joined, sending current image');
+      const currSessionId = sessionIdRef.current;
+      const currFolderPath = folderPathRef.current;
+      const currImageFiles = imageFilesRef.current;
+      const currActiveIndex = activeIndexRef.current;
+      
+      if (currSessionId && currFolderPath && currImageFiles.length > 0) {
+        const currentImage = currImageFiles[currActiveIndex];
+        if (currentImage && socket.connected) {
+          console.log('Sending image:', currentImage.fileName);
+          socket.emit('sync-image-to-display', {
+            sessionId: currSessionId,
+            folderPath: currFolderPath,
+            fileName: currentImage.fileName,
+          });
+        }
+      }
+    };
+
+    socket.on('display-joined', handleDisplayJoined);
+
+    // If already connected, join viewer session
+    if (socket.connected && sessionIdRef.current) {
+      socket.emit('join-viewer-session', sessionIdRef.current);
+    }
+
     return () => {
       // Remove only our listeners, don't disconnect the socket
       socket.off('connect', handleConnect);
@@ -183,8 +250,29 @@ export default function Home() {
       socket.off('file-changed', handleFileChanged);
       socket.off('file-deleted', handleFileDeleted);
       socket.off('watcher-error', handleWatcherError);
+      socket.off('display-joined', handleDisplayJoined);
+      if (sessionIdRef.current) {
+        socket.emit('leave-viewer-session', sessionIdRef.current);
+      }
     };
   }, []);
+
+  // Synchronize current image to display page
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    if (!sessionId || !folderPath || imageFiles.length === 0) return;
+    
+    const currentImage = imageFiles[activeIndex];
+    if (!currentImage) return;
+
+    console.log('Syncing image to displays:', currentImage.fileName);
+    socket.emit('sync-image-to-display', {
+      sessionId,
+      folderPath,
+      fileName: currentImage.fileName,
+    });
+  }, [activeIndex, folderPath, imageFiles, sessionId]);
 
   // Load folder from localStorage on mount
   useEffect(() => {
@@ -917,6 +1005,18 @@ export default function Home() {
   }, [activeIndex, imageFiles, folderPath, ratings]);
 
 
+  const handleCopyDisplayUrl = useCallback(() => {
+    if (!sessionId) return;
+    
+    const displayUrl = `${window.location.origin}/display?session=${sessionId}`;
+    navigator.clipboard.writeText(displayUrl).then(() => {
+      alert(`Display URL copied to clipboard!\n\n${displayUrl}\n\nOpen this URL on another device to show the current image.`);
+    }).catch(err => {
+      console.error('Failed to copy URL:', err);
+      alert(`Display URL:\n${displayUrl}`);
+    });
+  }, [sessionId]);
+
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <main className="flex-1 flex flex-col items-center justify-center w-full">
@@ -944,6 +1044,13 @@ export default function Home() {
               title={imageFiles[activeIndex]?.fileName}
               isFullscreen={isFullscreen}
             >
+              <button
+                className="header-button"
+                onClick={handleCopyDisplayUrl}
+                title="Copy display URL to clipboard"
+              >
+                <Icon name="link" />
+              </button>
               <button
                 className="header-button"
                 onClick={handleOpenWith}
