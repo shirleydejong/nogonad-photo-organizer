@@ -238,7 +238,11 @@ class FileWatcher {
 
     try {
       await sharp(filepath)
-        .resize(CONFIG.THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
+        .resize(CONFIG.THUMBNAIL_WIDTH, CONFIG.THUMBNAIL_WIDTH, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .withMetadata()
         .toFile(thumbPath);
 
       console.log(`Thumbnail created: ${thumbName}`);
