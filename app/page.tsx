@@ -9,6 +9,7 @@ import { ExifItem } from "@/components/exif-item";
 import { Header } from "@/components/header";
 import { FilterModal } from "@/components/filter-modal";
 import { ConflictModal } from "@/components/conflict-modal";
+import { CameraControlModal } from "@/components/camera-control-modal";
 import CONFIG from "@/config";
 import {
   formatAperture,
@@ -61,6 +62,13 @@ export default function Home() {
   const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [isWatcherActive, setIsWatcherActive] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>("");
+  
+  // Camera Control state
+  const [isCameraControlModalOpen, setIsCameraControlModalOpen] = useState<boolean>(false);
+  const [isShootAssistRunning, setIsShootAssistRunning] = useState<boolean>(false);
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
+  const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; percentage: number } | null>(null);
+  
   const socketRef = useRef<Socket | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const isFilmstripDraggingRef = useRef(false);
@@ -235,6 +243,58 @@ export default function Home() {
 
     socket.on('display-joined', handleDisplayJoined);
 
+    // ShootAssist event handlers
+    const handleShootAssistStatus = ({ isRunning }: { isRunning: boolean }) => {
+      console.log('ShootAssist status:', isRunning);
+      setIsShootAssistRunning(isRunning);
+      if (!isRunning) {
+        setIsCapturing(false);
+        setCaptureProgress(null);
+      }
+    };
+
+    const handleShootAssistReady = () => {
+      console.log('ShootAssist ready');
+      setIsShootAssistRunning(true);
+    };
+
+    const handleShootAssistStopped = () => {
+      console.log('ShootAssist stopped');
+      setIsShootAssistRunning(false);
+      setIsCapturing(false);
+      setCaptureProgress(null);
+    };
+
+    const handleCaptureStarted = ({ total, interval }: { total: number; interval: number }) => {
+      console.log('Capture started:', total, 'shots');
+      setIsCapturing(true);
+      setCaptureProgress({ current: 0, total, percentage: 0 });
+    };
+
+    const handleCaptureProgress = ({ current, total, percentage }: { current: number; total: number; percentage: number }) => {
+      console.log('Capture progress:', current, '/', total);
+      setCaptureProgress({ current, total, percentage });
+    };
+
+    const handleCaptureComplete = ({ total }: { total: number }) => {
+      console.log('Capture complete:', total, 'shots');
+      setIsCapturing(false);
+      setCaptureProgress(null);
+    };
+
+    const handleShootAssistError = ({ message }: { message: string }) => {
+      console.error('ShootAssist error:', message);
+      alert(`Camera error: ${message}`);
+    };
+
+    socket.on('shoot-assist-status', handleShootAssistStatus);
+    socket.on('shoot-assist-ready', handleShootAssistReady);
+    socket.on('shoot-assist-stopped', handleShootAssistStopped);
+    socket.on('capture-started', handleCaptureStarted);
+    socket.on('capture-progress', handleCaptureProgress);
+    socket.on('capture-complete', handleCaptureComplete);
+    socket.on('shoot-assist-error', handleShootAssistError);
+
     // If already connected, join viewer session
     if (socket.connected && sessionIdRef.current) {
       socket.emit('join-viewer-session', sessionIdRef.current);
@@ -251,6 +311,13 @@ export default function Home() {
       socket.off('file-deleted', handleFileDeleted);
       socket.off('watcher-error', handleWatcherError);
       socket.off('display-joined', handleDisplayJoined);
+      socket.off('shoot-assist-status', handleShootAssistStatus);
+      socket.off('shoot-assist-ready', handleShootAssistReady);
+      socket.off('shoot-assist-stopped', handleShootAssistStopped);
+      socket.off('capture-started', handleCaptureStarted);
+      socket.off('capture-progress', handleCaptureProgress);
+      socket.off('capture-complete', handleCaptureComplete);
+      socket.off('shoot-assist-error', handleShootAssistError);
       if (sessionIdRef.current) {
         socket.emit('leave-viewer-session', sessionIdRef.current);
       }
@@ -1017,6 +1084,89 @@ export default function Home() {
     });
   }, [sessionId]);
 
+  // Camera Control handlers
+  const handleStartShootAssist = useCallback(async () => {
+    try {
+      const response = await fetch('/api/shoot-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Failed to start ShootAssist: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to start ShootAssist:', err);
+      alert(`Failed to start ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, []);
+
+  const handleStopShootAssist = useCallback(async () => {
+    try {
+      const response = await fetch('/api/shoot-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Failed to stop ShootAssist: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to stop ShootAssist:', err);
+      alert(`Failed to stop ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, []);
+
+  const handleStartCapture = useCallback(async (shots: number, interval: number) => {
+    if (!folderPath) {
+      alert('No folder selected. Please select a folder first.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'start', 
+          shots, 
+          interval,
+          path: folderPath,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Failed to start capture: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to start capture:', err);
+      alert(`Failed to start capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, [folderPath]);
+
+  const handleStopCapture = useCallback(async () => {
+    try {
+      const response = await fetch('/api/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Failed to stop capture: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to stop capture:', err);
+      alert(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <main className="flex-1 flex flex-col items-center justify-center w-full">
@@ -1043,6 +1193,9 @@ export default function Home() {
               folderName={folderName}
               title={imageFiles[activeIndex]?.fileName}
               isFullscreen={isFullscreen}
+              onCameraControlClick={() => setIsCameraControlModalOpen(true)}
+              showCaptureProgress={!isCameraControlModalOpen && isCapturing}
+              captureProgress={captureProgress}
             >
               <button
                 className="header-button"
@@ -1390,6 +1543,19 @@ export default function Home() {
         selectedRatings={filterSelectedRatings}
         setSelectedRatings={setFilterSelectedRatings}
         conflictOption={false}
+      />
+
+      <CameraControlModal
+        isOpen={isCameraControlModalOpen}
+        onClose={() => setIsCameraControlModalOpen(false)}
+        isShootAssistRunning={isShootAssistRunning}
+        isCapturing={isCapturing}
+        captureProgress={captureProgress}
+        folderPath={folderPath}
+        onStartShootAssist={handleStartShootAssist}
+        onStopShootAssist={handleStopShootAssist}
+        onStartCapture={handleStartCapture}
+        onStopCapture={handleStopCapture}
       />
     </div>
   );
