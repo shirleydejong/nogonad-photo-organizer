@@ -5,6 +5,8 @@ Local-first photo viewer/organizer built with Next.js 16, focusing on HDR render
 
 **⚠️ Built entirely with vibe coding** - prioritize working solutions over perfect architecture.
 
+All program code is in English, including user interfaces.
+
 ## Critical Architecture Patterns
 
 ### File System Access Pattern

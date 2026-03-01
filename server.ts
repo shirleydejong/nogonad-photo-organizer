@@ -4,6 +4,7 @@ import next from 'next';
 import config from './config';
 import { Server as SocketIOServer } from 'socket.io';
 import FileWatcher, { FileChangeEvent } from './controllers/file-watcher';
+import getShootAssistController from './controllers/shoot-assist';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -39,8 +40,97 @@ app.prepare().then(() => {
     },
   });
 
+  // Setup ShootAssist controller with Socket.IO integration
+  const shootAssistController = getShootAssistController();
+  let captureState = {
+    isCapturing: false,
+    totalShots: 0,
+    currentShot: 0,
+  };
+
+  // Listen to ShootAssist events and broadcast via Socket.IO
+  shootAssistController.on('ready', () => {
+    console.log('[ShootAssist] Process ready');
+    io.emit('shoot-assist-ready');
+    io.emit('shoot-assist-status', { isRunning: true });
+  });
+
+  shootAssistController.on('exit', ({ code, signal }) => {
+    if ((code ?? 0) !== 0) {
+      const message = `[ShootAssist] Process exited with error code ${code} (signal: ${signal})`;
+      console.error(message);
+      io.emit('shoot-assist-error', { message });
+    } else {
+      console.log('[ShootAssist] Process exited:', code, signal);
+    }
+
+    io.emit('shoot-assist-stopped', { code, signal });
+    io.emit('shoot-assist-status', { isRunning: false });
+    captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
+  });
+
+  shootAssistController.on('error', (message) => {
+    console.error('[ShootAssist] Error:', message);
+    io.emit('shoot-assist-error', { message });
+  });
+
+  shootAssistController.on('warning', (message) => {
+    console.warn('[ShootAssist] Warning:', message);
+    io.emit('shoot-assist-warning', { message });
+  });
+
+  shootAssistController.on('status', (message) => {
+    console.log('[ShootAssist] Status:', message);
+    io.emit('shoot-assist-message', { message });
+  });
+
+  shootAssistController.on('capture-started', ({ count, delayMs }) => {
+    console.log(`[ShootAssist] Capture started: ${count} shots, ${delayMs}ms interval`);
+    captureState = { isCapturing: true, totalShots: count, currentShot: 0 };
+    io.emit('capture-started', { total: count, interval: delayMs });
+  });
+
+  shootAssistController.on('capture-progress', ({ current, total }) => {
+    console.log(`[ShootAssist] Capture progress: ${current}/${total}`);
+    captureState.currentShot = current;
+    captureState.totalShots = total;
+    const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+    io.emit('capture-progress', { current, total, percentage });
+  });
+
+  shootAssistController.on('capture-complete', ({ count }) => {
+    console.log(`[ShootAssist] Capture complete: ${count} shots`);
+    io.emit('capture-complete', { total: count });
+    captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
+  });
+
+  shootAssistController.on('command-complete', () => {
+    console.log('[ShootAssist] Command complete');
+  });
+
+  shootAssistController.on('file', (message) => {
+    console.log('[ShootAssist] File event:', message);
+    io.emit('shoot-assist-file', { message });
+  });
+
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+
+    // Send current ShootAssist status to newly connected client
+    socket.emit('shoot-assist-status', { 
+      isRunning: shootAssistController.isRunning() 
+    });
+    
+    if (captureState.isCapturing) {
+      const percentage = captureState.totalShots > 0 
+        ? Math.round((captureState.currentShot / captureState.totalShots) * 100) 
+        : 0;
+      socket.emit('capture-progress', {
+        current: captureState.currentShot,
+        total: captureState.totalShots,
+        percentage
+      });
+    }
 
     // Handle display session joining
     socket.on('join-display-session', (sessionId: string) => {
