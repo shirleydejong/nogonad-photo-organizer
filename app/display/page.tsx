@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSocket } from "@/utils/socket";
 
-export default function DisplayPage() {
+function DisplayPageContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") || "default";
   
@@ -80,5 +80,13 @@ export default function DisplayPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DisplayPage() {
+  return (
+    <Suspense fallback={<div className="w-screen h-screen bg-black" />}>
+      <DisplayPageContent />
+    </Suspense>
   );
 }

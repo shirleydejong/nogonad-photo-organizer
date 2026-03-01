@@ -384,14 +384,8 @@ export default function Home() {
 
       const startData = await startResponse.json();
 
-      // If no images found
-      if (startData.total === 0) {
-        setError("No images found in this folder");
-        setIsLoading(false);
-        return;
-      }
-
-      const files = startData.files as string[];
+      // Get files (can be empty array for empty folders)
+      const files = (startData.files || []) as string[];
 
       // Create ImageData objects
       const imageData: ImageData[] = files.map((fileName) => {
@@ -1505,7 +1499,28 @@ export default function Home() {
               )}
             </div>
           </div>
-        ) : null}
+        ) : (
+          // Empty folder state
+          <div className="flex flex-col w-full h-screen">
+            <Header 
+              folderName={folderName}
+              title="No images"
+              isFullscreen={isFullscreen}
+              onCameraControlClick={() => setIsCameraControlModalOpen(true)}
+              showCaptureProgress={!isCameraControlModalOpen && isCapturing}
+              captureProgress={captureProgress}
+            >
+              <div className="text-zinc-400 text-sm">0 images</div>
+            </Header>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-6 p-8">
+                <Icon name="photo_library" />
+                <div className="text-zinc-400 text-lg">This folder is empty</div>
+                <div className="text-zinc-500 text-sm">Add images to this folder or use camera control to capture photos</div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <ConflictModal

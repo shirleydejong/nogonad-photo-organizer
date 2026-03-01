@@ -107,7 +107,7 @@ export function CameraControlModal({
               disabled={isStartingShootAssist}
               className={isStartingShootAssist ? "w-full px-4 py-3 barber-pole-animate text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-default disabled:opacity-90" : "w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-75 text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-default"}
             >
-              <Icon name={isStartingShootAssist ? "hourglass_empty" : "play_arrow"} className={isStartingShootAssist ? "animate-spin" : ""} />
+              <Icon name={isStartingShootAssist ? "hourglass_empty" : "play_arrow"} />
               {isStartingShootAssist ? "Starting ShootAssist..." : "Start ShootAssist"}
             </button>
           </div>
