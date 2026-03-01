@@ -28,8 +28,45 @@ export function CameraControlModal({
   onStartCapture,
   onStopCapture,
 }: CameraControlModalProps) {
-  const [shots, setShots] = useState<number>(20);
-  const [interval, setInterval] = useState<number>(1000);
+  // Load from localStorage or use defaults
+  const [shots, setShots] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('shootAssist_shots');
+      return saved ? parseInt(saved) : 20;
+    }
+    return 20;
+  });
+  
+  const [interval, setInterval] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('shootAssist_interval');
+      return saved ? parseInt(saved) : 1000;
+    }
+    return 1000;
+  });
+  
+  const [isStartingShootAssist, setIsStartingShootAssist] = useState(false);
+
+  // Reset loading state when ShootAssist is ready
+  useEffect(() => {
+    if (isShootAssistRunning) {
+      setIsStartingShootAssist(false);
+    }
+  }, [isShootAssistRunning]);
+
+  // Save shots to localStorage when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('shootAssist_shots', shots.toString());
+    }
+  }, [shots]);
+
+  // Save interval to localStorage when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('shootAssist_interval', interval.toString());
+    }
+  }, [interval]);
 
   if (!isOpen) return null;
 
@@ -39,12 +76,17 @@ export function CameraControlModal({
     }
   };
 
+  const handleStartShootAssist = () => {
+    setIsStartingShootAssist(true);
+    onStartShootAssist();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[500px] w-full p-8 border border-zinc-700">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-zinc-100 font-semibold text-xl">Camera Control</h2>
+          <h2 className="text-zinc-100 font-semibold text-xl">ShootAssist</h2>
           <button
             onClick={onClose}
             className="text-zinc-400 hover:text-zinc-200 transition"
@@ -61,11 +103,12 @@ export function CameraControlModal({
               ShootAssist is not running. Start it to control your camera.
             </p>
             <button
-              onClick={onStartShootAssist}
-              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition flex items-center justify-center gap-2"
+              onClick={handleStartShootAssist}
+              disabled={isStartingShootAssist}
+              className={isStartingShootAssist ? "w-full px-4 py-3 barber-pole-animate text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-default disabled:opacity-90" : "w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-75 text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-default"}
             >
-              <Icon name="play_arrow" />
-              Start ShootAssist
+              <Icon name={isStartingShootAssist ? "hourglass_empty" : "play_arrow"} className={isStartingShootAssist ? "animate-spin" : ""} />
+              {isStartingShootAssist ? "Starting ShootAssist..." : "Start ShootAssist"}
             </button>
           </div>
         ) : (
@@ -74,6 +117,15 @@ export function CameraControlModal({
             <div className="flex items-center gap-2 text-sm">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-zinc-300">ShootAssist Running</span>
+			  
+			  {/* Terminate ShootAssist - less prominent */}
+			  <button
+				onClick={onStopShootAssist}
+				className="text-sm text-zinc-400 hover:text-red-400 transition flex items-center justify-center gap-2 cursor-pointer"
+			  >
+				<Icon name="power_settings_new" size={16} />
+				Terminate
+			  </button>
             </div>
 
             {/* Capture Configuration */}
@@ -133,33 +185,22 @@ export function CameraControlModal({
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {!isCapturing ? (
+              <div className="flex gap-3">
+				<button
+                  onClick={onStopCapture}
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-orange-700 text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icon name="stop_circle" />
+                  Stop Bulk
+                </button>
                 <button
                   onClick={handleStartCapture}
-                  disabled={!folderPath}
-                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded font-medium transition flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Icon name="camera" />
+                  <Icon name="burst_mode" />
                   Start Bulk Capture
                 </button>
-              ) : (
-                <button
-                  onClick={onStopCapture}
-                  className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded font-medium transition flex items-center justify-center gap-2"
-                >
-                  <Icon name="stop" />
-                  Stop Current Bulk
-                </button>
-              )}
-
-              {/* Terminate ShootAssist - less prominent */}
-              <button
-                onClick={onStopShootAssist}
-                className="w-full px-4 py-2 bg-zinc-800 hover:bg-red-900 text-zinc-400 hover:text-white rounded text-sm transition flex items-center justify-center gap-2"
-              >
-                <Icon name="power_settings_new" size={16} />
-                Terminate ShootAssist
-              </button>
+              </div>
             </div>
           </div>
         )}

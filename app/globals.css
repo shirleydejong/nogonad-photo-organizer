@@ -95,7 +95,31 @@ button {
   }
 }
 
+@keyframes barberPole {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 0;
+  }
+}
+
 @layer components {
+  
+  .barber-pole-animate {
+    background: linear-gradient(
+      45deg,
+      #2563eb 25%,
+      #1d4ed8 25%,
+      #1d4ed8 50%,
+      #2563eb 50%,
+      #2563eb 75%,
+      #1d4ed8 75%,
+      #1d4ed8
+    );
+    background-size: 40px 40px;
+    animation: barberPole 0.8s linear infinite;
+  }
   
   .header-button {
     @apply px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center;

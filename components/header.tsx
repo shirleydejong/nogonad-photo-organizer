@@ -67,7 +67,7 @@ export function Header({
             onClick={onCameraControlClick}
             title="Camera Control"
           >
-            <Icon name="camera" /> Camera Control
+            <Icon name="camera" />
           </button>
         )}
         {children}

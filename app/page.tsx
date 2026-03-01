@@ -915,6 +915,9 @@ export default function Home() {
   // Keyboard navigation and rating
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      
+       if (isCameraControlModalOpen) return;
+      
       if (e.key === "F11") {
         e.preventDefault();
         if (!document.fullscreenElement) {
@@ -976,7 +979,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex]);
+  }, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen]);
 
   // Reset zoom and pan when changing photos
   useEffect(() => {
@@ -1084,7 +1087,7 @@ export default function Home() {
     });
   }, [sessionId]);
 
-  // Camera Control handlers
+  // Camera Control (ShootAssist) handlers
   const handleStartShootAssist = useCallback(async () => {
     try {
       const response = await fetch('/api/shoot-assist', {
