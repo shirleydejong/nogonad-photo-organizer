@@ -4,7 +4,7 @@ import next from 'next';
 import config from '@/config';
 import { Server as SocketIOServer } from 'socket.io';
 import FileWatcher, { FileChangeEvent } from '@/controllers/file-watcher';
-import shootAssistController from '@/controllers/shoot-assist';
+import getShootAssistController from '@/controllers/shoot-assist';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
