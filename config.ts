@@ -8,4 +8,5 @@ export default {
 	DB: 'npo.db',
 	HTTP_PORT: 3000,
 	SOCKET_PORT: 3001,
+	SHOOT_ASSIST: 'ShootAssist.exe'
 };
