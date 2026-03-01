@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getShootAssistController from '@/controllers/shoot-assist';
+import { sendShootAssistCommand } from '@/utils/shoot-assist-command-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,30 +13,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const controller = getShootAssistController();
-
-    // Fire and forget - respond immediately
     if (action === 'start') {
-      // Start process in background
-      controller.start().catch((err) => {
-        console.error('[ShootAssist API] Failed to start:', err instanceof Error ? err.message : err);
-      });
+      const response = await sendShootAssistCommand('shoot-assist-start');
+
+      if (!response.success) {
+        return NextResponse.json(
+          { error: response.error || 'Failed to start ShootAssist' },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({ 
         success: true, 
-        message: 'ShootAssist starting...' 
+        message: response.message || 'ShootAssist starting...'
       });
     } 
     
     if (action === 'stop') {
-      // Stop process in background
-      controller.stop().catch((err) => {
-        console.error('[ShootAssist API] Failed to stop:', err instanceof Error ? err.message : err);
-      });
+      const response = await sendShootAssistCommand('shoot-assist-stop');
+
+      if (!response.success) {
+        return NextResponse.json(
+          { error: response.error || 'Failed to stop ShootAssist' },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({ 
         success: true, 
-        message: 'ShootAssist stopping...' 
+        message: response.message || 'ShootAssist stopping...'
       });
     }
 

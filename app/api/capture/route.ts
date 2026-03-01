@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getShootAssistController from '@/controllers/shoot-assist';
+import { sendShootAssistCommand } from '@/utils/shoot-assist-command-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +13,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const controller = getShootAssistController();
-
-    // Fire and forget - respond immediately
     if (action === 'start') {
       if (typeof shots !== 'number' || shots <= 0) {
         return NextResponse.json(
@@ -31,35 +28,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Start capture in background
-      (async () => {
-        try {
-          // Optionally set download path if provided
-          if (path && typeof path === 'string') {
-            await controller.setDownloadPath(path);
-          }
-          
-          await controller.startBulkShoot(shots, interval);
-        } catch (err) {
-          console.log('[Capture API] Failed to start capture:', err instanceof Error ? err.message : err);
-        }
-      })();
+      const response = await sendShootAssistCommand('capture-start', {
+        shots,
+        interval,
+        path: typeof path === 'string' ? path : undefined,
+      });
+
+      if (!response.success) {
+        return NextResponse.json(
+          { error: response.error || 'Failed to start capture' },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({ 
         success: true, 
-        message: `Starting capture of ${shots} shots with ${interval}ms interval` 
+        message: response.message || `Starting capture of ${shots} shots with ${interval}ms interval`
       });
     } 
     
     if (action === 'stop') {
-      // Stop capture in background
-      controller.stopBulkShoot().catch((err) => {
-        console.error('[Capture API] Failed to stop capture:', err instanceof Error ? err.message : err);
-      });
+      const response = await sendShootAssistCommand('capture-stop');
+
+      if (!response.success) {
+        return NextResponse.json(
+          { error: response.error || 'Failed to stop capture' },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({ 
         success: true, 
-        message: 'Stopping capture...' 
+        message: response.message || 'Stopping capture...'
       });
     }
 

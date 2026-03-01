@@ -14,6 +14,12 @@ const socketPort = config.SOCKET_PORT; // Separate port for Socket.IO to avoid c
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+type CommandAck = {
+  success: boolean;
+  message?: string;
+  error?: string;
+};
+
 // Store active watchers per folder
 const activeWatchers = new Map<string, FileWatcher>();
 
@@ -42,6 +48,8 @@ app.prepare().then(() => {
 
   // Setup ShootAssist controller with Socket.IO integration
   const shootAssistController = getShootAssistController();
+  const toErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
   let captureState = {
     isCapturing: false,
     totalShots: 0,
@@ -131,6 +139,74 @@ app.prepare().then(() => {
         percentage
       });
     }
+
+    socket.on('shoot-assist-start', (_payload: unknown, ack?: (response: CommandAck) => void) => {
+      shootAssistController.start().catch((error) => {
+        const message = `[ShootAssist] Failed to start: ${toErrorMessage(error)}`;
+        console.error(message);
+        io.emit('shoot-assist-error', { message });
+      });
+
+      ack?.({ success: true, message: 'ShootAssist starting...' });
+    });
+
+    socket.on('shoot-assist-stop', (_payload: unknown, ack?: (response: CommandAck) => void) => {
+      shootAssistController.stop().catch((error) => {
+        const message = `[ShootAssist] Failed to stop: ${toErrorMessage(error)}`;
+        console.error(message);
+        io.emit('shoot-assist-error', { message });
+      });
+
+      ack?.({ success: true, message: 'ShootAssist stopping...' });
+    });
+
+    socket.on(
+      'capture-start',
+      (
+        payload: { shots?: number; interval?: number; path?: string } | undefined,
+        ack?: (response: CommandAck) => void
+      ) => {
+        const shots = payload?.shots;
+        const interval = payload?.interval;
+        const path = payload?.path;
+
+        if (typeof shots !== 'number' || shots <= 0) {
+          ack?.({ success: false, error: 'Invalid shots parameter. Must be a number greater than 0' });
+          return;
+        }
+
+        if (typeof interval !== 'number' || interval < 0) {
+          ack?.({ success: false, error: 'Invalid interval parameter. Must be a number >= 0' });
+          return;
+        }
+
+        (async () => {
+          try {
+            if (path && typeof path === 'string') {
+              await shootAssistController.setDownloadPath(path);
+            }
+
+            await shootAssistController.startBulkShoot(shots, interval);
+          } catch (error) {
+            const message = `[Capture] Failed to start capture: ${toErrorMessage(error)}`;
+            console.error(message);
+            io.emit('shoot-assist-error', { message });
+          }
+        })();
+
+        ack?.({ success: true, message: `Starting capture of ${shots} shots with ${interval}ms interval` });
+      }
+    );
+
+    socket.on('capture-stop', (_payload: unknown, ack?: (response: CommandAck) => void) => {
+      shootAssistController.stopBulkShoot().catch((error) => {
+        const message = `[Capture] Failed to stop capture: ${toErrorMessage(error)}`;
+        console.error(message);
+        io.emit('shoot-assist-error', { message });
+      });
+
+      ack?.({ success: true, message: 'Stopping capture...' });
+    });
 
     // Handle display session joining
     socket.on('join-display-session', (sessionId: string) => {
