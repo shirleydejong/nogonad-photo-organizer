@@ -106,6 +106,12 @@ app.prepare().then(() => {
     io.emit('capture-complete', { total: count });
     captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
   });
+  
+  shootAssistController.on('capture-stopped', () => {
+    console.log(`[ShootAssist] Capture stopped`);
+    io.emit('capture-stopped');
+    captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
+  });
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);

@@ -67,11 +67,6 @@ export class ShootAssistController extends EventEmitter {
             resolve();
           } else if (output.includes('[STATUS] OK')) {
             this.emit('command-complete');
-            // Clear capture state when command completes
-            if (this.currentCapture) {
-             // this.emit('capture-complete', this.currentCapture);
-              //this.currentCapture = null;
-            }
           }
         });
 
@@ -98,9 +93,21 @@ export class ShootAssistController extends EventEmitter {
               this.emit('capture-complete', this.currentCapture);
               this.currentCapture = null;
             }
+			
+			const bulkStopped = output.includes('[STATUS] Bulk AF capture stopped by stop command');
+			if (bulkStopped) {
+				this.emit('capture-stopped');
+            }
+			
           } else if (output.includes('[ERROR]')) {
             this.safeEmitError(output);
           } else if (output.includes('[WARNING]')) {
+			
+			const noBulkInProgress = output.includes('[WARNING] No bulk AF capture in progress');
+			if( noBulkInProgress ) {
+				this.emit('capture-stopped');
+			}
+			
             this.emit('warning', output);
           } else if (output.includes('[FILE]')) {
             this.emit('file', output);

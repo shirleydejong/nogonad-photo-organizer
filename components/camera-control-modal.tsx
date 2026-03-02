@@ -84,7 +84,7 @@ export function CameraControlModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[500px] w-full p-8 border border-zinc-700">
+      <div className="bg-zinc-900 rounded-lg shadow-2xl max-w-[500px] w-full p-4 border border-zinc-700">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-zinc-100 font-semibold text-xl">ShootAssist</h2>

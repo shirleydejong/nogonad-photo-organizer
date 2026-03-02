@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Thumbnail fetch error:', error);
+    console.error('Image fetch error:', error);
     return NextResponse.json(
-      { error: 'Thumbnail not found' },
+      { error: 'Image or Thumbnail not found' },
       { status: 404 }
     );
   }

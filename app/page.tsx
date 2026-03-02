@@ -282,6 +282,12 @@ export default function Home() {
       setIsCapturing(false);
       setCaptureProgress(null);
     };
+    
+    const handleCaptureStopped = () => {
+      console.log('Capture stopped');
+      setIsCapturing(false);
+      setCaptureProgress(null);
+    };
 
     const handleShootAssistError = ({ message }: { message: string }) => {
       console.error('ShootAssist error:', message);
@@ -294,6 +300,7 @@ export default function Home() {
     socket.on('capture-started', handleCaptureStarted);
     socket.on('capture-progress', handleCaptureProgress);
     socket.on('capture-complete', handleCaptureComplete);
+    socket.on('capture-stopped', handleCaptureStopped);
     socket.on('shoot-assist-error', handleShootAssistError);
 
     // If already connected, join viewer session
@@ -318,6 +325,7 @@ export default function Home() {
       socket.off('capture-started', handleCaptureStarted);
       socket.off('capture-progress', handleCaptureProgress);
       socket.off('capture-complete', handleCaptureComplete);
+      socket.off('capture-stopped', handleCaptureStopped);
       socket.off('shoot-assist-error', handleShootAssistError);
       if (sessionIdRef.current) {
         socket.emit('leave-viewer-session', sessionIdRef.current);
@@ -1192,8 +1200,7 @@ export default function Home() {
               title={imageFiles[activeIndex]?.fileName}
               isFullscreen={isFullscreen}
               onCameraControlClick={() => setIsCameraControlModalOpen(true)}
-              showCaptureProgress={!isCameraControlModalOpen && isCapturing}
-              captureProgress={captureProgress}
+              onStopCapture={handleStopCapture}
             >
               <button
                 className="header-button"
@@ -1360,6 +1367,31 @@ export default function Home() {
                       )}
                     </div>
                   </div>
+
+                  {!isCameraControlModalOpen && isCapturing && captureProgress && (
+                    <div className="capture-progress-toast">
+                      <Icon name="camera" />
+                      <div className="flex flex-col gap-1 min-w-[120px]">
+                        <span className="text-zinc-300 font-mono">
+                          {captureProgress.current}/{captureProgress.total}
+                        </span>
+                        <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                            style={{ width: `${captureProgress.percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className="flex border-l border-gray-200">
+                        <button
+                          onClick={handleStopCapture}
+                          className="border-transparent p-4 flex items-center justify-center font-medium text-blue-600 hover:text-white cursor-pointer focus:outline-none focus:ring-2"
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -1508,8 +1540,7 @@ export default function Home() {
               title="No images"
               isFullscreen={isFullscreen}
               onCameraControlClick={() => setIsCameraControlModalOpen(true)}
-              showCaptureProgress={!isCameraControlModalOpen && isCapturing}
-              captureProgress={captureProgress}
+              onStopCapture={handleStopCapture}
             >
               <div className="text-zinc-400 text-sm">0 images</div>
             </Header>

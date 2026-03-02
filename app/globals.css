@@ -122,7 +122,7 @@ button {
   }
   
   .header-button {
-    @apply px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center;
+    @apply px-4 py-2 bg-zinc-800 rounded text-zinc-200 hover:bg-zinc-700 transition flex gap-2 items-center cursor-pointer;
   }
   
   .photo-nav-button {
@@ -209,5 +209,12 @@ button {
   .rating-panel:has(.rating-emoji[data-rating="5"]:hover) .rating-star:nth-child(-n + 5) {
     opacity: 1;
     text-shadow: 0 0 10px rgb(244 196 48 / 70%);
+  }
+  
+  .capture-progress-toast {
+    @apply absolute bottom-4 right-4 flex items-center gap-3 p-2 pl-4 rounded-lg shadow-md min-w-[180px];
+    background: linear-gradient(145deg, rgb(18 18 18 / 85%), rgb(8 8 8 / 90%));
+    border: 1px solid rgb(255 255 255 / 12%);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 45%), inset 0 0 0 1px rgb(255 255 255 / 5%);
   }
 }

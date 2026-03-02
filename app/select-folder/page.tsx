@@ -188,12 +188,6 @@ export default function SelectFolder() {
           socket.off('thumbnail-complete', handleComplete);
           socket.off('thumbnail-error', handleError);
 
-          /*if (data.total === 0) {
-            setError("No images found in this folder");
-            setIsProcessing(false);
-            return;
-          }*/
-
           try {
             // Fetch batch EXIF data for all files in the folder
             const exifResponse = await fetch('/api/exif', {
