@@ -118,7 +118,7 @@ export default function SelectFolder() {
     setFilteredPaths([]);
   }
 
-  async function handlePickFolder(targetRoute: '/' | '/list') {
+  async function handlePickFolder(targetRoute: '/' | '/list' | '/bulk-rate') {
     setError(null);
     setShowAutocomplete(false);
     
@@ -341,6 +341,13 @@ export default function SelectFolder() {
               >
                 <Icon name="list_alt" />
                 View as List
+              </button>
+              <button
+                className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
+                onClick={() => handlePickFolder('/bulk-rate')}
+              >
+                <Icon name="grid_view" />
+                Bulk Rate
               </button>
             </div>
             
