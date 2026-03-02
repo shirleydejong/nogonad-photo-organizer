@@ -1,28 +1,33 @@
-import config from "eslint-config-next";
 
-import { defineConfig, globalIgnores } from 'eslint/config';
+import js from '@eslint/js';
+import nextPlugin from '@next/eslint-plugin-next';
+import typescriptEslint from 'typescript-eslint';
 
-const eslintConfig = defineConfig([
-	config,
+export default [
 	{
-		env: {
-			node: true,
-			es2025: true
-		},
-		extends: ['eslint:recommended'],
-		overrides: [],
-		parserOptions: {
-			ecmaVersion: 'latest',
-			sourceType: 'module'
+		ignores: [
+			'.next/**',
+			'out/**',
+			'build/**',
+			'next-env.d.ts',
+			'node_modules/**',
+		],
+	},
+	js.configs.recommended,
+	...typescriptEslint.configs.recommended,
+	{
+		plugins: {
+			'@next/next': nextPlugin,
 		},
 		rules: {
+			...nextPlugin.configs.recommended.rules,
 			indent: [
 				'error',
 				'tab',
 				{
 					ignoreComments: true,
-					SwitchCase: 1
-				}
+					SwitchCase: 1,
+				},
 			],
 			'no-lonely-if': ['error'],
 			'linebreak-style': ['warn', 'unix'],
@@ -31,8 +36,8 @@ const eslintConfig = defineConfig([
 				'single',
 				{
 					allowTemplateLiterals: true,
-					avoidEscape: true
-				}
+					avoidEscape: true,
+				},
 			],
 			semi: ['error', 'always'],
 			'no-prototype-builtins': ['off'],
@@ -46,8 +51,8 @@ const eslintConfig = defineConfig([
 				'warn',
 				{
 					skipBlankLines: true,
-					ignoreComments: true
-				}
+					ignoreComments: true,
+				},
 			],
 			'no-unused-vars': ['warn'],
 			'no-unreachable': ['warn'],
@@ -61,22 +66,10 @@ const eslintConfig = defineConfig([
 						if: { before: true, after: false },
 						for: { before: true, after: false },
 						switch: { before: true, after: false },
-						else: { before: true, after: true }
-					}
-				}
-			]
-		}
+						else: { before: true, after: true },
+					},
+				},
+			],
+		},
 	},
-	//...nextVitals,
-	//...nextTs,
-	// Override default ignores of eslint-config-next.
-	globalIgnores([
-		// Default ignores of eslint-config-next:
-		'.next/**',
-		'out/**',
-		'build/**',
-		'next-env.d.ts',
-	]),
-]);
-
-export default eslintConfig;
+];
