@@ -77,20 +77,15 @@ app.prepare().then(() => {
     captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
   });
 
-  shootAssistController.on('error', (message) => {
-    console.error('[ShootAssist] Error:', message);
-    io.emit('shoot-assist-error', { message });
-  });
+  shootAssistController.on('error', (message) => io.emit('shoot-assist-error', { message }));
 
-  shootAssistController.on('warning', (message) => {
-    console.warn('[ShootAssist] Warning:', message);
-    io.emit('shoot-assist-warning', { message });
-  });
+  shootAssistController.on('warning', (message) => io.emit('shoot-assist-warning', { message }));
 
-  shootAssistController.on('status', (message) => {
-    console.log('[ShootAssist] Status:', message);
-    io.emit('shoot-assist-message', { message });
-  });
+  shootAssistController.on('status', (message) => io.emit('shoot-assist-message', { message }));
+  
+  shootAssistController.on('command-complete', () => io.emit('shoot-assist-command-complete'));
+  
+  shootAssistController.on('file', (message) => io.emit('shoot-assist-file', { message }));
 
   shootAssistController.on('capture-started', ({ count, delayMs }) => {
     console.log(`[ShootAssist] Capture started: ${count} shots, ${delayMs}ms interval`);
@@ -110,15 +105,6 @@ app.prepare().then(() => {
     console.log(`[ShootAssist] Capture complete: ${count} shots`);
     io.emit('capture-complete', { total: count });
     captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
-  });
-
-  shootAssistController.on('command-complete', () => {
-    console.log('[ShootAssist] Command complete');
-  });
-
-  shootAssistController.on('file', (message) => {
-    console.log('[ShootAssist] File event:', message);
-    io.emit('shoot-assist-file', { message });
   });
 
   io.on('connection', (socket) => {

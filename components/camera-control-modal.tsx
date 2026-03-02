@@ -73,6 +73,7 @@ export function CameraControlModal({
   const handleStartCapture = () => {
     if (shots > 0 && interval >= 0) {
       onStartCapture(shots, interval);
+      onClose();
     }
   };
 
@@ -164,24 +165,6 @@ export function CameraControlModal({
                 <Icon name="folder" size={14} /> Saving to: {folderPath || 'No folder selected'}
               </div>
             </div>
-
-            {/* Progress Bar */}
-            {isCapturing && captureProgress && (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-300">Capturing...</span>
-                  <span className="text-zinc-300 font-mono">
-                    {captureProgress.current}/{captureProgress.total}
-                  </span>
-                </div>
-                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                    style={{ width: `${captureProgress.percentage}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
 
             {/* Action Buttons */}
             <div className="space-y-3">
