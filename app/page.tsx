@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { getSocket } from "@/utils/socket";
 import { Socket } from "socket.io-client";
 import { Icon } from "@/components/icon";
@@ -284,7 +285,7 @@ export default function Home() {
 
     const handleShootAssistError = ({ message }: { message: string }) => {
       console.error('ShootAssist error:', message);
-      alert(`Camera error: ${message}`);
+      toast.error(`Camera error: ${message}`);
     };
 
     socket.on('shoot-assist-status', handleShootAssistStatus);
@@ -1074,10 +1075,10 @@ export default function Home() {
     
     const displayUrl = `${window.location.origin}/display?session=${sessionId}`;
     navigator.clipboard.writeText(displayUrl).then(() => {
-      alert(`Display URL copied to clipboard!\n\n${displayUrl}\n\nOpen this URL on another device to show the current image.`);
+      toast.success('Display URL copied to clipboard!');
     }).catch(err => {
       console.error('Failed to copy URL:', err);
-      alert(`Display URL:\n${displayUrl}`);
+      toast.error(`Failed to copy URL: ${displayUrl}`);
     });
   }, [sessionId]);
 
@@ -1092,11 +1093,11 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(`Failed to start ShootAssist: ${error.error || 'Unknown error'}`);
+        toast.error(`Failed to start ShootAssist: ${error.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to start ShootAssist:', err);
-      alert(`Failed to start ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Failed to start ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }, []);
 
@@ -1110,17 +1111,17 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(`Failed to stop ShootAssist: ${error.error || 'Unknown error'}`);
+        toast.error(`Failed to stop ShootAssist: ${error.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to stop ShootAssist:', err);
-      alert(`Failed to stop ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Failed to stop ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }, []);
 
   const handleStartCapture = useCallback(async (shots: number, interval: number) => {
     if (!folderPath) {
-      alert('No folder selected. Please select a folder first.');
+      toast.error('No folder selected. Please select a folder first.');
       return;
     }
 
@@ -1138,11 +1139,11 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(`Failed to start capture: ${error.error || 'Unknown error'}`);
+        toast.error(`Failed to start capture: ${error.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to start capture:', err);
-      alert(`Failed to start capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Failed to start capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }, [folderPath]);
 
@@ -1156,11 +1157,11 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(`Failed to stop capture: ${error.error || 'Unknown error'}`);
+        toast.error(`Failed to stop capture: ${error.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to stop capture:', err);
-      alert(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }, []);
 
