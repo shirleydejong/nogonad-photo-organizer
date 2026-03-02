@@ -69,8 +69,8 @@ export class ShootAssistController extends EventEmitter {
             this.emit('command-complete');
             // Clear capture state when command completes
             if (this.currentCapture) {
-              this.emit('capture-complete', this.currentCapture);
-              this.currentCapture = null;
+             // this.emit('capture-complete', this.currentCapture);
+              //this.currentCapture = null;
             }
           }
         });
@@ -85,12 +85,18 @@ export class ShootAssistController extends EventEmitter {
             this.emit('status', output);
             
             // Try to parse capture progress
-            // Look for patterns like "Shot 3/10" or "Capture 3 of 10" etc.
-            const progressMatch = output.match(/(?:Shot|Capture|Photo)\s+(\d+)(?:\/|of|\sof\s)(\d+)/i);
+			// Look for patterns like "[STATUS] Shot 6/10"
+			const progressMatch = output.match(/Shot\s+(\d+)\/(\d+)/);
             if (progressMatch && this.currentCapture) {
               const current = parseInt(progressMatch[1], 10);
               const total = parseInt(progressMatch[2], 10);
               this.emit('capture-progress', { current, total });
+            }
+			
+			const bulkComplete = output.includes('[STATUS] Bulk AF capture completed');
+			if (bulkComplete && this.currentCapture) {
+              this.emit('capture-complete', this.currentCapture);
+              this.currentCapture = null;
             }
           } else if (output.includes('[ERROR]')) {
             this.safeEmitError(output);
