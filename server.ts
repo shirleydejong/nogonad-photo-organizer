@@ -6,6 +6,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import FileWatcher, { FileChangeEvent } from '@/controllers/file-watcher';
 import getShootAssistController from '@/controllers/shoot-assist';
 
+console.log('Starting server in:', process.env.NODE_ENV);
+
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = config.HTTP_PORT;
