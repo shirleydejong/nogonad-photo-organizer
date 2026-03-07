@@ -742,6 +742,7 @@ export default function Home() {
   // Don't trigger navigation swipe when zoomed in
     if (zoomLevel > 100 && (e.buttons & 1) ) {
       pan(e);
+      return
       
     } else {
       const deltaX = e.clientX - mainImageStartXRef.current;
@@ -1342,7 +1343,7 @@ export default function Home() {
                           style={{
                             transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
                             transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
-                            touchAction: 'none',
+                            touchAction: 'none'
                           }}
                           draggable={false}
                           onPointerDown={handleMainImagePointerDown}
