@@ -715,7 +715,18 @@ export default function Home() {
   }
 
   function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    console.log('Pointer down with button', e.button, 'and zoom level', zoomLevel);
+  // Left mouse button + zoomed in = pan mode
+    if (zoomLevel > 100 && e.button === 0) {
+      console.log('POINTER: Entering pan mode', e.button, e.clientX, e.clientY);
+      panStartXRef.current = e.clientX;
+      panStartYRef.current = e.clientY;
+      isMainImageSwipingRef.current = false;
+    }
+    
+    if( e.pointerType === 'touch') {
+      console.log(e)
+    }
 
     // Cancel any pending timeout from previous swipe
     if (swipeButtonTimeoutRef.current) {
@@ -734,37 +745,39 @@ export default function Home() {
   function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
     if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || filteredImageFiles.length === 0) return;
 
-    // Don't trigger navigation swipe when zoomed in
-    if (zoomLevel > 100) return;
-
-    const deltaX = e.clientX - mainImageStartXRef.current;
-    const deltaY = e.clientY - mainImageStartYRef.current;
-
-    if (Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) return;
-    if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
-
-    const currentIdx = filteredImageFiles.findIndex(
-      img => img.fileName === imageFiles[activeIndex]?.fileName
-    );
-
-    if (deltaX < 0) {
-      // Swipe left = next image, image goes left
-      if (currentIdx < filteredImageFiles.length - 1) {
-        const nextImg = filteredImageFiles[currentIdx + 1];
-        setSwipeDirection('left');
-        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
-      }
+  // Don't trigger navigation swipe when zoomed in
+    if (zoomLevel > 100 && (e.buttons & 1) ) {
+      pan(e);
+      
     } else {
-      // Swipe right = previous image, image goes right
-      if (currentIdx > 0) {
+      const deltaX = e.clientX - mainImageStartXRef.current;
+      const deltaY = e.clientY - mainImageStartYRef.current;
+
+      if (e.pointerType === 'mouse' && Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) return;
+      if (e.pointerType === 'mouse' && Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+      const currentIdx = filteredImageFiles.findIndex(
+        img => img.fileName === imageFiles[activeIndex]?.fileName
+      );
+
+    // Swipe left = next image, image goes left1
+      if (deltaX < 0 && currentIdx < filteredImageFiles.length - 1) {
+        const nextImg = filteredImageFiles[currentIdx + 1];
+         setSwipeDirection('left');
+        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+        
+    // Swipe right = previous image, image goes right
+      } else if (deltaX > 0 && currentIdx > 0) {
         const prevImg = filteredImageFiles[currentIdx - 1];
         setSwipeDirection('right');
         setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
       }
-    }
 
-    mainImageSwipeTriggeredRef.current = true;
-    isMainImageSwipingRef.current = false;
+      mainImageSwipeTriggeredRef.current = true;
+      isMainImageSwipingRef.current = false;
+      
+    }
+    
   }
 
   function handleMainImagePointerUp() {
@@ -772,14 +785,14 @@ export default function Home() {
     mainImageSwipeTriggeredRef.current = false;
     setIsMainImageDragging(false);
 
-    // Show buttons after 2 seconds
+    // Show buttons after 1600ms
     if (swipeButtonTimeoutRef.current) {
       clearTimeout(swipeButtonTimeoutRef.current);
     }
     swipeButtonTimeoutRef.current = setTimeout(() => {
       setIsSwipingActive(false);
       swipeButtonTimeoutRef.current = null;
-    }, 2000);
+    }, 1600);
   }
 
   function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
@@ -809,18 +822,21 @@ export default function Home() {
   }
 
   function handleImageTouchStart(e: React.TouchEvent<HTMLImageElement>) {
+    console.warn('Touch start with', e.touches.length, 'touches');
     if (e.touches.length === 2) {
       // Two-finger pinch
       touchPinchRef.current.distance = getDistance(e.touches[0], e.touches[1]);
       touchPinchRef.current.startZoom = zoomLevel;
     } else if (zoomLevel > 100) {
+      //console.log('TOUCH: Entering pan mode', e.touches[0].clientX, e.touches[0].clientY);
       // Single finger pan when zoomed in
-      panStartXRef.current = e.touches[0].clientX;
-      panStartYRef.current = e.touches[0].clientY;
+      //panStartXRef.current = e.touches[0].clientX;
+      //panStartYRef.current = e.touches[0].clientY;
     }
   }
 
   function handleImageTouchMove(e: React.TouchEvent<HTMLImageElement>) {
+    /*console.warn('Touch move with', e.touches.length, 'touches');
     if (e.touches.length === 2) {
       // Two-finger pinch zoom
       const newDistance = getDistance(e.touches[0], e.touches[1]);
@@ -836,22 +852,27 @@ export default function Home() {
 
     } else if (e.touches.length === 1 && zoomLevel > 100) {
       pan(e);
-    }
+    }*/
+   //if (e.touches.length === 1 && zoomLevel > 100) {
+   // console.log('TOUCH MOVE: Panning with single touch', e.touches.length, e.touches[0].clientX, e.touches[0].clientY);
+  // }
   }
 
   function handleImageMouseDown(e: React.MouseEvent<HTMLImageElement>) {
+    /*console.warn('Mouse down with button', e.button);
     if (zoomLevel > 100 && e.button === 0) {
+      console.warn('xxx');
       // Left mouse button + zoomed in = pan mode
       panStartXRef.current = e.clientX;
       panStartYRef.current = e.clientY;
       isMainImageSwipingRef.current = false;
-    }
+    }*/
   }
 
   function handleImageMouseMove(e: React.MouseEvent<HTMLImageElement>) {
-    if (zoomLevel > 100 && (e.buttons & 1) && isMainImageSwipingRef.current === false) {
+    /*if (zoomLevel > 100 && (e.buttons & 1) && isMainImageSwipingRef.current === false) {
       pan(e);
-    }
+    }*/
   }
 
   function pan(e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) {
@@ -1360,9 +1381,9 @@ export default function Home() {
                           onPointerCancel={handleMainImagePointerUp}
                           onWheel={handleImageWheel}
                           onTouchStart={handleImageTouchStart}
-                          onTouchMove={handleImageTouchMove}
-                          onMouseDown={handleImageMouseDown}
-                          onMouseMove={handleImageMouseMove}
+                          //onTouchMove={handleImageTouchMove}
+                          //onMouseDown={handleImageMouseDown}
+                          //onMouseMove={handleImageMouseMove}
                         />
                       )}
                     </div>
