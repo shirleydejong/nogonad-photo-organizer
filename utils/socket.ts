@@ -5,7 +5,7 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    const socketURL = new URL(window.location);
+    const socketURL = new URL(window.location.origin);
     socketURL.port = config.SOCKET_PORT.toString();
     
     socket = io(socketURL.toString(), {
