@@ -715,17 +715,11 @@ export default function Home() {
   }
 
   function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
-    console.log('Pointer down with button', e.button, 'and zoom level', zoomLevel);
   // Left mouse button + zoomed in = pan mode
     if (zoomLevel > 100 && e.button === 0) {
-      console.log('POINTER: Entering pan mode', e.button, e.clientX, e.clientY);
       panStartXRef.current = e.clientX;
       panStartYRef.current = e.clientY;
       isMainImageSwipingRef.current = false;
-    }
-    
-    if( e.pointerType === 'touch') {
-      console.log(e)
     }
 
     // Cancel any pending timeout from previous swipe
@@ -763,7 +757,7 @@ export default function Home() {
     // Swipe left = next image, image goes left1
       if (deltaX < 0 && currentIdx < filteredImageFiles.length - 1) {
         const nextImg = filteredImageFiles[currentIdx + 1];
-         setSwipeDirection('left');
+        setSwipeDirection('left');
         setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
         
     // Swipe right = previous image, image goes right
@@ -821,80 +815,55 @@ export default function Home() {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  function handleImageTouchStart(e: React.TouchEvent<HTMLImageElement>) {
-    console.warn('Touch start with', e.touches.length, 'touches');
+  function handleTouchStart(e: React.TouchEvent<HTMLImageElement>) {
     if (e.touches.length === 2) {
-      // Two-finger pinch
-      touchPinchRef.current.distance = getDistance(e.touches[0], e.touches[1]);
-      touchPinchRef.current.startZoom = zoomLevel;
-    } else if (zoomLevel > 100) {
-      //console.log('TOUCH: Entering pan mode', e.touches[0].clientX, e.touches[0].clientY);
-      // Single finger pan when zoomed in
-      //panStartXRef.current = e.touches[0].clientX;
-      //panStartYRef.current = e.touches[0].clientY;
+      const dist = getDistance(e.touches[0], e.touches[1]);
+      touchPinchRef.current = { distance: dist, startZoom: zoomLevel };
     }
   }
 
-  function handleImageTouchMove(e: React.TouchEvent<HTMLImageElement>) {
-    /*console.warn('Touch move with', e.touches.length, 'touches');
+  function handleTouchMove(e: React.TouchEvent<HTMLImageElement>) {
     if (e.touches.length === 2) {
-      // Two-finger pinch zoom
-      const newDistance = getDistance(e.touches[0], e.touches[1]);
-      const delta = newDistance - touchPinchRef.current.distance;
-      const zoomChange = (delta / 100) * 10;
-      const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom + zoomChange));
-
-      if (newZoom === 100) {
-        setPanX(0);
-        setPanY(0);
+      const dist = getDistance(e.touches[0], e.touches[1]);
+      const delta = dist / touchPinchRef.current.distance;
+      const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom * delta));
+      
+      if (newZoom !== zoomLevel) {
+        if (newZoom === 100) {
+          setZoomLevel(100);
+          setPanX(0);
+          setPanY(0);
+        } else {
+          setZoomLevel(newZoom);
+        }
       }
-      setZoomLevel(newZoom);
-
-    } else if (e.touches.length === 1 && zoomLevel > 100) {
-      pan(e);
-    }*/
-   //if (e.touches.length === 1 && zoomLevel > 100) {
-   // console.log('TOUCH MOVE: Panning with single touch', e.touches.length, e.touches[0].clientX, e.touches[0].clientY);
-  // }
+    }
   }
 
-  function handleImageMouseDown(e: React.MouseEvent<HTMLImageElement>) {
-    /*console.warn('Mouse down with button', e.button);
-    if (zoomLevel > 100 && e.button === 0) {
-      console.warn('xxx');
-      // Left mouse button + zoomed in = pan mode
-      panStartXRef.current = e.clientX;
-      panStartYRef.current = e.clientY;
-      isMainImageSwipingRef.current = false;
-    }*/
-  }
-
-  function handleImageMouseMove(e: React.MouseEvent<HTMLImageElement>) {
-    /*if (zoomLevel > 100 && (e.buttons & 1) && isMainImageSwipingRef.current === false) {
-      pan(e);
-    }*/
-  }
-
-  function pan(e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) {
-    const z = 'touches' in e ? e.touches[0] : e;
-
-    const deltaX = (z.clientX - panStartXRef.current) * pinchFactor;
-    const deltaY = (z.clientY - panStartYRef.current) * pinchFactor;
+  function pan(e: React.PointerEvent<HTMLImageElement>) {
+    const deltaX = (e.clientX - panStartXRef.current) * pinchFactor;
+    const deltaY = (e.clientY - panStartYRef.current) * pinchFactor;
+    
     const zoomFactor = zoomLevel / 100;
-
     const container = document.querySelector('.main-image-container');
 
-    const maxPanX = ((e.currentTarget.clientWidth * zoomFactor - container!.clientWidth) / 2) / zoomFactor;
-    const maxPanY = ((e.currentTarget.clientHeight * zoomFactor - container!.clientHeight) / 2) / zoomFactor;
+    if (!container) return;
 
-    const newPanX = e.currentTarget.clientWidth * zoomFactor < container!.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + deltaX / zoomFactor));
-    const newPanY = e.currentTarget.clientHeight * zoomFactor < container!.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + deltaY / zoomFactor));
+    // Adjust for zoom level to make movement feel natural
+    const moveX = deltaX / zoomFactor;
+    const moveY = deltaY / zoomFactor;
+
+    const maxPanX = ((e.currentTarget.clientWidth * zoomFactor - container.clientWidth) / 2) / zoomFactor;
+    const maxPanY = ((e.currentTarget.clientHeight * zoomFactor - container.clientHeight) / 2) / zoomFactor;
+
+    const newPanX = e.currentTarget.clientWidth * zoomFactor < container.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + moveX));
+    const newPanY = e.currentTarget.clientHeight * zoomFactor < container.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + moveY));
 
     setPanX(newPanX);
     setPanY(newPanY);
 
-    panStartXRef.current = z.clientX;
-    panStartYRef.current = z.clientY;
+    panStartXRef.current = e.clientX;
+    panStartYRef.current = e.clientY;
   }
 
   // Reset swipe animation after it completes
@@ -1373,17 +1342,16 @@ export default function Home() {
                           style={{
                             transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
                             transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
+                            touchAction: zoomLevel > 100 ? 'none' : 'pan-y pinch-zoom',
                           }}
                           draggable={false}
                           onPointerDown={handleMainImagePointerDown}
                           onPointerMove={handleMainImagePointerMove}
                           onPointerUp={handleMainImagePointerUp}
                           onPointerCancel={handleMainImagePointerUp}
+                          onTouchStart={handleTouchStart}
+                          onTouchMove={handleTouchMove}
                           onWheel={handleImageWheel}
-                          onTouchStart={handleImageTouchStart}
-                          //onTouchMove={handleImageTouchMove}
-                          //onMouseDown={handleImageMouseDown}
-                          //onMouseMove={handleImageMouseMove}
                         />
                       )}
                     </div>
