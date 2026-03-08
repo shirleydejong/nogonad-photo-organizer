@@ -76,7 +76,7 @@ export function ImportModal({
           } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <div className="flex flex-col items-center gap-3">
-            <Icon name="cloud_upload" size={32} className="text-zinc-400" />
+            <Icon name="cloud_upload" size={32} />
             <div>
               <p className="text-zinc-100 font-medium">Drag and drop your JSON file here</p>
               <p className="text-zinc-500 text-sm mt-1">or</p>
