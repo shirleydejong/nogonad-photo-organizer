@@ -6,6 +6,8 @@ import { Header } from "@/components/header";
 import { ConflictModal } from "@/components/conflict-modal";
 import { FilterModal } from "@/components/filter-modal";
 import { StatusModal } from "@/components/status-modal";
+import { ExportModal } from "@/components/export-modal";
+import { ImportModal } from "@/components/import-modal";
 import Link from "next/link";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
@@ -42,6 +44,8 @@ export default function ListPage() {
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
   // Status modal state
   const [statusModal, setStatusModal] = useState<{
@@ -339,6 +343,116 @@ export default function ListPage() {
   const handleIgnoreConflict = useCallback(() => {
     setSelectedConflict(null);
   }, []);
+
+  const handleExportRatings = useCallback((filename: string, prefix: string) => {
+    try {
+      const exportData: Array<{ id: string; rating: number | null }> = [];
+      
+      ratings.forEach((rating, id) => {
+        if (rating && rating.rating !== null) {
+          const exportId = prefix ? `${prefix}${id}` : id;
+          exportData.push({
+            id: exportId,
+            rating: rating.rating
+          });
+        }
+      });
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${filename}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export ratings:', err);
+      setStatusModal({
+        isOpen: true,
+        status: 'error',
+        message: 'Failed to export ratings',
+        errorDetails: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }, [ratings]);
+
+  const handleImportRatings = useCallback(async (file: File) => {
+    try {
+      setStatusModal({
+        isOpen: true,
+        status: 'loading',
+        message: 'Importing ratings...',
+      });
+      setShowImportModal(false);
+
+      const fileContent = await file.text();
+      const jsonData = JSON.parse(fileContent) as Array<{ id: string; rating: number | null }>;
+
+      if (!Array.isArray(jsonData)) {
+        throw new Error('JSON file must contain an array of ratings');
+      }
+
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      for (const item of jsonData) {
+        if (!item.id || item.rating === undefined) {
+          continue;
+        }
+
+        // Check if rating already exists in database
+        const existingRating = ratings.get(item.id);
+        if (existingRating && existingRating.rating !== null) {
+          skippedCount++;
+          continue;
+        }
+
+        // Import the rating
+        const response = await fetch('/api/ratings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: `${item.id}.jpg`,
+            rating: item.rating,
+            folderPath,
+            overRuleFileRating: false,
+          }),
+        });
+
+        if (response.ok) {
+          importedCount++;
+          // Update local state
+          setRatings(prev => {
+            const newMap = new Map(prev);
+            newMap.set(item.id, {
+              id: item.id,
+              rating: item.rating,
+              overRuleFileRating: false,
+              createdAt: new Date().toISOString()
+            });
+            return newMap;
+          });
+        }
+      }
+
+      setStatusModal({
+        isOpen: true,
+        status: 'success',
+        message: `Import complete: ${importedCount} ratings imported${skippedCount > 0 ? `, ${skippedCount} skipped (already in database)` : ''}`,
+      });
+    } catch (err) {
+      console.error('Failed to import ratings:', err);
+      setStatusModal({
+        isOpen: true,
+        status: 'error',
+        message: 'Failed to import ratings',
+        errorDetails: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  }, [ratings, folderPath]);
 
   function renderRatingStars(fileName: string) {
     const fileId = getFileId(fileName);
@@ -849,6 +963,22 @@ export default function ListPage() {
             <Icon name="filter_list" />
           </button>
           <button
+            className="header-button"
+            onClick={() => setShowExportModal(true)}
+            title="Export ratings to JSON"
+            disabled={statusModal.isOpen}
+          >
+            <Icon name="download" />
+          </button>
+          <button
+            className="header-button"
+            onClick={() => setShowImportModal(true)}
+            title="Import ratings from JSON"
+            disabled={statusModal.isOpen}
+          >
+            <Icon name="upload" />
+          </button>
+          <button
             className={`header-button ${hasAnyConflicts() ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={handleApplyRatings}
             disabled={hasAnyConflicts() || statusModal.isOpen}
@@ -948,6 +1078,23 @@ export default function ListPage() {
         conflictOption={true}
         showConflictsOnly={showConflictsOnly}
         setShowConflictsOnly={setShowConflictsOnly}
+      />
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={(filename, prefix) => {
+          handleExportRatings(filename, prefix);
+          setShowExportModal(false);
+        }}
+        defaultFilename={`${folderName}_ratings`}
+      />
+
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImportRatings}
+        isLoading={statusModal.isOpen && statusModal.status === 'loading'}
       />
 
       <StatusModal
