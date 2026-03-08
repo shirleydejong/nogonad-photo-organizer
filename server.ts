@@ -1,3 +1,4 @@
+import os from 'os';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
@@ -6,10 +7,13 @@ import { Server as SocketIOServer } from 'socket.io';
 import FileWatcher, { FileChangeEvent } from '@/controllers/file-watcher';
 import getShootAssistController from '@/controllers/shoot-assist';
 
-console.log('Starting server in:', process.env.NODE_ENV);
-
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+
+console.log('Starting server in:', dev ? 'development' : 'production', 'mode');
+
+const hostname = config?.HOSTNAME || Object.values(os.networkInterfaces())
+  .flat()
+  .find((iface) => iface?.family === 'IPv4' && !iface.internal)?.address || 'localhost';
 const port = config.HTTP_PORT;
 const socketPort = config.SOCKET_PORT; // Separate port for Socket.IO to avoid conflicts with Next.js HMR
 
