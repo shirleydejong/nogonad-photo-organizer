@@ -11,6 +11,7 @@ const dev = process.env.NODE_ENV !== 'production';
 
 console.log('Starting server in:', dev ? 'development' : 'production', 'mode');
 
+// @ts-ignore - Allow undefined config for development without .env file
 const hostname = config?.HOSTNAME || Object.values(os.networkInterfaces())
   .flat()
   .find((iface) => iface?.family === 'IPv4' && !iface.internal)?.address || 'localhost';
