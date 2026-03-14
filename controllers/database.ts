@@ -39,6 +39,16 @@ export type DbInfo = {
 	created: boolean;
 };
 
+export type GroupRecord = {
+	id: string;
+	name: string;
+};
+
+export type ImageGroupRecord = {
+	imageId: string;
+	groupId: string;
+};
+
 /**
  * In-memory cache of database connections, keyed by database file path.
  * Prevents opening multiple connections to the same database file.
@@ -94,6 +104,7 @@ function getDatabase(folderPath: string): DbInfo {
 
 	const existed = fs.existsSync(dbPath);
 	const db = new Database(dbPath);
+	db.pragma('foreign_keys = ON');
 
 	const dbInfo = {
 		db,
@@ -172,6 +183,7 @@ function ensureRatingsTable(dbInfo?: DbInfo) {
 
 	if (row) {
 		dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS ratings_id_unique ON ratings(id)').run();
+		ensureImageGroupsTable(dbInfo);
 		return;
 	}
 
@@ -179,6 +191,68 @@ function ensureRatingsTable(dbInfo?: DbInfo) {
 		'CREATE TABLE ratings (id varchar(255) PRIMARY KEY, rating int, overRuleFileRating boolean,createdAt datetime)'
 	).run();
 	dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS ratings_id_unique ON ratings(id)').run();
+	ensureImageGroupsTable(dbInfo);
+};
+
+/**
+ * Ensures the groups table exists in the database
+ *
+ * Table schema:
+ * - id (varchar, PRIMARY KEY): Unique group identifier
+ * - name (varchar): Display name of the group
+ *
+ * @param {DbInfo} [dbInfo] - Database connection info. Must be provided.
+ * @throws {Error} If dbInfo is not provided
+ */
+function ensureGroupsTable(dbInfo?: DbInfo) {
+	if (!dbInfo) {
+		throw new Error('Database connection is required to ensure groups table exists');
+	}
+
+	const row = dbInfo.db
+		.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='groups'")
+		.get();
+
+	if (row) {
+		dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS groups_id_unique ON groups(id)').run();
+		ensureImageGroupsTable(dbInfo);
+		return;
+	}
+
+	dbInfo.db.prepare('CREATE TABLE groups (id varchar(255) PRIMARY KEY, name varchar(255) NOT NULL)').run();
+	dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS groups_id_unique ON groups(id)').run();
+	ensureImageGroupsTable(dbInfo);
+};
+
+/**
+ * Ensures the image-group relation table exists in the database
+ *
+ * Table schema:
+ * - imageId (varchar): References ratings.id
+ * - groupId (varchar): References groups.id
+ *
+ * Composite primary key ensures one group assignment per image/group pair.
+ * Foreign keys cascade deletions to avoid orphaned relations.
+ *
+ * @param {DbInfo} [dbInfo] - Database connection info. Must be provided.
+ * @throws {Error} If dbInfo is not provided
+ */
+function ensureImageGroupsTable(dbInfo?: DbInfo) {
+	if (!dbInfo) {
+		throw new Error('Database connection is required to ensure image_groups table exists');
+	}
+
+	dbInfo.db.prepare(
+		`CREATE TABLE IF NOT EXISTS image_groups (
+			imageId varchar(255) NOT NULL,
+			groupId varchar(255) NOT NULL,
+			PRIMARY KEY (imageId, groupId),
+			FOREIGN KEY (imageId) REFERENCES ratings(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY (groupId) REFERENCES groups(id) ON DELETE CASCADE ON UPDATE CASCADE
+		)`
+	).run();
+	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS image_groups_imageId_idx ON image_groups(imageId)').run();
+	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS image_groups_groupId_idx ON image_groups(groupId)').run();
 };
 
 /**
@@ -253,6 +327,167 @@ export function getAllRatings(folderPath: string): Array<{ id: string; rating: n
 
 	const rows = dbInfo.db.prepare('SELECT id, rating, overRuleFileRating, createdAt FROM ratings').all();
 	return rows as Array<{ id: string; rating: number | null; overRuleFileRating: boolean | null; createdAt: string }>;
+};
+
+/**
+ * Retrieves all groups from the database for a folder
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @returns {GroupRecord[]} Array of groups
+ */
+export function getAllGroups(folderPath: string): GroupRecord[] {
+	const dbInfo = getDatabase(folderPath);
+	ensureGroupsTable(dbInfo);
+
+	const rows = dbInfo.db.prepare('SELECT id, name FROM groups ORDER BY name COLLATE NOCASE ASC').all();
+	return rows as GroupRecord[];
+};
+
+/**
+ * Retrieves one group by id from the database
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} id - Group identifier
+ * @returns {GroupRecord | null} The group record or null when not found
+ */
+export function getGroup(folderPath: string, id: string): GroupRecord | null {
+	const dbInfo = getDatabase(folderPath);
+	ensureGroupsTable(dbInfo);
+
+	const row = dbInfo.db.prepare('SELECT id, name FROM groups WHERE id = ?').get(id) as GroupRecord | undefined;
+	return row ?? null;
+};
+
+/**
+ * Creates a new group record
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} id - Group identifier
+ * @param {string} name - Group name
+ * @returns {GroupRecord} Newly created group
+ */
+export function createGroup(folderPath: string, id: string, name: string): GroupRecord {
+	const dbInfo = getDatabase(folderPath);
+	ensureGroupsTable(dbInfo);
+
+	dbInfo.db.prepare('INSERT INTO groups (id, name) VALUES (@id, @name)').run({ id, name });
+	return { id, name };
+};
+
+/**
+ * Updates an existing group name
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} id - Group identifier
+ * @param {string} name - New group name
+ * @returns {GroupRecord | null} Updated group or null when no group matches id
+ */
+export function updateGroup(folderPath: string, id: string, name: string): GroupRecord | null {
+	const dbInfo = getDatabase(folderPath);
+	ensureGroupsTable(dbInfo);
+
+	const result = dbInfo.db.prepare('UPDATE groups SET name = @name WHERE id = @id').run({ id, name });
+	if (result.changes === 0) {
+		return null;
+	}
+
+	return { id, name };
+};
+
+/**
+ * Deletes a group by id
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} id - Group identifier
+ * @returns {boolean} True when a row was deleted
+ */
+export function deleteGroup(folderPath: string, id: string): boolean {
+	const dbInfo = getDatabase(folderPath);
+	ensureGroupsTable(dbInfo);
+
+	const result = dbInfo.db.prepare('DELETE FROM groups WHERE id = ?').run(id);
+	return result.changes > 0;
+};
+
+/**
+ * Retrieves image-group relation records with optional filters
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {Object} [filters] - Optional query filters
+ * @param {string} [filters.imageId] - Filter by image id
+ * @param {string} [filters.groupId] - Filter by group id
+ * @returns {ImageGroupRecord[]} Array of matching relation records
+ */
+export function getImageGroupRelations(
+	folderPath: string,
+	filters?: { imageId?: string; groupId?: string }
+): ImageGroupRecord[] {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	if (filters?.imageId && filters?.groupId) {
+		const rows = dbInfo.db
+			.prepare('SELECT imageId, groupId FROM image_groups WHERE imageId = ? AND groupId = ?')
+			.all(filters.imageId, filters.groupId);
+		return rows as ImageGroupRecord[];
+	}
+
+	if (filters?.imageId) {
+		const rows = dbInfo.db
+			.prepare('SELECT imageId, groupId FROM image_groups WHERE imageId = ? ORDER BY groupId COLLATE NOCASE ASC')
+			.all(filters.imageId);
+		return rows as ImageGroupRecord[];
+	}
+
+	if (filters?.groupId) {
+		const rows = dbInfo.db
+			.prepare('SELECT imageId, groupId FROM image_groups WHERE groupId = ? ORDER BY imageId COLLATE NOCASE ASC')
+			.all(filters.groupId);
+		return rows as ImageGroupRecord[];
+	}
+
+	const rows = dbInfo.db
+		.prepare('SELECT imageId, groupId FROM image_groups ORDER BY groupId COLLATE NOCASE ASC, imageId COLLATE NOCASE ASC')
+		.all();
+	return rows as ImageGroupRecord[];
+};
+
+/**
+ * Creates a relation between image and group
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} imageId - Image id from ratings table
+ * @param {string} groupId - Group id from groups table
+ * @returns {ImageGroupRecord} Created relation
+ */
+export function createImageGroupRelation(folderPath: string, imageId: string, groupId: string): ImageGroupRecord {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	dbInfo.db.prepare('INSERT INTO image_groups (imageId, groupId) VALUES (@imageId, @groupId)').run({ imageId, groupId });
+	return { imageId, groupId };
+};
+
+/**
+ * Deletes an image-group relation
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} imageId - Image id from ratings table
+ * @param {string} groupId - Group id from groups table
+ * @returns {boolean} True when the relation was deleted
+ */
+export function deleteImageGroupRelation(folderPath: string, imageId: string, groupId: string): boolean {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	const result = dbInfo.db.prepare('DELETE FROM image_groups WHERE imageId = ? AND groupId = ?').run(imageId, groupId);
+	return result.changes > 0;
 };
 
 /**
