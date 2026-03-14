@@ -118,7 +118,7 @@ export default function SelectFolder() {
     setFilteredPaths([]);
   }
 
-  async function handlePickFolder(targetRoute: '/' | '/list' | '/bulk-rate') {
+  async function handlePickFolder(targetRoute: '/' | '/list' | '/bulk-rate' | '/pairwise-ranking') {
     setError(null);
     setShowAutocomplete(false);
     
@@ -348,6 +348,16 @@ export default function SelectFolder() {
               >
                 <Icon name="grid_view" />
                 Bulk Rate
+              </button>
+              
+            </div>
+            <div className="flex gap-4">
+              <button
+                className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
+                onClick={() => handlePickFolder('/pairwise-ranking')}
+              >
+                <Icon name="swap_horiz" />
+                Pairwise Ranking
               </button>
             </div>
             

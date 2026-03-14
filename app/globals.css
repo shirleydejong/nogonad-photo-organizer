@@ -32,6 +32,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.top-toolbar {
+  @apply sticky top-0 z-50 w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0 transition-transform duration-300;
+  background: linear-gradient(145deg, rgb(18 18 18 / 85%), rgb(8 8 8 / 90%));
+  backdrop-filter: blur(8px);
+}
+
+.top-toolbar.hidden {
+  display: none;
+}
+
 #filmstrip {
   scroll-behavior: smooth;
 }

@@ -49,6 +49,20 @@ export type ImageGroupRecord = {
 	groupId: string;
 };
 
+export type PairwiseComparisonRecord = {
+	imageAId: string;
+	imageBId: string;
+	winnerImageId: string | null;
+	sourceGroupId: string;
+	skipped: boolean;
+	comparedAt: string;
+};
+
+export type GroupRatedImageRecord = {
+	imageId: string;
+	rating: number;
+};
+
 /**
  * In-memory cache of database connections, keyed by database file path.
  * Prevents opening multiple connections to the same database file.
@@ -254,6 +268,60 @@ function ensureImageGroupsTable(dbInfo?: DbInfo) {
 	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS image_groups_imageId_idx ON image_groups(imageId)').run();
 	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS image_groups_groupId_idx ON image_groups(groupId)').run();
 };
+
+/**
+ * Ensures the pairwise ranking table exists in the database
+ *
+ * Table schema:
+ * - imageAId (varchar): First image id (lexicographically smaller)
+ * - imageBId (varchar): Second image id (lexicographically larger)
+ * - winnerImageId (varchar|null): Winning image id, null when skipped
+ * - sourceGroupId (varchar): Group id where this comparison was last recorded
+ * - skipped (boolean): Whether the comparison was skipped
+ * - comparedAt (datetime): Timestamp of the last comparison update
+ *
+ * Composite primary key on (imageAId, imageBId) makes comparisons reusable across groups.
+ *
+ * @param {DbInfo} [dbInfo] - Database connection info. Must be provided.
+ * @throws {Error} If dbInfo is not provided
+ */
+function ensurePairwiseRankingTable(dbInfo?: DbInfo) {
+	if (!dbInfo) {
+		throw new Error('Database connection is required to ensure pairwise_ranking table exists');
+	}
+
+	dbInfo.db.prepare(
+		`CREATE TABLE IF NOT EXISTS pairwise_ranking (
+			imageAId varchar(255) NOT NULL,
+			imageBId varchar(255) NOT NULL,
+			winnerImageId varchar(255),
+			sourceGroupId varchar(255) NOT NULL,
+			skipped boolean NOT NULL DEFAULT 0,
+			comparedAt datetime NOT NULL,
+			PRIMARY KEY (imageAId, imageBId),
+			CHECK (imageAId < imageBId),
+			CHECK (winnerImageId IS NULL OR winnerImageId = imageAId OR winnerImageId = imageBId),
+			FOREIGN KEY (imageAId) REFERENCES ratings(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY (imageBId) REFERENCES ratings(id) ON DELETE CASCADE ON UPDATE CASCADE,
+			FOREIGN KEY (winnerImageId) REFERENCES ratings(id) ON DELETE SET NULL ON UPDATE CASCADE,
+			FOREIGN KEY (sourceGroupId) REFERENCES groups(id) ON DELETE CASCADE ON UPDATE CASCADE
+		)`
+	).run();
+
+	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS pairwise_ranking_sourceGroupId_idx ON pairwise_ranking(sourceGroupId)').run();
+	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS pairwise_ranking_winnerImageId_idx ON pairwise_ranking(winnerImageId)').run();
+	dbInfo.db.prepare('CREATE INDEX IF NOT EXISTS pairwise_ranking_comparedAt_idx ON pairwise_ranking(comparedAt)').run();
+};
+
+function normalizePairwiseIds(imageAId: string, imageBId: string): { imageAId: string; imageBId: string } {
+	if (imageAId === imageBId) {
+		throw new Error('Pairwise comparison requires two different image ids');
+	}
+
+	return imageAId < imageBId
+		? { imageAId, imageBId }
+		: { imageAId: imageBId, imageBId: imageAId };
+}
 
 /**
  * Inserts or updates a photo rating in the database
@@ -488,6 +556,163 @@ export function deleteImageGroupRelation(folderPath: string, imageId: string, gr
 
 	const result = dbInfo.db.prepare('DELETE FROM image_groups WHERE imageId = ? AND groupId = ?').run(imageId, groupId);
 	return result.changes > 0;
+};
+
+/**
+ * Returns all rated image ids for a group above or equal to the minimum rating.
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} groupId - Group id
+ * @param {number} [minRating=1] - Minimum rating threshold
+ * @returns {GroupRatedImageRecord[]} Rated group images
+ */
+export function getGroupRatedImages(folderPath: string, groupId: string, minRating: number = 1): GroupRatedImageRecord[] {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	const normalizedMinRating = Number.isFinite(minRating) ? Math.max(1, Math.min(5, Math.trunc(minRating))) : 1;
+	const rows = dbInfo.db.prepare(
+		`SELECT ig.imageId as imageId, r.rating as rating
+		 FROM image_groups ig
+		 INNER JOIN ratings r ON r.id = ig.imageId
+		 WHERE ig.groupId = @groupId
+		   AND r.rating IS NOT NULL
+		   AND r.rating >= @minRating
+		 ORDER BY r.rating DESC, ig.imageId COLLATE NOCASE ASC`
+	).all({ groupId, minRating: normalizedMinRating });
+
+	return rows as GroupRatedImageRecord[];
+};
+
+/**
+ * Inserts or updates a pairwise comparison result.
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {Object} comparison - Pairwise comparison data
+ * @returns {PairwiseComparisonRecord} Saved pairwise comparison
+ */
+export function upsertPairwiseComparison(
+	folderPath: string,
+	comparison: {
+		imageAId: string;
+		imageBId: string;
+		winnerImageId: string | null;
+		sourceGroupId: string;
+		skipped?: boolean;
+	}
+): PairwiseComparisonRecord {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+	ensurePairwiseRankingTable(dbInfo);
+
+	const normalizedPair = normalizePairwiseIds(comparison.imageAId, comparison.imageBId);
+	const skipped = Boolean(comparison.skipped) || comparison.winnerImageId === null;
+	const winnerImageId = skipped ? null : comparison.winnerImageId;
+
+	if (winnerImageId && winnerImageId !== normalizedPair.imageAId && winnerImageId !== normalizedPair.imageBId) {
+		throw new Error('winnerImageId must be one of the compared image ids');
+	}
+
+	const comparedAt = new Date().toISOString();
+	dbInfo.db.prepare(
+		`INSERT INTO pairwise_ranking (imageAId, imageBId, winnerImageId, sourceGroupId, skipped, comparedAt)
+		 VALUES (@imageAId, @imageBId, @winnerImageId, @sourceGroupId, @skipped, @comparedAt)
+		 ON CONFLICT(imageAId, imageBId) DO UPDATE SET
+			winnerImageId = excluded.winnerImageId,
+			sourceGroupId = excluded.sourceGroupId,
+			skipped = excluded.skipped,
+			comparedAt = excluded.comparedAt`
+	).run({
+		imageAId: normalizedPair.imageAId,
+		imageBId: normalizedPair.imageBId,
+		winnerImageId,
+		sourceGroupId: comparison.sourceGroupId,
+		skipped: skipped ? 1 : 0,
+		comparedAt,
+	});
+
+	return {
+		imageAId: normalizedPair.imageAId,
+		imageBId: normalizedPair.imageBId,
+		winnerImageId,
+		sourceGroupId: comparison.sourceGroupId,
+		skipped,
+		comparedAt,
+	};
+};
+
+/**
+ * Returns pairwise comparisons where both images are in the provided image id set.
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string[]} imageIds - Image ids to include
+ * @returns {PairwiseComparisonRecord[]} Matching pairwise comparisons
+ */
+export function getPairwiseComparisonsForImageIds(folderPath: string, imageIds: string[]): PairwiseComparisonRecord[] {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+	ensurePairwiseRankingTable(dbInfo);
+
+	const normalizedIds = Array.from(
+		new Set(
+			imageIds
+				.map((id) => id.trim())
+				.filter((id) => id.length > 0)
+		)
+	);
+
+	if (normalizedIds.length < 2) {
+		return [];
+	}
+
+	const idSet = new Set(normalizedIds);
+	const pairMap = new Map<string, PairwiseComparisonRecord>();
+	const chunkSize = 400;
+
+	for (let i = 0; i < normalizedIds.length; i += chunkSize) {
+		const chunk = normalizedIds.slice(i, i + chunkSize);
+		const placeholders = chunk.map(() => '?').join(',');
+		const rows = dbInfo.db.prepare(
+			`SELECT imageAId, imageBId, winnerImageId, sourceGroupId, skipped, comparedAt
+			 FROM pairwise_ranking
+			 WHERE imageAId IN (${placeholders}) OR imageBId IN (${placeholders})`
+		).all(...chunk, ...chunk) as Array<{
+			imageAId: string;
+			imageBId: string;
+			winnerImageId: string | null;
+			sourceGroupId: string;
+			skipped: number | boolean;
+			comparedAt: string;
+		}>;
+
+		for (const row of rows) {
+			if (!idSet.has(row.imageAId) || !idSet.has(row.imageBId)) {
+				continue;
+			}
+
+			const key = `${row.imageAId}::${row.imageBId}`;
+			if (pairMap.has(key)) {
+				continue;
+			}
+
+			pairMap.set(key, {
+				imageAId: row.imageAId,
+				imageBId: row.imageBId,
+				winnerImageId: row.winnerImageId,
+				sourceGroupId: row.sourceGroupId,
+				skipped: Boolean(row.skipped),
+				comparedAt: row.comparedAt,
+			});
+		}
+	}
+
+	return Array.from(pairMap.values());
 };
 
 /**

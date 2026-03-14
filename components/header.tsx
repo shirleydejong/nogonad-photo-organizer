@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 
@@ -21,11 +22,29 @@ export function Header({
   onStopCapture,
 }: HeaderProps) {
   const router = useRouter();
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY <= 0) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY.current) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <header 
       id="top-toolbar" 
-      className={`w-full flex items-center justify-between px-8 py-3 border-b border-zinc-800 flex-shrink-0 ${isFullscreen ? 'hidden' : ''}`}
+      className={`top-toolbar ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isFullscreen ? 'hidden' : ''}`}
     >
       <div className="flex items-center gap-3">
         <button
