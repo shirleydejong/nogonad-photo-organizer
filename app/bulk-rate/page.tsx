@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
+import { FilterModal } from "@/components/filter-modal";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
 
@@ -28,6 +29,9 @@ export default function BulkRatePage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [showUnrated, setShowUnrated] = useState<boolean>(true);
+  const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   
   // Multi-select state
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -52,6 +56,22 @@ export default function BulkRatePage() {
     const lastDot = fileName.lastIndexOf('.');
     if (lastDot === -1) return fileName + '-thumb';
     return fileName.substring(0, lastDot) + '-thumb' + fileName.substring(lastDot);
+  }
+
+  function shouldShowImage(fileName: string): boolean {
+    const fileId = getFileId(fileName);
+    const ratingData = ratings.get(fileId);
+    const currentRating = ratingData?.rating ?? null;
+
+    if (currentRating === null && showUnrated) {
+      return true;
+    }
+
+    if (currentRating !== null && selectedRatings.has(currentRating)) {
+      return true;
+    }
+
+    return false;
   }
 
   // Load folder and images
@@ -275,6 +295,28 @@ export default function BulkRatePage() {
     }
   }, [isSelecting]);
 
+  const visibleImageEntries = useMemo(
+    () => imageFiles
+      .map((image, index) => ({ image, index }))
+      .filter(({ image }) => shouldShowImage(image.fileName)),
+    [imageFiles, ratings, showUnrated, selectedRatings]
+  );
+
+  const visibleIndices = useMemo(
+    () => new Set(visibleImageEntries.map(({ index }) => index)),
+    [visibleImageEntries]
+  );
+
+  useEffect(() => {
+    setSelectedIndices((prev) => {
+      const filtered = new Set(Array.from(prev).filter((index) => visibleIndices.has(index)));
+      if (filtered.size === prev.size) {
+        return prev;
+      }
+      return filtered;
+    });
+  }, [visibleIndices]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -287,7 +329,7 @@ export default function BulkRatePage() {
       // Ctrl+A: Select all
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
-        setSelectedIndices(new Set(imageFiles.map((_, i) => i)));
+        setSelectedIndices(new Set(visibleImageEntries.map(({ index }) => index)));
         return;
       }
 
@@ -323,7 +365,7 @@ export default function BulkRatePage() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [selectedIndices, imageFiles, applyRatingToSelected]);
+  }, [selectedIndices, visibleImageEntries, applyRatingToSelected]);
 
   const currentRating = selectedIndices.size > 0
     ? (() => {
@@ -379,7 +421,16 @@ export default function BulkRatePage() {
   return (
     <div className="flex min-h-screen flex-col bg-black font-sans">
       <Header folderName={folderName} title="Bulk Rate" isFullscreen={false}>
-        <div className="text-zinc-400 text-sm">{imageFiles.length} images, {selectedIndices.size} selected</div>
+        <div className="flex items-center gap-4">
+          <div className="text-zinc-400 text-sm">{visibleImageEntries.length} / {imageFiles.length} images, {selectedIndices.size} selected</div>
+          <button
+            className="header-button"
+            onClick={() => setShowFilterModal(true)}
+            title="Filter images by rating"
+          >
+            <Icon name="filter_list" />
+          </button>
+        </div>
       </Header>
 
       <main className="flex-1 flex flex-col w-full overflow-hidden">
@@ -401,7 +452,12 @@ export default function BulkRatePage() {
             ref={gridRef}
             className="inline-grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4 w-full mb-48"
           >
-            {imageFiles.map((image, index) => {
+            {visibleImageEntries.length === 0 && (
+              <div className="col-span-full text-zinc-500 text-center py-12">
+                No images match the current filter.
+              </div>
+            )}
+            {visibleImageEntries.map(({ image, index }) => {
               const fileId = getFileId(image.fileName);
               const isSelected = selectedIndices.has(index);
               const imageRating = ratings.get(fileId)?.rating ?? null;
@@ -530,6 +586,15 @@ export default function BulkRatePage() {
           </div>
         )}
       </main>
+
+      <FilterModal
+        isOpen={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        showUnrated={showUnrated}
+        setShowUnrated={setShowUnrated}
+        selectedRatings={selectedRatings}
+        setSelectedRatings={setSelectedRatings}
+      />
     </div>
   );
 }
