@@ -9,6 +9,9 @@ interface FilterModalProps {
   setShowUnrated: (value: boolean) => void;
   selectedRatings: Set<number>;
   setSelectedRatings: (ratings: Set<number>) => void;
+  availableGroups?: Array<{ id: string; name: string; imageCount?: number }>;
+  selectedGroupIds?: Set<string>;
+  setSelectedGroupIds?: (groupIds: Set<string>) => void;
   conflictOption?: boolean;
   showConflictsOnly?: boolean;
   setShowConflictsOnly?: (value: boolean) => void;
@@ -21,6 +24,9 @@ export function FilterModal({
   setShowUnrated,
   selectedRatings,
   setSelectedRatings,
+  availableGroups,
+  selectedGroupIds,
+  setSelectedGroupIds,
   conflictOption,
   showConflictsOnly,
   setShowConflictsOnly,
@@ -30,6 +36,7 @@ export function FilterModal({
   const handleClearFilters = () => {
     setShowUnrated(true);
     setSelectedRatings(new Set([1, 2, 3, 4, 5]));
+    setSelectedGroupIds?.(new Set());
     setShowConflictsOnly?.(false);
   };
 
@@ -87,6 +94,62 @@ export function FilterModal({
               })}
             </div>
           </div>
+
+          {/* Groups */}
+          {availableGroups && selectedGroupIds && setSelectedGroupIds && (
+            <div>
+              <div className="text-zinc-300 text-sm font-medium mb-4">Groups</div>
+              {availableGroups.length === 0 ? (
+                <div className="text-zinc-500 text-sm bg-zinc-800/40 border border-zinc-800 rounded-lg px-3 py-2">
+                  No groups available. Group filter is disabled.
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-auto space-y-2 pr-1">
+                  {availableGroups.map((group) => {
+                    const isSelected = selectedGroupIds.has(group.id);
+                    const countLabel = typeof group.imageCount === "number"
+                      ? `${group.imageCount} photo${group.imageCount === 1 ? "" : "s"}`
+                      : null;
+
+                    return (
+                      <label
+                        key={group.id}
+                        className={`flex items-center justify-between gap-4 cursor-pointer p-3 rounded-lg border transition ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-500/10"
+                            : "border-zinc-800 hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const next = new Set(selectedGroupIds);
+                              if (e.target.checked) {
+                                next.add(group.id);
+                              } else {
+                                next.delete(group.id);
+                              }
+                              setSelectedGroupIds(next);
+                            }}
+                            className="w-5 h-5 rounded cursor-pointer"
+                          />
+                          <span className="text-zinc-100 font-medium truncate">{group.name}</span>
+                        </div>
+                        {countLabel && (
+                          <span className="text-zinc-400 text-xs whitespace-nowrap">{countLabel}</span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-zinc-500 text-xs mt-2">
+                No groups selected keeps current behavior. Selected groups are OR, then combined with ratings as AND.
+              </p>
+            </div>
+          )}
           
           {/* Unrated images and Conflicts */}
           <div>

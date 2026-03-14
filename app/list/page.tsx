@@ -12,6 +12,7 @@ import Link from "next/link";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
 import { aggregateRatings } from "@/utils/ratings-aggregator";
+import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from "@/utils/group-filters";
 
 interface ImageData {
   fileName: string;
@@ -43,6 +44,10 @@ export default function ListPage() {
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
+  const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
+  const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
@@ -68,6 +73,35 @@ export default function ListPage() {
       router.push('/select-folder');
     }
   }, [router]);
+
+  const loadGroupFilters = useCallback(async (normalizedPath: string) => {
+    if (!normalizedPath) {
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+      return;
+    }
+
+    try {
+      const groupFilterData = await fetchGroupFilterData(normalizedPath);
+      setAvailableGroups(groupFilterData.groups);
+      setGroupCounts(groupFilterData.groupCounts);
+      setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
+      setSelectedGroupIds((prev) => {
+        const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
+        return next.size === prev.size ? prev : next;
+      });
+    } catch (groupErr) {
+      console.error('Failed to load group filters:', groupErr);
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+    }
+  }, []);
 
   // Load folder and images
   async function loadFolder(path: string) {
@@ -200,6 +234,9 @@ export default function ListPage() {
         console.error('Failed to fetch RAW files:', rawErr);
       }
 
+      setLoadProgress(85);
+      await loadGroupFilters(normalizedPath);
+
       setLoadProgress(95);
       setIsLoading(false);
 
@@ -235,14 +272,36 @@ export default function ListPage() {
       }
     }
 
+    let matchesRating = false;
+
     // If no rating and showUnrated is true, show it
     if (currentRating === null && showUnrated) {
-      return true;
+      matchesRating = true;
     }
 
     // If has rating and it's in selectedRatings, show it
     if (currentRating !== null && selectedRatings.has(currentRating)) {
+      matchesRating = true;
+    }
+
+    if (!matchesRating) {
+      return false;
+    }
+
+    // No selected groups keeps existing behavior.
+    if (selectedGroupIds.size === 0) {
       return true;
+    }
+
+    const imageGroups = imageGroupIdsByImageId.get(fileId);
+    if (!imageGroups || imageGroups.size === 0) {
+      return false;
+    }
+
+    for (const groupId of selectedGroupIds) {
+      if (imageGroups.has(groupId)) {
+        return true;
+      }
     }
 
     return false;
@@ -956,7 +1015,10 @@ export default function ListPage() {
           <div className="text-zinc-400 text-sm">{imageFiles.filter(img => shouldShowImage(img.fileName)).length} / {imageFiles.length} images</div>
           <button
             className="header-button"
-            onClick={() => setShowFilterModal(true)}
+            onClick={() => {
+              void loadGroupFilters(folderPath);
+              setShowFilterModal(true);
+            }}
             title="Filter images by rating"
             disabled={statusModal.isOpen}
           >
@@ -1075,6 +1137,12 @@ export default function ListPage() {
         setShowUnrated={setShowUnrated}
         selectedRatings={selectedRatings}
         setSelectedRatings={setSelectedRatings}
+        availableGroups={availableGroups.map((group) => ({
+          ...group,
+          imageCount: groupCounts.get(group.id) ?? 0,
+        }))}
+        selectedGroupIds={selectedGroupIds}
+        setSelectedGroupIds={setSelectedGroupIds}
         conflictOption={true}
         showConflictsOnly={showConflictsOnly}
         setShowConflictsOnly={setShowConflictsOnly}

@@ -27,6 +27,7 @@ import {
   formatFileSize,
   formatColor,
 } from "@/utils/exif-formatters";
+import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from "@/utils/group-filters";
 
 interface ImageData {
   originalFile: File;
@@ -61,6 +62,10 @@ export default function Home() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
   const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
+  const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
+  const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [isWatcherActive, setIsWatcherActive] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>("");
   
@@ -97,18 +102,44 @@ export default function Home() {
     const fileId = getFileId(img.fileName);
     const rating = ratings.get(fileId)?.rating ?? null;
 
-    // If no filter is active (all ratings selected and unrated shown), show all
-    if (filterSelectedRatings.size === 5 && filterShowUnrated) {
+    // If no filters are active, show all.
+    if (filterSelectedRatings.size === 5 && filterShowUnrated && selectedGroupIds.size === 0) {
       return true;
     }
 
+    let matchesRating = false;
+
     // If image is unrated (null, undefined, 0, or less than 1)
     if (rating === null || rating === undefined || rating < 1) {
-      return filterShowUnrated;
+      matchesRating = filterShowUnrated;
     }
 
     // If image has a rating, check if it's in the selected ratings
-    return filterSelectedRatings.has(rating);
+    if (rating !== null && rating !== undefined && rating >= 1) {
+      matchesRating = filterSelectedRatings.has(rating);
+    }
+
+    if (!matchesRating) {
+      return false;
+    }
+
+    // No selected groups keeps existing behavior.
+    if (selectedGroupIds.size === 0) {
+      return true;
+    }
+
+    const imageGroups = imageGroupIdsByImageId.get(fileId);
+    if (!imageGroups || imageGroups.size === 0) {
+      return false;
+    }
+
+    for (const groupId of selectedGroupIds) {
+      if (imageGroups.has(groupId)) {
+        return true;
+      }
+    }
+
+    return false;
   });
 
   // Adjust activeIndex if current image is filtered out
@@ -361,6 +392,35 @@ export default function Home() {
     }
   }, [router]);
 
+  const loadGroupFilters = useCallback(async (normalizedPath: string) => {
+    if (!normalizedPath) {
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+      return;
+    }
+
+    try {
+      const groupFilterData = await fetchGroupFilterData(normalizedPath);
+      setAvailableGroups(groupFilterData.groups);
+      setGroupCounts(groupFilterData.groupCounts);
+      setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
+      setSelectedGroupIds((prev) => {
+        const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
+        return next.size === prev.size ? prev : next;
+      });
+    } catch (groupErr) {
+      console.error('Failed to load group filters:', groupErr);
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+    }
+  }, []);
+
   // Load folder and images
   async function loadFolder(path: string) {
     setIsLoading(true);
@@ -456,6 +516,8 @@ export default function Home() {
       } catch (ratingErr) {
         console.error('Failed to fetch ratings:', ratingErr);
       }
+
+      await loadGroupFilters(normalizedPath);
 
       setIsLoading(false);
 
@@ -1209,7 +1271,10 @@ export default function Home() {
               </button>
               <button
                 className="header-button"
-                onClick={() => setIsFilterModalOpen(true)}
+                onClick={() => {
+                  void loadGroupFilters(folderPath);
+                  setIsFilterModalOpen(true);
+                }}
                 title="Filter images by rating"
               >
                 <Icon name="filter_list" />
@@ -1582,6 +1647,12 @@ export default function Home() {
         setShowUnrated={setFilterShowUnrated}
         selectedRatings={filterSelectedRatings}
         setSelectedRatings={setFilterSelectedRatings}
+        availableGroups={availableGroups.map((group) => ({
+          ...group,
+          imageCount: groupCounts.get(group.id) ?? 0,
+        }))}
+        selectedGroupIds={selectedGroupIds}
+        setSelectedGroupIds={setSelectedGroupIds}
         conflictOption={false}
       />
 

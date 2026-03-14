@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { FilterModal } from "@/components/filter-modal";
+import { GroupsModal } from "@/components/groups-modal";
+import { SelectionGroupsModal } from "@/components/selection-groups-modal";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
+import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from "@/utils/group-filters";
 
 interface ImageData {
   fileName: string;
@@ -30,8 +33,14 @@ export default function BulkRatePage() {
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [showGroupsModal, setShowGroupsModal] = useState<boolean>(false);
+  const [showSelectionGroupsModal, setShowSelectionGroupsModal] = useState<boolean>(false);
   const [showUnrated, setShowUnrated] = useState<boolean>(true);
   const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
+  const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
+  const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   
   // Multi-select state
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -63,16 +72,67 @@ export default function BulkRatePage() {
     const ratingData = ratings.get(fileId);
     const currentRating = ratingData?.rating ?? null;
 
+    let matchesRating = false;
+
     if (currentRating === null && showUnrated) {
-      return true;
+      matchesRating = true;
     }
 
     if (currentRating !== null && selectedRatings.has(currentRating)) {
+      matchesRating = true;
+    }
+
+    if (!matchesRating) {
+      return false;
+    }
+
+    // No selected groups keeps existing behavior.
+    if (selectedGroupIds.size === 0) {
       return true;
+    }
+
+    const imageGroups = imageGroupIdsByImageId.get(fileId);
+    if (!imageGroups || imageGroups.size === 0) {
+      return false;
+    }
+
+    for (const groupId of selectedGroupIds) {
+      if (imageGroups.has(groupId)) {
+        return true;
+      }
     }
 
     return false;
   }
+
+  const loadGroupFilters = useCallback(async (normalizedPath: string) => {
+    if (!normalizedPath) {
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+      return;
+    }
+
+    try {
+      const groupFilterData = await fetchGroupFilterData(normalizedPath);
+      setAvailableGroups(groupFilterData.groups);
+      setGroupCounts(groupFilterData.groupCounts);
+      setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
+      setSelectedGroupIds((prev) => {
+        const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
+        return next.size === prev.size ? prev : next;
+      });
+    } catch (groupErr) {
+      console.error('Failed to load group filters:', groupErr);
+      const emptyData = emptyGroupFilterData();
+      setAvailableGroups(emptyData.groups);
+      setGroupCounts(emptyData.groupCounts);
+      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+      setSelectedGroupIds(new Set());
+    }
+  }, []);
 
   // Load folder and images
   async function loadFolder(path: string) {
@@ -146,6 +206,9 @@ export default function BulkRatePage() {
       } catch (ratingErr) {
         console.error('Failed to fetch ratings:', ratingErr);
       }
+
+      setLoadProgress(85);
+      await loadGroupFilters(normalizedPath);
 
       setLoadProgress(95);
       setIsLoading(false);
@@ -299,12 +362,29 @@ export default function BulkRatePage() {
     () => imageFiles
       .map((image, index) => ({ image, index }))
       .filter(({ image }) => shouldShowImage(image.fileName)),
-    [imageFiles, ratings, showUnrated, selectedRatings]
+    [imageFiles, ratings, showUnrated, selectedRatings, selectedGroupIds, imageGroupIdsByImageId]
   );
 
   const visibleIndices = useMemo(
     () => new Set(visibleImageEntries.map(({ index }) => index)),
     [visibleImageEntries]
+  );
+
+  const selectedImageRefs = useMemo(
+    () => Array.from(selectedIndices)
+      .map((index) => {
+        const image = imageFiles[index];
+        if (!image) {
+          return null;
+        }
+
+        return {
+          fileId: getFileId(image.fileName),
+          fileName: image.fileName,
+        };
+      })
+      .filter((value): value is { fileId: string; fileName: string } => value !== null),
+    [selectedIndices, imageFiles]
   );
 
   useEffect(() => {
@@ -425,10 +505,21 @@ export default function BulkRatePage() {
           <div className="text-zinc-400 text-sm">{visibleImageEntries.length} / {imageFiles.length} images, {selectedIndices.size} selected</div>
           <button
             className="header-button"
-            onClick={() => setShowFilterModal(true)}
+            onClick={() => {
+              void loadGroupFilters(folderPath);
+              setShowFilterModal(true);
+            }}
             title="Filter images by rating"
           >
             <Icon name="filter_list" />
+          </button>
+          <button
+            className="header-button"
+            onClick={() => setShowGroupsModal(true)}
+            title="Manage groups"
+            disabled={!folderPath}
+          >
+            <Icon name="folder_managed" />
           </button>
         </div>
       </Header>
@@ -575,11 +666,25 @@ export default function BulkRatePage() {
                 </button>
                 <button
                   type="button"
-                  className="rating-emoji"
+                  className="rating-emoji text-zinc-100"
                   aria-label="Clear rating"
                   onClick={() => applyRatingToSelected(null)}
                 >
                   ✕
+                </button>
+              </div>
+
+              <div className="mt-2 flex justify-center">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100 text-xs font-medium transition cursor-pointer flex items-center gap-1.5"
+                  onClick={() => {
+                    void loadGroupFilters(folderPath);
+                    setShowSelectionGroupsModal(true);
+                  }}
+                >
+                  <Icon name="group_work" size={16} />
+                  Groups
                 </button>
               </div>
             </div>
@@ -594,6 +699,31 @@ export default function BulkRatePage() {
         setShowUnrated={setShowUnrated}
         selectedRatings={selectedRatings}
         setSelectedRatings={setSelectedRatings}
+        availableGroups={availableGroups.map((group) => ({
+          ...group,
+          imageCount: groupCounts.get(group.id) ?? 0,
+        }))}
+        selectedGroupIds={selectedGroupIds}
+        setSelectedGroupIds={setSelectedGroupIds}
+      />
+
+      <GroupsModal
+        isOpen={showGroupsModal}
+        onClose={() => {
+          setShowGroupsModal(false);
+          void loadGroupFilters(folderPath);
+        }}
+        folderPath={folderPath}
+      />
+
+      <SelectionGroupsModal
+        isOpen={showSelectionGroupsModal}
+        onClose={() => setShowSelectionGroupsModal(false)}
+        folderPath={folderPath}
+        groups={availableGroups}
+        selectedImages={selectedImageRefs}
+        imageGroupIdsByImageId={imageGroupIdsByImageId}
+        onRelationsUpdated={() => loadGroupFilters(folderPath)}
       />
     </div>
   );
