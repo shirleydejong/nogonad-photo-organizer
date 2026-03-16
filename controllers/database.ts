@@ -86,7 +86,7 @@ const cachedDbs = new Map<string, DbInfo>();
  */
 function resolveDbPath(folderPath: string): string {
 	const fullPath = path.join(folderPath, config.NPO_FOLDER);
-	if (!fs.existsSync(fullPath)) {
+	if(!fs.existsSync(fullPath)) {
 		fs.mkdirSync(fullPath, { recursive: true });
 	}
 
@@ -112,7 +112,7 @@ function resolveDbPath(folderPath: string): string {
 function getDatabase(folderPath: string): DbInfo {
 	const dbPath = resolveDbPath(folderPath);
 	const cached = cachedDbs.get(dbPath);
-	if (cached) {
+	if(cached) {
 		return cached;
 	}
 
@@ -148,9 +148,9 @@ function getDatabase(folderPath: string): DbInfo {
  * // Close all cached databases
  * closeDatabase();
  */
-function closeDatabase(folderPath?: string) {
-	if (!folderPath) {
-		for (const dbInfo of cachedDbs.values()) {
+export function closeDatabase(folderPath?: string) {
+	if(!folderPath) {
+		for(const dbInfo of cachedDbs.values()) {
 			dbInfo.db.close();
 		}
 		cachedDbs.clear();
@@ -159,7 +159,7 @@ function closeDatabase(folderPath?: string) {
 
 	const dbPath = resolveDbPath(folderPath);
 	const dbInfo = cachedDbs.get(dbPath);
-	if (!dbInfo) {
+	if(!dbInfo) {
 		return;
 	}
 
@@ -195,7 +195,7 @@ function ensureRatingsTable(dbInfo?: DbInfo) {
 		.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ratings'")
 		.get();
 
-	if (row) {
+	if(row) {
 		dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS ratings_id_unique ON ratings(id)').run();
 		ensureImageGroupsTable(dbInfo);
 		return;
@@ -219,7 +219,7 @@ function ensureRatingsTable(dbInfo?: DbInfo) {
  * @throws {Error} If dbInfo is not provided
  */
 function ensureGroupsTable(dbInfo?: DbInfo) {
-	if (!dbInfo) {
+	if(!dbInfo) {
 		throw new Error('Database connection is required to ensure groups table exists');
 	}
 
@@ -227,7 +227,7 @@ function ensureGroupsTable(dbInfo?: DbInfo) {
 		.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='groups'")
 		.get();
 
-	if (row) {
+	if(row) {
 		dbInfo.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS groups_id_unique ON groups(id)').run();
 		ensureImageGroupsTable(dbInfo);
 		return;
@@ -252,7 +252,7 @@ function ensureGroupsTable(dbInfo?: DbInfo) {
  * @throws {Error} If dbInfo is not provided
  */
 function ensureImageGroupsTable(dbInfo?: DbInfo) {
-	if (!dbInfo) {
+	if(!dbInfo) {
 		throw new Error('Database connection is required to ensure image_groups table exists');
 	}
 
@@ -286,7 +286,7 @@ function ensureImageGroupsTable(dbInfo?: DbInfo) {
  * @throws {Error} If dbInfo is not provided
  */
 function ensurePairwiseRankingTable(dbInfo?: DbInfo) {
-	if (!dbInfo) {
+	if(!dbInfo) {
 		throw new Error('Database connection is required to ensure pairwise_ranking table exists');
 	}
 
@@ -314,13 +314,53 @@ function ensurePairwiseRankingTable(dbInfo?: DbInfo) {
 };
 
 function normalizePairwiseIds(imageAId: string, imageBId: string): { imageAId: string; imageBId: string } {
-	if (imageAId === imageBId) {
+	if(imageAId === imageBId) {
 		throw new Error('Pairwise comparison requires two different image ids');
 	}
 
 	return imageAId < imageBId
 		? { imageAId, imageBId }
 		: { imageAId: imageBId, imageBId: imageAId };
+}
+
+function normalizeUniqueIds(ids: string[]): string[] {
+	return Array.from(
+		new Set(
+			ids
+				.map((id) => id.trim())
+				.filter((id) => id.length > 0)
+		)
+	);
+}
+
+function ensureRatingRowsExist(dbInfo: DbInfo, imageIds: string[]): string[] {
+	const normalizedImageIds = normalizeUniqueIds(imageIds);
+	if(normalizedImageIds.length === 0) {
+		return normalizedImageIds;
+	}
+
+	ensureRatingsTable(dbInfo);
+
+	const createdAt = new Date().toISOString();
+	const insertStatement = dbInfo.db.prepare(
+		`INSERT INTO ratings (id, rating, overRuleFileRating, createdAt)
+		 VALUES (@id, NULL, 0, @createdAt)
+		 ON CONFLICT(id) DO NOTHING`
+	);
+
+	const transaction = dbInfo.db.transaction((ids: string[]) => {
+		for(const id of ids) {
+			insertStatement.run({ id, createdAt });
+		}
+	});
+
+	transaction(normalizedImageIds);
+	return normalizedImageIds;
+}
+
+export function ensureRatingsExist(folderPath: string, imageIds: string[]): string[] {
+	const dbInfo = getDatabase(folderPath);
+	return ensureRatingRowsExist(dbInfo, imageIds);
 }
 
 /**
@@ -455,7 +495,7 @@ export function updateGroup(folderPath: string, id: string, name: string): Group
 	ensureGroupsTable(dbInfo);
 
 	const result = dbInfo.db.prepare('UPDATE groups SET name = @name WHERE id = @id').run({ id, name });
-	if (result.changes === 0) {
+	if(result.changes === 0) {
 		return null;
 	}
 
@@ -495,21 +535,21 @@ export function getImageGroupRelations(
 	ensureGroupsTable(dbInfo);
 	ensureImageGroupsTable(dbInfo);
 
-	if (filters?.imageId && filters?.groupId) {
+	if(filters?.imageId && filters?.groupId) {
 		const rows = dbInfo.db
 			.prepare('SELECT imageId, groupId FROM image_groups WHERE imageId = ? AND groupId = ?')
 			.all(filters.imageId, filters.groupId);
 		return rows as ImageGroupRecord[];
 	}
 
-	if (filters?.imageId) {
+	if(filters?.imageId) {
 		const rows = dbInfo.db
 			.prepare('SELECT imageId, groupId FROM image_groups WHERE imageId = ? ORDER BY groupId COLLATE NOCASE ASC')
 			.all(filters.imageId);
 		return rows as ImageGroupRecord[];
 	}
 
-	if (filters?.groupId) {
+	if(filters?.groupId) {
 		const rows = dbInfo.db
 			.prepare('SELECT imageId, groupId FROM image_groups WHERE groupId = ? ORDER BY imageId COLLATE NOCASE ASC')
 			.all(filters.groupId);
@@ -535,10 +575,42 @@ export function createImageGroupRelation(folderPath: string, imageId: string, gr
 	ensureRatingsTable(dbInfo);
 	ensureGroupsTable(dbInfo);
 	ensureImageGroupsTable(dbInfo);
+	ensureRatingRowsExist(dbInfo, [imageId]);
 
 	dbInfo.db.prepare('INSERT INTO image_groups (imageId, groupId) VALUES (@imageId, @groupId)').run({ imageId, groupId });
 	return { imageId, groupId };
 };
+
+export function createImageGroupRelations(
+	folderPath: string,
+	imageIds: string[],
+	groupId: string
+): { created: ImageGroupRecord[]; existing: ImageGroupRecord[] } {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	const normalizedImageIds = ensureRatingRowsExist(dbInfo, imageIds);
+	const created: ImageGroupRecord[] = [];
+	const existing: ImageGroupRecord[] = [];
+	const insertStatement = dbInfo.db.prepare('INSERT OR IGNORE INTO image_groups (imageId, groupId) VALUES (@imageId, @groupId)');
+
+	const transaction = dbInfo.db.transaction((ids: string[]) => {
+		for(const imageId of ids) {
+			const result = insertStatement.run({ imageId, groupId });
+			if(result.changes > 0) {
+				created.push({ imageId, groupId });
+				continue;
+			}
+
+			existing.push({ imageId, groupId });
+		}
+	});
+
+	transaction(normalizedImageIds);
+	return { created, existing };
+}
 
 /**
  * Deletes an image-group relation
@@ -557,6 +629,37 @@ export function deleteImageGroupRelation(folderPath: string, imageId: string, gr
 	const result = dbInfo.db.prepare('DELETE FROM image_groups WHERE imageId = ? AND groupId = ?').run(imageId, groupId);
 	return result.changes > 0;
 };
+
+export function deleteImageGroupRelations(
+	folderPath: string,
+	imageIds: string[],
+	groupId: string
+): { deleted: ImageGroupRecord[]; missing: ImageGroupRecord[] } {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+
+	const normalizedImageIds = normalizeUniqueIds(imageIds);
+	const deleted: ImageGroupRecord[] = [];
+	const missing: ImageGroupRecord[] = [];
+	const deleteStatement = dbInfo.db.prepare('DELETE FROM image_groups WHERE imageId = ? AND groupId = ?');
+
+	const transaction = dbInfo.db.transaction((ids: string[]) => {
+		for(const imageId of ids) {
+			const result = deleteStatement.run(imageId, groupId);
+			if(result.changes > 0) {
+				deleted.push({ imageId, groupId });
+				continue;
+			}
+
+			missing.push({ imageId, groupId });
+		}
+	});
+
+	transaction(normalizedImageIds);
+	return { deleted, missing };
+}
 
 /**
  * Returns all rated image ids for a group above or equal to the minimum rating.
@@ -613,7 +716,7 @@ export function upsertPairwiseComparison(
 	const skipped = Boolean(comparison.skipped) || comparison.winnerImageId === null;
 	const winnerImageId = skipped ? null : comparison.winnerImageId;
 
-	if (winnerImageId && winnerImageId !== normalizedPair.imageAId && winnerImageId !== normalizedPair.imageBId) {
+	if(winnerImageId && winnerImageId !== normalizedPair.imageAId && winnerImageId !== normalizedPair.imageBId) {
 		throw new Error('winnerImageId must be one of the compared image ids');
 	}
 
@@ -667,7 +770,7 @@ export function getPairwiseComparisonsForImageIds(folderPath: string, imageIds: 
 		)
 	);
 
-	if (normalizedIds.length < 2) {
+	if(normalizedIds.length < 2) {
 		return [];
 	}
 
@@ -675,7 +778,7 @@ export function getPairwiseComparisonsForImageIds(folderPath: string, imageIds: 
 	const pairMap = new Map<string, PairwiseComparisonRecord>();
 	const chunkSize = 400;
 
-	for (let i = 0; i < normalizedIds.length; i += chunkSize) {
+	for(let i = 0; i < normalizedIds.length; i += chunkSize) {
 		const chunk = normalizedIds.slice(i, i + chunkSize);
 		const placeholders = chunk.map(() => '?').join(',');
 		const rows = dbInfo.db.prepare(
@@ -691,13 +794,13 @@ export function getPairwiseComparisonsForImageIds(folderPath: string, imageIds: 
 			comparedAt: string;
 		}>;
 
-		for (const row of rows) {
-			if (!idSet.has(row.imageAId) || !idSet.has(row.imageBId)) {
+		for(const row of rows) {
+			if(!idSet.has(row.imageAId) || !idSet.has(row.imageBId)) {
 				continue;
 			}
 
 			const key = `${row.imageAId}::${row.imageBId}`;
-			if (pairMap.has(key)) {
+			if(pairMap.has(key)) {
 				continue;
 			}
 
