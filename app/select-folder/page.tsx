@@ -23,6 +23,27 @@ export default function SelectFolder() {
 
   const [hasActiveFolder, setHasActiveFolder] = useState<boolean>(false);
 
+  async function requestCloseDatabaseConnections() {
+    try {
+      await fetch('/api/database/close', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to close database connections:', error);
+    }
+  }
+
+  useEffect(() => {
+    void requestCloseDatabaseConnections();
+
+    const handlePageShow = () => {
+      void requestCloseDatabaseConnections();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
+
   // Load path history from localStorage on mount
   useEffect(() => {
     const savedPaths = localStorage.getItem('pathHistory');
@@ -52,15 +73,21 @@ export default function SelectFolder() {
     const socket = getSocket();
     socketRef.current = socket;
 
+    const emitUnwatchAllFolders = () => {
+      socket.emit('unwatch-all-folders');
+    };
+
     // Check if already connected
     if (socket.connected) {
       isSocketReady.current = true;
+      emitUnwatchAllFolders();
     }
 
     // Listen for connection events
     const handleConnect = () => {
       console.log('Socket connected:', socket.id);
       isSocketReady.current = true;
+      emitUnwatchAllFolders();
     };
 
     const handleDisconnect = () => {

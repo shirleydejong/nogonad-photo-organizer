@@ -145,12 +145,30 @@ export interface ColorFormatResult {
 
 export function formatColor(exif: any): ColorFormatResult {
   const profile = exif?.ProfileDescription;
-  const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ColorSpace;
+  const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ICCProfileName || exif?.ColorSpace;
   let cs = null;
-  if (typeof colorSpace === "string") cs = colorSpace;
-  else if (colorSpace === 1) cs = "sRGB";
-  else if (colorSpace === 65535) cs = "Uncalibrated";
-  const bitsArr = exif?.BitsPerSample;
+  if (typeof colorSpace === "string") {
+    cs = colorSpace;
+  } else if (colorSpace === 65535) {
+    const colorModeMap: Record<number, string> = {
+      0: "Bitmap",
+      1: "Grayscale",
+      2: "Indexed",
+      3: "RGB",
+      4: "CMYK",
+      7: "Multichannel",
+      8: "Duotone",
+      9: "Lab",
+    };
+    cs = colorModeMap[exif?.ColorMode] || "Uncalibrated";
+  } else {
+    const colorSpaceMap: Record<number, string> = {
+      1: "sRGB",
+      2: "Adobe RGB",
+    };
+    cs = colorSpaceMap[colorSpace] || "Uncalibrated";
+  }
+  const bitsArr = exif?.BitsPerSample || exif?.BitDepth;
   let bits = null;
   if (Array.isArray(bitsArr) && bitsArr.length) bits = `${bitsArr[0]} bits/channel`;
   else if (Number.isFinite(bitsArr)) bits = `${bitsArr} bits/channel`;

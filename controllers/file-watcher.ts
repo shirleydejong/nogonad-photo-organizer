@@ -7,7 +7,7 @@ import CONFIG from '@/config';
 import { getRating } from './database';
 
 // Supported image extensions
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'];
 
 interface FileWatcherCallbacks {
   onFileAdded?: (fileName: string, hasRating?: boolean) => void;
@@ -247,8 +247,9 @@ class FileWatcher {
 
       console.log(`Thumbnail created: ${thumbName}`);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      throw err;
+      //const err = error instanceof Error ? error : new Error(String(error));
+      //throw err;
+      console.log(`Error creating thumbnail for ${filename}:`, error);
     }
   }
 

@@ -6,6 +6,7 @@ import config from '@/config';
 import { Server as SocketIOServer } from 'socket.io';
 import FileWatcher, { FileChangeEvent } from '@/controllers/file-watcher';
 import getShootAssistController from '@/controllers/shoot-assist';
+import { watch } from 'fs';
 
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -271,6 +272,8 @@ app.prepare().then(() => {
           files: result.files, 
           folderPath 
         });
+        watcher.stop(); // Stop the watcher after processing
+        
       } catch (error) {
         console.error('Failed to generate thumbnails:', error);
         socket.emit('thumbnail-error', { 
@@ -339,6 +342,29 @@ app.prepare().then(() => {
         socket.emit('watch-stopped', { folderPath });
       } catch (error) {
         console.error('Failed to stop watcher:', error);
+      }
+    });
+
+    // Handle stop watching all folders
+    socket.on('unwatch-all-folders', async () => {
+      console.log('Unwatch all folders request');
+
+      try {
+        const stopPromises: Promise<void>[] = [];
+
+        for (const watcher of activeWatchers.values()) {
+          stopPromises.push(watcher.stop());
+        }
+
+        await Promise.all(stopPromises);
+        activeWatchers.clear();
+
+        socket.emit('watch-all-stopped');
+      } catch (error) {
+        console.error('Failed to stop all watchers:', error);
+        socket.emit('watcher-error', {
+          error: error instanceof Error ? error.message : 'Failed to stop all watchers',
+        });
       }
     });
 

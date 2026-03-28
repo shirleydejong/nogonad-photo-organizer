@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       '.gif': 'image/gif',
       '.webp': 'image/webp',
       '.bmp': 'image/bmp',
+      '.jxl': 'image/jxl',
     }[ext] || 'image/jpeg';
 
     return new NextResponse(fileBuffer, {

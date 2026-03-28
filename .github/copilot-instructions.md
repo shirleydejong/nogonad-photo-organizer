@@ -40,7 +40,7 @@ All API routes in `app/api/*/route.ts` are POST-based and handle server-side fil
 #### Image Processing
 - **sharp** library for thumbnail generation (240px width, aspect-preserved)
 - **chokidar** for file watching (disabled during thumbnail batch processing)
-- Supported formats: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`
+- Supported formats: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.jxl`
 
 ### Controller Layer Pattern
 Controllers in `controllers/` handle business logic:

@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 
 // Supported image extensions
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'];
 
 export async function POST(request: NextRequest) {
   try {

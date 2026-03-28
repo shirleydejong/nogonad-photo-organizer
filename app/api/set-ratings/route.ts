@@ -12,7 +12,7 @@ export interface AggregatedRatings {
 }
 
 const RAW_EXTENSIONS = ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'];
-const JPG_EXTENSIONS = ['.jpg', '.jpeg'];
+const JPG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl']; // Supported image formats for rating updates
 
 /**
  * Check if a file exists
