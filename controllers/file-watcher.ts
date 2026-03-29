@@ -5,6 +5,8 @@ import chokidar, { FSWatcher } from 'chokidar';
 import sharp from 'sharp';
 import CONFIG from '@/config';
 import { getRating } from './database';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 // Supported image extensions
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'];
@@ -247,6 +249,26 @@ class FileWatcher {
 
       console.log(`Thumbnail created: ${thumbName}`);
     } catch (error) {
+      
+      if( filepath.endsWith('.jxl') ) {
+        console.log(`Sharp failed for .jxl file, trying ImageMagick: ${filename}`);
+          try {
+            
+            const execFileAsync = promisify(execFile);
+            await execFileAsync('magick', [
+              filepath,
+              '-resize',
+              `${CONFIG.THUMBNAIL_WIDTH}x${CONFIG.THUMBNAIL_WIDTH}>`,
+              '-strip',
+              thumbPath,
+            ]);
+
+            console.log(`Thumbnail created with ImageMagick: ${thumbName}`);
+          } catch (imgError) {
+            console.log(`ImageMagick also failed for ${filename}:`, imgError);
+          }
+      }
+      
       //const err = error instanceof Error ? error : new Error(String(error));
       //throw err;
       console.log(`Error creating thumbnail for ${filename}:`, error);
