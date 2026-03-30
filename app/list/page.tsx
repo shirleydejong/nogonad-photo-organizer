@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Header } from "@/components/header";
-import { ConflictModal } from "@/components/conflict-modal";
-import { FilterModal } from "@/components/filter-modal";
-import { StatusModal } from "@/components/status-modal";
-import { ExportModal } from "@/components/export-modal";
-import { ImportModal } from "@/components/import-modal";
-import CONFIG from "@/config";
-import { Icon } from "@/components/icon";
-import { aggregateRatings } from "@/utils/ratings-aggregator";
-import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from "@/utils/group-filters";
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Header } from '@/components/header';
+import { ConflictModal } from '@/components/conflict-modal';
+import { FilterModal } from '@/components/filter-modal';
+import { StatusModal } from '@/components/status-modal';
+import { ExportModal } from '@/components/export-modal';
+import { ImportModal } from '@/components/import-modal';
+import CONFIG from '@/config';
+import { Icon } from '@/components/icon';
+import { aggregateRatings } from '@/utils/ratings-aggregator';
+import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
   fileName: string;
@@ -27,1153 +27,1153 @@ interface Rating {
 }
 
 export default function ListPage() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
-  const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
-  const [folderPath, setFolderPath] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [loadProgress, setLoadProgress] = useState<number>(0);
-  const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
-  const [exifData, setExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to EXIF Rating
-  const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
-  const [hasXmpMap, setHasXmpMap] = useState<Map<string, boolean>>(new Map()); // Map of fileId to hasXmp
-  const [rawExifData, setRawExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to RAW EXIF Rating
-  const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null; newRating: number | null } | null>(null);
-  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
-  const [showUnrated, setShowUnrated] = useState<boolean>(true);
-  const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
-  const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
-  const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
-  const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
-  const [showExportModal, setShowExportModal] = useState<boolean>(false);
-  const [showImportModal, setShowImportModal] = useState<boolean>(false);
+	const router = useRouter();
+	const [error, setError] = useState<string | null>(null);
+	const [folderName, setFolderName] = useState<string | null>(null);
+	const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
+	const [folderPath, setFolderPath] = useState<string>('');
+	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const [loadProgress, setLoadProgress] = useState<number>(0);
+	const [ratings, setRatings] = useState<Map<string, Rating | null>>(new Map());
+	const [exifData, setExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to EXIF Rating
+	const [rawFiles, setRawFiles] = useState<Map<string, string>>(new Map()); // Map of fileId to RAW filename
+	const [hasXmpMap, setHasXmpMap] = useState<Map<string, boolean>>(new Map()); // Map of fileId to hasXmp
+	const [rawExifData, setRawExifData] = useState<Map<string, number | null>>(new Map()); // Map of fileId to RAW EXIF Rating
+	const [selectedConflict, setSelectedConflict] = useState<{ fileName: string; exifRating: number; dbRating: number | null; newRating: number | null } | null>(null);
+	const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+	const [showUnrated, setShowUnrated] = useState<boolean>(true);
+	const [selectedRatings, setSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+	const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
+	const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
+	const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
+	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+	const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
+	const [showExportModal, setShowExportModal] = useState<boolean>(false);
+	const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
   // Status modal state
-  const [statusModal, setStatusModal] = useState<{
+	const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
     status: 'loading' | 'success' | 'error';
     message: string;
     errorDetails?: string;
   }>({
-    isOpen: false,
-    status: 'loading',
-    message: '',
+  	isOpen: false,
+  	status: 'loading',
+  	message: '',
   });
 
   // Load folder from localStorage on mount
-  useEffect(() => {
-    const activeFolder = localStorage.getItem('activeFolder');
-    if (activeFolder) {
-      loadFolder(activeFolder);
-    } else {
-      router.push('/select-folder');
-    }
-  }, [router]);
+	useEffect(() => {
+		const activeFolder = localStorage.getItem('activeFolder');
+		if(activeFolder) {
+			loadFolder(activeFolder);
+		} else {
+			router.push('/select-folder');
+		}
+	}, [router]);
 
-  const loadGroupFilters = useCallback(async (normalizedPath: string) => {
-    if (!normalizedPath) {
-      const emptyData = emptyGroupFilterData();
-      setAvailableGroups(emptyData.groups);
-      setGroupCounts(emptyData.groupCounts);
-      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
-      setSelectedGroupIds(new Set());
-      return;
-    }
+	const loadGroupFilters = useCallback(async(normalizedPath: string) => {
+		if(!normalizedPath) {
+			const emptyData = emptyGroupFilterData();
+			setAvailableGroups(emptyData.groups);
+			setGroupCounts(emptyData.groupCounts);
+			setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+			setSelectedGroupIds(new Set());
+			return;
+		}
 
-    try {
-      const groupFilterData = await fetchGroupFilterData(normalizedPath);
-      setAvailableGroups(groupFilterData.groups);
-      setGroupCounts(groupFilterData.groupCounts);
-      setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
-      setSelectedGroupIds((prev) => {
-        const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
-        return next.size === prev.size ? prev : next;
-      });
-    } catch (groupErr) {
-      console.error('Failed to load group filters:', groupErr);
-      const emptyData = emptyGroupFilterData();
-      setAvailableGroups(emptyData.groups);
-      setGroupCounts(emptyData.groupCounts);
-      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
-      setSelectedGroupIds(new Set());
-    }
-  }, []);
+		try {
+			const groupFilterData = await fetchGroupFilterData(normalizedPath);
+			setAvailableGroups(groupFilterData.groups);
+			setGroupCounts(groupFilterData.groupCounts);
+			setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
+			setSelectedGroupIds((prev) => {
+				const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
+				return next.size === prev.size ? prev : next;
+			});
+		} catch (groupErr) {
+			console.error('Failed to load group filters:', groupErr);
+			const emptyData = emptyGroupFilterData();
+			setAvailableGroups(emptyData.groups);
+			setGroupCounts(emptyData.groupCounts);
+			setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+			setSelectedGroupIds(new Set());
+		}
+	}, []);
 
   // Load folder and images
-  async function loadFolder(path: string) {
-    setIsLoading(true);
-    setLoadProgress(0);
-    setError(null);
+	async function loadFolder(path: string) {
+		setIsLoading(true);
+		setLoadProgress(0);
+		setError(null);
 
-    try {
-      const normalizedPath = path.replace(/\//g, '\\');
-      const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
-      setFolderPath(normalizedPath);
+		try {
+			const normalizedPath = path.replace(/\//g, '\\');
+			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+			setFolderPath(normalizedPath);
 
       // Get the folder name from the path
-      const parts = normalizedPath.split('\\');
-      const lastPart = parts[parts.length - 1];
-      setFolderName(lastPart || normalizedPath);
+			const parts = normalizedPath.split('\\');
+			const lastPart = parts[parts.length - 1];
+			setFolderName(lastPart || normalizedPath);
 
       // Get list of files (thumbnails should already exist)
-      setLoadProgress(10);
-      const startResponse = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
-      });
+			setLoadProgress(10);
+			const startResponse = await fetch('/api/image', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
+			});
 
-      if (!startResponse.ok) {
-        const errorData = await startResponse.json();
-        throw new Error(errorData.error || 'Could not load images');
-      }
+			if(!startResponse.ok) {
+				const errorData = await startResponse.json();
+				throw new Error(errorData.error || 'Could not load images');
+			}
 
-      const startData = await startResponse.json();
+			const startData = await startResponse.json();
 
       // If no images found
-      if (startData.total === 0) {
-        setError("No images found in this folder");
-        setIsLoading(false);
-        return;
-      }
+			if(startData.total === 0) {
+				setError('No images found in this folder');
+				setIsLoading(false);
+				return;
+			}
 
-      const files = startData.files as string[];
+			const files = startData.files as string[];
 
       // Create ImageData objects
-      setLoadProgress(25);
-      const imageData: ImageData[] = files.map((fileName) => {
-        const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
-        const encodedPath = encodeURIComponent(fileName);
-        return {
-          fileName: fileName,
-          thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
-          originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
-        };
-      });
+			setLoadProgress(25);
+			const imageData: ImageData[] = files.map((fileName) => {
+				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
+				const encodedPath = encodeURIComponent(fileName);
+				return {
+					fileName: fileName,
+					thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+					originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
+				};
+			});
 
-      setImageFiles(imageData);
+			setImageFiles(imageData);
 
       // Load batch EXIF data from localStorage
-      setLoadProgress(40);
-      let batchExifData: any[] = [];
-      try {
-        const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
-        if (storedExifData) {
-          batchExifData = JSON.parse(storedExifData);
-        }
-      } catch (exifErr) {
-        console.error('Failed to load batch EXIF data:', exifErr);
-      }
+			setLoadProgress(40);
+			let batchExifData: any[] = [];
+			try {
+				const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
+				if(storedExifData) {
+					batchExifData = JSON.parse(storedExifData);
+				}
+			} catch (exifErr) {
+				console.error('Failed to load batch EXIF data:', exifErr);
+			}
 
       // Create a map of fileId -> EXIF Rating for quick lookup in conflict detection
-      const exifDataMap = new Map<string, number | null>();
-      for (const exifFile of batchExifData) {
-        if (exifFile.FileName && exifFile.Rating != null) {
-          const fileId = getFileId(exifFile.FileName);
-          exifDataMap.set(fileId, exifFile.Rating);
-        }
-      }
-      setExifData(exifDataMap);
+			const exifDataMap = new Map<string, number | null>();
+			for(const exifFile of batchExifData) {
+				if(exifFile.FileName && exifFile.Rating != null) {
+					const fileId = getFileId(exifFile.FileName);
+					exifDataMap.set(fileId, exifFile.Rating);
+				}
+			}
+			setExifData(exifDataMap);
 
       // Fetch ratings for this folder
-      setLoadProgress(55);
-      try {
-        const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
+			setLoadProgress(55);
+			try {
+				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
 
-        if (ratingsResponse.ok) {
-          const ratingsData = await ratingsResponse.json();
-          if (ratingsData.success && ratingsData.ratings) {
-            const ratingsMap = new Map<string, Rating | null>();
-            for (const rating of ratingsData.ratings) {
-              ratingsMap.set(rating.id, rating);
-            }
-            setRatings(ratingsMap);
-          }
-        }
-      } catch (ratingErr) {
-        console.error('Failed to fetch ratings:', ratingErr);
-      }
+				if(ratingsResponse.ok) {
+					const ratingsData = await ratingsResponse.json();
+					if(ratingsData.success && ratingsData.ratings) {
+						const ratingsMap = new Map<string, Rating | null>();
+						for(const rating of ratingsData.ratings) {
+							ratingsMap.set(rating.id, rating);
+						}
+						setRatings(ratingsMap);
+					}
+				}
+			} catch (ratingErr) {
+				console.error('Failed to fetch ratings:', ratingErr);
+			}
 
       // Fetch RAW files from raw subfolder
-      setLoadProgress(75);
-      try {
-        const rawResponse = await fetch('/api/raw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderPath: normalizedPath }),
-        });
+			setLoadProgress(75);
+			try {
+				const rawResponse = await fetch('/api/raw', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ folderPath: normalizedPath }),
+				});
 
-        if (rawResponse.ok) {
-          const rawData = await rawResponse.json();
-          if (rawData.success && rawData.hasRawFolder && rawData.ratings) {
-            const rawFilesMap = new Map<string, string>();
-            const xmpMap = new Map<string, boolean>();
-            const rawExifDataMap = new Map<string, number | null>();
-            for (const rawFile of rawData.ratings) {
-              if (rawFile.FileName) {
-                const fileId = getFileId(rawFile.FileName);
-                rawFilesMap.set(fileId, rawFile.FileName);
-                if (rawFile.hasXmp !== undefined) {
-                  xmpMap.set(fileId, rawFile.hasXmp);
-                }
-                if (rawFile.Rating != null) {
-                  rawExifDataMap.set(fileId, rawFile.Rating);
-                }
-              }
-            }
-            setRawFiles(rawFilesMap);
-            setHasXmpMap(xmpMap);
-            setRawExifData(rawExifDataMap);
-          }
-        }
-      } catch (rawErr) {
-        console.error('Failed to fetch RAW files:', rawErr);
-      }
+				if(rawResponse.ok) {
+					const rawData = await rawResponse.json();
+					if(rawData.success && rawData.hasRawFolder && rawData.ratings) {
+						const rawFilesMap = new Map<string, string>();
+						const xmpMap = new Map<string, boolean>();
+						const rawExifDataMap = new Map<string, number | null>();
+						for(const rawFile of rawData.ratings) {
+							if(rawFile.FileName) {
+								const fileId = getFileId(rawFile.FileName);
+								rawFilesMap.set(fileId, rawFile.FileName);
+								if(rawFile.hasXmp !== undefined) {
+									xmpMap.set(fileId, rawFile.hasXmp);
+								}
+								if(rawFile.Rating != null) {
+									rawExifDataMap.set(fileId, rawFile.Rating);
+								}
+							}
+						}
+						setRawFiles(rawFilesMap);
+						setHasXmpMap(xmpMap);
+						setRawExifData(rawExifDataMap);
+					}
+				}
+			} catch (rawErr) {
+				console.error('Failed to fetch RAW files:', rawErr);
+			}
 
-      setLoadProgress(85);
-      await loadGroupFilters(normalizedPath);
+			setLoadProgress(85);
+			await loadGroupFilters(normalizedPath);
 
-      setLoadProgress(95);
-      setIsLoading(false);
+			setLoadProgress(95);
+			setIsLoading(false);
 
-    } catch (e: any) {
-      console.error('Error:', e);
-      setError(e.message || "Could not load folder.");
-      setIsLoading(false);
-    }
-  }
+		} catch (e: any) {
+			console.error('Error:', e);
+			setError(e.message || 'Could not load folder.');
+			setIsLoading(false);
+		}
+	}
 
-  function getThumbnailFilename(filename: string): string {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1) return filename + '-thumb';
-    return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
-  }
+	function getThumbnailFilename(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return filename + '-thumb';}
+		return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
+	}
 
-  function getFileId(filename: string): string {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1) return filename;
-    return filename.substring(0, lastDot);
-  }
+	function getFileId(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return filename;}
+		return filename.substring(0, lastDot);
+	}
 
-  function shouldShowImage(fileName: string): boolean {
-    const fileId = getFileId(fileName);
-    const ratingData = ratings.get(fileId);
-    const currentRating = ratingData?.rating ?? null;
+	function shouldShowImage(fileName: string): boolean {
+		const fileId = getFileId(fileName);
+		const ratingData = ratings.get(fileId);
+		const currentRating = ratingData?.rating ?? null;
 
     // Check if conflicts-only filter is enabled
-    if (showConflictsOnly) {
-      const hasConflict = hasRatingConflict(fileName) || hasJpgRawMismatch(fileName) || hasRawRatingConflict(fileName);
-      if (!hasConflict) {
-        return false;
-      }
-    }
+		if(showConflictsOnly) {
+			const hasConflict = hasRatingConflict(fileName) || hasJpgRawMismatch(fileName) || hasRawRatingConflict(fileName);
+			if(!hasConflict) {
+				return false;
+			}
+		}
 
-    let matchesRating = false;
+		let matchesRating = false;
 
     // If no rating and showUnrated is true, show it
-    if (currentRating === null && showUnrated) {
-      matchesRating = true;
-    }
+		if(currentRating === null && showUnrated) {
+			matchesRating = true;
+		}
 
     // If has rating and it's in selectedRatings, show it
-    if (currentRating !== null && selectedRatings.has(currentRating)) {
-      matchesRating = true;
-    }
+		if(currentRating !== null && selectedRatings.has(currentRating)) {
+			matchesRating = true;
+		}
 
-    if (!matchesRating) {
-      return false;
-    }
+		if(!matchesRating) {
+			return false;
+		}
 
     // No selected groups keeps existing behavior.
-    if (selectedGroupIds.size === 0) {
-      return true;
-    }
+		if(selectedGroupIds.size === 0) {
+			return true;
+		}
 
-    const imageGroups = imageGroupIdsByImageId.get(fileId);
-    if (!imageGroups || imageGroups.size === 0) {
-      return false;
-    }
+		const imageGroups = imageGroupIdsByImageId.get(fileId);
+		if(!imageGroups || imageGroups.size === 0) {
+			return false;
+		}
 
-    for (const groupId of selectedGroupIds) {
-      if (imageGroups.has(groupId)) {
-        return true;
-      }
-    }
+		for(const groupId of selectedGroupIds) {
+			if(imageGroups.has(groupId)) {
+				return true;
+			}
+		}
 
-    return false;
-  }
+		return false;
+	}
 
-  const updateRatingInDatabase = useCallback(async (fileName: string, rating: number | null) => {
-    try {
-      const response = await fetch('/api/ratings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName,
-          rating,
-          folderPath,
-          overRuleFileRating: false,
-        }),
-      });
+	const updateRatingInDatabase = useCallback(async(fileName: string, rating: number | null) => {
+		try {
+			const response = await fetch('/api/ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName,
+					rating,
+					folderPath,
+					overRuleFileRating: false,
+				}),
+			});
 
-      if (response.ok) {
-        const fileId = getFileId(fileName);
-        setRatings(prev => {
-          const newMap = new Map(prev);
-          newMap.set(fileId, { id: fileId, rating, overRuleFileRating: false, createdAt: new Date().toISOString() });
-          return newMap;
-        });
-      }
-    } catch (err) {
-      console.error('Failed to update rating:', err);
-    }
-  }, [folderPath]);
+			if(response.ok) {
+				const fileId = getFileId(fileName);
+				setRatings(prev => {
+					const newMap = new Map(prev);
+					newMap.set(fileId, { id: fileId, rating, overRuleFileRating: false, createdAt: new Date().toISOString() });
+					return newMap;
+				});
+			}
+		} catch (err) {
+			console.error('Failed to update rating:', err);
+		}
+	}, [folderPath]);
 
-  const handleUseExifRating = useCallback(async () => {
-    if (!selectedConflict) return;
-    try {
-      await updateRatingInDatabase(selectedConflict.fileName, selectedConflict.exifRating);
-      setSelectedConflict(null);
-    } catch (err) {
-      console.error('Failed to use EXIF rating:', err);
-    }
-  }, [selectedConflict, updateRatingInDatabase]);
+	const handleUseExifRating = useCallback(async() => {
+		if(!selectedConflict) {return;}
+		try {
+			await updateRatingInDatabase(selectedConflict.fileName, selectedConflict.exifRating);
+			setSelectedConflict(null);
+		} catch (err) {
+			console.error('Failed to use EXIF rating:', err);
+		}
+	}, [selectedConflict, updateRatingInDatabase]);
 
-  const handleUseNewRating = useCallback(async () => {
-    if (!selectedConflict || selectedConflict.newRating === null) return;
-    try {
-      const response = await fetch('/api/ratings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: selectedConflict.fileName,
-          rating: selectedConflict.newRating,
-          folderPath,
-          overRuleFileRating: true,
-        }),
-      });
+	const handleUseNewRating = useCallback(async() => {
+		if(!selectedConflict || selectedConflict.newRating === null) {return;}
+		try {
+			const response = await fetch('/api/ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName: selectedConflict.fileName,
+					rating: selectedConflict.newRating,
+					folderPath,
+					overRuleFileRating: true,
+				}),
+			});
 
-      if (response.ok) {
-        const fileId = getFileId(selectedConflict.fileName);
-        setRatings(prev => {
-          const newMap = new Map(prev);
-          newMap.set(fileId, { id: fileId, rating: selectedConflict.newRating, overRuleFileRating: true, createdAt: new Date().toISOString() });
-          return newMap;
-        });
-        setSelectedConflict(null);
-      }
-    } catch (err) {
-      console.error('Failed to use new rating:', err);
-    }
-  }, [selectedConflict, folderPath]);
+			if(response.ok) {
+				const fileId = getFileId(selectedConflict.fileName);
+				setRatings(prev => {
+					const newMap = new Map(prev);
+					newMap.set(fileId, { id: fileId, rating: selectedConflict.newRating, overRuleFileRating: true, createdAt: new Date().toISOString() });
+					return newMap;
+				});
+				setSelectedConflict(null);
+			}
+		} catch (err) {
+			console.error('Failed to use new rating:', err);
+		}
+	}, [selectedConflict, folderPath]);
 
-  const handleUseDatabaseRating = useCallback(async () => {
-    if (!selectedConflict) return;
-    try {
-      const response = await fetch('/api/ratings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: selectedConflict.fileName,
-          rating: selectedConflict.dbRating,
-          folderPath,
-          overRuleFileRating: true,
-        }),
-      });
+	const handleUseDatabaseRating = useCallback(async() => {
+		if(!selectedConflict) {return;}
+		try {
+			const response = await fetch('/api/ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName: selectedConflict.fileName,
+					rating: selectedConflict.dbRating,
+					folderPath,
+					overRuleFileRating: true,
+				}),
+			});
 
-      if (response.ok) {
-        const fileId = getFileId(selectedConflict.fileName);
-        setRatings(prev => {
-          const newMap = new Map(prev);
-          newMap.set(fileId, { id: fileId, rating: selectedConflict.dbRating, overRuleFileRating: true, createdAt: new Date().toISOString() });
-          return newMap;
-        });
-        setSelectedConflict(null);
-      }
-    } catch (err) {
-      console.error('Failed to use database rating:', err);
-    }
-  }, [selectedConflict, folderPath]);
+			if(response.ok) {
+				const fileId = getFileId(selectedConflict.fileName);
+				setRatings(prev => {
+					const newMap = new Map(prev);
+					newMap.set(fileId, { id: fileId, rating: selectedConflict.dbRating, overRuleFileRating: true, createdAt: new Date().toISOString() });
+					return newMap;
+				});
+				setSelectedConflict(null);
+			}
+		} catch (err) {
+			console.error('Failed to use database rating:', err);
+		}
+	}, [selectedConflict, folderPath]);
 
-  const handleIgnoreConflict = useCallback(() => {
-    setSelectedConflict(null);
-  }, []);
+	const handleIgnoreConflict = useCallback(() => {
+		setSelectedConflict(null);
+	}, []);
 
-  const handleExportRatings = useCallback((filename: string, prefix: string) => {
-    try {
-      const exportData: Array<{ id: string; rating: number | null }> = [];
+	const handleExportRatings = useCallback((filename: string, prefix: string) => {
+		try {
+			const exportData: Array<{ id: string; rating: number | null }> = [];
       
-      ratings.forEach((rating, id) => {
-        if (rating && rating.rating !== null) {
-          const exportId = prefix ? `${prefix}${id}` : id;
-          exportData.push({
-            id: exportId,
-            rating: rating.rating
-          });
-        }
-      });
+			ratings.forEach((rating, id) => {
+				if(rating && rating.rating !== null) {
+					const exportId = prefix ? `${prefix}${id}` : id;
+					exportData.push({
+						id: exportId,
+						rating: rating.rating
+					});
+				}
+			});
 
-      const jsonString = JSON.stringify(exportData, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${filename}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to export ratings:', err);
-      setStatusModal({
-        isOpen: true,
-        status: 'error',
-        message: 'Failed to export ratings',
-        errorDetails: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  }, [ratings]);
+			const jsonString = JSON.stringify(exportData, null, 2);
+			const blob = new Blob([jsonString], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `${filename}.json`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('Failed to export ratings:', err);
+			setStatusModal({
+				isOpen: true,
+				status: 'error',
+				message: 'Failed to export ratings',
+				errorDetails: err instanceof Error ? err.message : 'Unknown error',
+			});
+		}
+	}, [ratings]);
 
-  const handleImportRatings = useCallback(async (file: File) => {
-    try {
-      setStatusModal({
-        isOpen: true,
-        status: 'loading',
-        message: 'Importing ratings...',
-      });
-      setShowImportModal(false);
+	const handleImportRatings = useCallback(async(file: File) => {
+		try {
+			setStatusModal({
+				isOpen: true,
+				status: 'loading',
+				message: 'Importing ratings...',
+			});
+			setShowImportModal(false);
 
-      const fileContent = await file.text();
-      const jsonData = JSON.parse(fileContent) as Array<{ id: string; rating: number | null }>;
+			const fileContent = await file.text();
+			const jsonData = JSON.parse(fileContent) as Array<{ id: string; rating: number | null }>;
 
-      if (!Array.isArray(jsonData)) {
-        throw new Error('JSON file must contain an array of ratings');
-      }
+			if(!Array.isArray(jsonData)) {
+				throw new Error('JSON file must contain an array of ratings');
+			}
 
-      let importedCount = 0;
-      let skippedCount = 0;
+			let importedCount = 0;
+			let skippedCount = 0;
 
-      for (const item of jsonData) {
-        if (!item.id || item.rating === undefined) {
-          continue;
-        }
+			for(const item of jsonData) {
+				if(!item.id || item.rating === undefined) {
+					continue;
+				}
 
         // Check if rating already exists in database
-        const existingRating = ratings.get(item.id);
-        if (existingRating && existingRating.rating !== null) {
-          skippedCount++;
-          continue;
-        }
+				const existingRating = ratings.get(item.id);
+				if(existingRating && existingRating.rating !== null) {
+					skippedCount++;
+					continue;
+				}
 
         // Import the rating
-        const response = await fetch('/api/ratings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: `${item.id}.jpg`,
-            rating: item.rating,
-            folderPath,
-            overRuleFileRating: false,
-          }),
-        });
+				const response = await fetch('/api/ratings', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						fileName: `${item.id}.jpg`,
+						rating: item.rating,
+						folderPath,
+						overRuleFileRating: false,
+					}),
+				});
 
-        if (response.ok) {
-          importedCount++;
+				if(response.ok) {
+					importedCount++;
           // Update local state
-          setRatings(prev => {
-            const newMap = new Map(prev);
-            newMap.set(item.id, {
-              id: item.id,
-              rating: item.rating,
-              overRuleFileRating: false,
-              createdAt: new Date().toISOString()
-            });
-            return newMap;
-          });
-        }
-      }
+					setRatings(prev => {
+						const newMap = new Map(prev);
+						newMap.set(item.id, {
+							id: item.id,
+							rating: item.rating,
+							overRuleFileRating: false,
+							createdAt: new Date().toISOString()
+						});
+						return newMap;
+					});
+				}
+			}
 
-      setStatusModal({
-        isOpen: true,
-        status: 'success',
-        message: `Import complete: ${importedCount} ratings imported${skippedCount > 0 ? `, ${skippedCount} skipped (already in database)` : ''}`,
-      });
-    } catch (err) {
-      console.error('Failed to import ratings:', err);
-      setStatusModal({
-        isOpen: true,
-        status: 'error',
-        message: 'Failed to import ratings',
-        errorDetails: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  }, [ratings, folderPath]);
+			setStatusModal({
+				isOpen: true,
+				status: 'success',
+				message: `Import complete: ${importedCount} ratings imported${skippedCount > 0 ? `, ${skippedCount} skipped (already in database)` : ''}`,
+			});
+		} catch (err) {
+			console.error('Failed to import ratings:', err);
+			setStatusModal({
+				isOpen: true,
+				status: 'error',
+				message: 'Failed to import ratings',
+				errorDetails: err instanceof Error ? err.message : 'Unknown error',
+			});
+		}
+	}, [ratings, folderPath]);
 
-  function renderRatingStars(fileName: string) {
-    const fileId = getFileId(fileName);
-    const ratingData = ratings.get(fileId);
-    const currentRating = ratingData?.rating ?? null;
+	function renderRatingStars(fileName: string) {
+		const fileId = getFileId(fileName);
+		const ratingData = ratings.get(fileId);
+		const currentRating = ratingData?.rating ?? null;
 
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            onClick={() => {
-              const newRating = currentRating === star ? null : star;
-              updateRatingInDatabase(fileName, newRating);
-            }}
-            className={`text-xl transition-colors ${currentRating !== null && star <= currentRating
-              ? 'text-yellow-400'
-              : 'text-zinc-600 hover:text-zinc-500'
-              }`}
-            title={`Rate ${star} stars`}
-          >
+		return (
+			<div className="flex gap-1">
+				{[1, 2, 3, 4, 5].map((star) => (
+					<button
+						key={star}
+						onClick={() => {
+							const newRating = currentRating === star ? null : star;
+							updateRatingInDatabase(fileName, newRating);
+						}}
+						className={`text-xl transition-colors ${currentRating !== null && star <= currentRating
+							? 'text-yellow-400'
+							: 'text-zinc-600 hover:text-zinc-500'
+						}`}
+						title={`Rate ${star} stars`}
+					>
             ★
-          </button>
-        ))}
-      </div>
-    );
-  }
+					</button>
+				))}
+			</div>
+		);
+	}
 
-  function hasRatingConflict(fileName: string): boolean {
-    const fileId = getFileId(fileName);
-    const exifRating = exifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
-    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+	function hasRatingConflict(fileName: string): boolean {
+		const fileId = getFileId(fileName);
+		const exifRating = exifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
+		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
     // Conflict exists only if file has EXIF rating AND database rating differs
     // No EXIF rating = no conflict, even if database has a rating
-    if (exifRating != null && exifRating !== 0 && dbRating !== null && exifRating !== dbRating && !dbOverRule) {
-      return true;
-    }
+		if(exifRating != null && exifRating !== 0 && dbRating !== null && exifRating !== dbRating && !dbOverRule) {
+			return true;
+		}
 
-    return false;
-  }
+		return false;
+	}
 
-  function hasRawRatingConflict(fileName: string): boolean {
-    const fileId = getFileId(fileName);
-    const rawRating = rawExifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
-    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+	function hasRawRatingConflict(fileName: string): boolean {
+		const fileId = getFileId(fileName);
+		const rawRating = rawExifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
+		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
     // Conflict exists only if RAW file has EXIF rating AND database rating differs
     // No RAW rating = no conflict, even if database has a rating
-    if (rawRating != null && rawRating !== 0 && dbRating !== null && rawRating !== dbRating && !dbOverRule) {
-      return true;
-    }
+		if(rawRating != null && rawRating !== 0 && dbRating !== null && rawRating !== dbRating && !dbOverRule) {
+			return true;
+		}
 
-    return false;
-  }
+		return false;
+	}
 
-  function hasJpgRawMismatch(fileName: string): boolean {
-    const fileId = getFileId(fileName);
-    const exifRating = exifData.get(fileId);
-    const rawRating = rawExifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
+	function hasJpgRawMismatch(fileName: string): boolean {
+		const fileId = getFileId(fileName);
+		const exifRating = exifData.get(fileId);
+		const rawRating = rawExifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
 
     // Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
-    if (exifRating != null && exifRating !== 0 && rawRating != null && rawRating !== 0 && !dbRating && exifRating !== rawRating) {
-      return true;
-    }
+		if(exifRating != null && exifRating !== 0 && rawRating != null && rawRating !== 0 && !dbRating && exifRating !== rawRating) {
+			return true;
+		}
 
-    return false;
-  }
+		return false;
+	}
 
-  function hasAllRatingsMatch(fileName: string): boolean {
-    const fileId = getFileId(fileName);
-    const exifRating = exifData.get(fileId);
-    const rawRating = rawExifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
+	function hasAllRatingsMatch(fileName: string): boolean {
+		const fileId = getFileId(fileName);
+		const exifRating = exifData.get(fileId);
+		const rawRating = rawExifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
 
-    return (
-      exifRating != null &&
+		return (
+			exifRating != null &&
       exifRating !== 0 &&
       rawRating != null &&
       rawRating !== 0 &&
       dbRating != null &&
       exifRating === rawRating &&
       exifRating === dbRating
-    );
-  }
+		);
+	}
 
-  function hasAnyConflicts(): boolean {
+	function hasAnyConflicts(): boolean {
     // Check if any image has a conflict
-    for (const image of imageFiles) {
-      if (hasRatingConflict(image.fileName) || hasRawRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)) {
-        return true;
-      }
-    }
-    return false;
-  }
+		for(const image of imageFiles) {
+			if(hasRatingConflict(image.fileName) || hasRawRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-  const handleApplyRatings = useCallback(async () => {
+	const handleApplyRatings = useCallback(async() => {
     // Show modal immediately
-    setStatusModal({
-      isOpen: true,
-      status: 'loading',
-      message: 'Applying ratings to all images...',
-    });
+		setStatusModal({
+			isOpen: true,
+			status: 'loading',
+			message: 'Applying ratings to all images...',
+		});
 
-    try {
+		try {
       // Transform ratings Map to match the expected format
-      const dbRatingsMap = new Map();
-      ratings.forEach((rating, fileId) => {
-        if (rating && rating.rating !== null && rating.rating !== 0) {
-          dbRatingsMap.set(fileId, {
-            rating: rating.rating,
-            overRuleFileRating: rating.overRuleFileRating ?? false
-          });
-        }
-      });
+			const dbRatingsMap = new Map();
+			ratings.forEach((rating, fileId) => {
+				if(rating && rating.rating !== null && rating.rating !== 0) {
+					dbRatingsMap.set(fileId, {
+						rating: rating.rating,
+						overRuleFileRating: rating.overRuleFileRating ?? false
+					});
+				}
+			});
 
       // Filter out 0 values from JPG ratings
-      const jpgRatingsMap = new Map();
-      exifData.forEach((rating, fileId) => {
-        if (rating !== null && rating !== 0) {
-          jpgRatingsMap.set(fileId, rating);
-        }
-      });
+			const jpgRatingsMap = new Map();
+			exifData.forEach((rating, fileId) => {
+				if(rating !== null && rating !== 0) {
+					jpgRatingsMap.set(fileId, rating);
+				}
+			});
 
       // Filter out 0 values from RAW ratings
-      const rawRatingsMap = new Map();
-      rawExifData.forEach((rating, fileId) => {
-        if (rating !== null && rating !== 0) {
-          rawRatingsMap.set(fileId, rating);
-        }
-      });
+			const rawRatingsMap = new Map();
+			rawExifData.forEach((rating, fileId) => {
+				if(rating !== null && rating !== 0) {
+					rawRatingsMap.set(fileId, rating);
+				}
+			});
 
-      console.log('DB Ratings Map:', dbRatingsMap);
-      console.log('JPG Ratings Map:', jpgRatingsMap);
-      console.log('RAW Ratings Map:', rawRatingsMap);
+			console.log('DB Ratings Map:', dbRatingsMap);
+			console.log('JPG Ratings Map:', jpgRatingsMap);
+			console.log('RAW Ratings Map:', rawRatingsMap);
 
-      const aggregated = aggregateRatings(dbRatingsMap, jpgRatingsMap, rawRatingsMap, hasAnyConflicts());
+			const aggregated = aggregateRatings(dbRatingsMap, jpgRatingsMap, rawRatingsMap, hasAnyConflicts());
 
-      console.log('Aggregated ratings to apply:', aggregated);
+			console.log('Aggregated ratings to apply:', aggregated);
 
-      const response = await fetch('/api/set-ratings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...aggregated,
-          folderPath,
-        }),
-      });
+			const response = await fetch('/api/set-ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					...aggregated,
+					folderPath,
+				}),
+			});
 
-      if (response.ok) {
-        console.log('Ratings applied successfully');
+			if(response.ok) {
+				console.log('Ratings applied successfully');
         // Automatically move 1-star files to trash if any exist
-        const oneStarCount = getOneStarCount();
-        if (oneStarCount > 0) {
-          await handleMoveToTrash();
-        } else {
-          setStatusModal({
-            isOpen: true,
-            status: 'success',
-            message: 'All ratings have been applied successfully!',
-          });
-        }
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to apply ratings:', errorData);
-        setStatusModal({
-          isOpen: true,
-          status: 'error',
-          message: 'Failed to apply ratings',
-          errorDetails: errorData.error || 'An unexpected error occurred',
-        });
-      }
+				const oneStarCount = getOneStarCount();
+				if(oneStarCount > 0) {
+					await handleMoveToTrash();
+				} else {
+					setStatusModal({
+						isOpen: true,
+						status: 'success',
+						message: 'All ratings have been applied successfully!',
+					});
+				}
+			} else {
+				const errorData = await response.json();
+				console.error('Failed to apply ratings:', errorData);
+				setStatusModal({
+					isOpen: true,
+					status: 'error',
+					message: 'Failed to apply ratings',
+					errorDetails: errorData.error || 'An unexpected error occurred',
+				});
+			}
 
-    } catch (err: any) {
-      console.error('Failed to apply ratings:', err);
-      setStatusModal({
-        isOpen: true,
-        status: 'error',
-        message: 'Failed to apply ratings',
-        errorDetails: err.message || 'An unexpected error occurred',
-      });
-    }
-  }, [ratings, exifData, rawExifData, imageFiles, folderPath]);
+		} catch (err: any) {
+			console.error('Failed to apply ratings:', err);
+			setStatusModal({
+				isOpen: true,
+				status: 'error',
+				message: 'Failed to apply ratings',
+				errorDetails: err.message || 'An unexpected error occurred',
+			});
+		}
+	}, [ratings, exifData, rawExifData, imageFiles, folderPath]);
 
-  const getOneStarCount = useCallback(() => {
-    let count = 0;
-    ratings.forEach((rating) => {
-      if (rating && rating.rating === 1) {
-        count++;
-      }
-    });
-    return count;
-  }, [ratings]);
+	const getOneStarCount = useCallback(() => {
+		let count = 0;
+		ratings.forEach((rating) => {
+			if(rating && rating.rating === 1) {
+				count++;
+			}
+		});
+		return count;
+	}, [ratings]);
 
-  const handleMoveToTrash = useCallback(async () => {
-    const count = getOneStarCount();
-    if (count === 0) return;
+	const handleMoveToTrash = useCallback(async() => {
+		const count = getOneStarCount();
+		if(count === 0) {return;}
 
-    setStatusModal({
-      isOpen: true,
-      status: 'loading',
-      message: `Moving ${count} 1-star files (and variants) to trash...`,
-    });
+		setStatusModal({
+			isOpen: true,
+			status: 'loading',
+			message: `Moving ${count} 1-star files (and variants) to trash...`,
+		});
 
-    try {
-      const response = await fetch('/api/trash', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath }),
-      });
+		try {
+			const response = await fetch('/api/trash', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ folderPath }),
+			});
 
-      if (response.ok) {
-        const data = await response.json();
+			if(response.ok) {
+				const data = await response.json();
 
         // Remove moved files from the local ratings map so the UI updates
-        setRatings(prev => {
-          const newMap = new Map(prev);
-          data.movedFiles.forEach((fullPath: string) => {
-            const fileName = fullPath.split(/[\\/]/).pop() || '';
-            const fileId = getFileId(fileName);
-            newMap.delete(fileId);
-          });
-          return newMap;
-        });
+				setRatings(prev => {
+					const newMap = new Map(prev);
+					data.movedFiles.forEach((fullPath: string) => {
+						const fileName = fullPath.split(/[\\/]/).pop() || '';
+						const fileId = getFileId(fileName);
+						newMap.delete(fileId);
+					});
+					return newMap;
+				});
 
-        setStatusModal({
-          isOpen: true,
-          status: 'success',
-          message: `All ratings applied and ${data.movedFiles.length} files moved to trash.`,
-        });
-      } else {
-        const errorData = await response.json();
-        setStatusModal({
-          isOpen: true,
-          status: 'error',
-          message: 'Failed to move files to trash',
-          errorDetails: errorData.error || 'An unexpected error occurred',
-        });
-      }
-    } catch (err: any) {
-      console.error('Failed to move files to trash:', err);
-      setStatusModal({
-        isOpen: true,
-        status: 'error',
-        message: 'Failed to move files to trash',
-        errorDetails: err.message || 'An unexpected error occurred',
-      });
-    }
-  }, [folderPath, getOneStarCount]);
+				setStatusModal({
+					isOpen: true,
+					status: 'success',
+					message: `All ratings applied and ${data.movedFiles.length} files moved to trash.`,
+				});
+			} else {
+				const errorData = await response.json();
+				setStatusModal({
+					isOpen: true,
+					status: 'error',
+					message: 'Failed to move files to trash',
+					errorDetails: errorData.error || 'An unexpected error occurred',
+				});
+			}
+		} catch (err: any) {
+			console.error('Failed to move files to trash:', err);
+			setStatusModal({
+				isOpen: true,
+				status: 'error',
+				message: 'Failed to move files to trash',
+				errorDetails: err.message || 'An unexpected error occurred',
+			});
+		}
+	}, [folderPath, getOneStarCount]);
 
-  const handleStatusModalClose = useCallback(async () => {
-    try {
+	const handleStatusModalClose = useCallback(async() => {
+		try {
       // Fetch fresh batch EXIF data - same as select-folder does
-      const exifResponse = await fetch('/api/exif', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath, action: 'batch' }),
-      });
+			const exifResponse = await fetch('/api/exif', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ folderPath, action: 'batch' }),
+			});
 
-      if (exifResponse.ok) {
-        const exifData = await exifResponse.json();
-        if (exifData.success && exifData.exifData) {
+			if(exifResponse.ok) {
+				const exifData = await exifResponse.json();
+				if(exifData.success && exifData.exifData) {
           // Store batch EXIF data in localStorage (same way as select-folder)
-          localStorage.setItem(`batchExifData_${folderPath}`, JSON.stringify(exifData.exifData));
-        }
-      }
-    } catch (exifErr) {
-      console.error('Failed to fetch batch EXIF data:', exifErr);
+					localStorage.setItem(`batchExifData_${folderPath}`, JSON.stringify(exifData.exifData));
+				}
+			}
+		} catch (exifErr) {
+			console.error('Failed to fetch batch EXIF data:', exifErr);
       // Continue anyway, loadFolder will use cached data
-    }
+		}
 
     // Reload the folder to refresh all data (will use fresh EXIF data from localStorage)
-    if (folderPath) {
-      await loadFolder(folderPath);
-    }
+		if(folderPath) {
+			await loadFolder(folderPath);
+		}
 
     // Close the modal
-    setStatusModal({
-      isOpen: false,
-      status: 'loading',
-      message: '',
-    });
-  }, [folderPath]);
+		setStatusModal({
+			isOpen: false,
+			status: 'loading',
+			message: '',
+		});
+	}, [folderPath]);
 
-  function renderConflictIndicator(fileName: string) {
-    const fileId = getFileId(fileName);
-    const exifRating = exifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
-    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+	function renderConflictIndicator(fileName: string) {
+		const fileId = getFileId(fileName);
+		const exifRating = exifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
+		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
     // No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
-    if (!dbRating && !exifRating) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="text-zinc-500 text-xs">
+		if(!dbRating && !exifRating) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="text-zinc-500 text-xs">
             No rating
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Ratings differ = conflict
-    if ((dbRating && exifRating) && exifRating !== dbRating && !dbOverRule) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <button
-            onClick={() => setSelectedConflict({ fileName, exifRating, dbRating, newRating: null })}
-            className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
-          >
+		if((dbRating && exifRating) && exifRating !== dbRating && !dbOverRule) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<button
+						onClick={() => setSelectedConflict({ fileName, exifRating, dbRating, newRating: null })}
+						className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
+					>
             ≠ Conflict
-          </button>
-          <div className="text-zinc-500 text-xs">
+					</button>
+					<div className="text-zinc-500 text-xs">
             JPG: {exifRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      );
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Ratings differ = conflict
-    if ((dbRating && exifRating) && exifRating !== dbRating && dbOverRule) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		if((dbRating && exifRating) && exifRating !== dbRating && dbOverRule) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ Resolved
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             JPG: {exifRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      );
-    }
+					</div>
+				</div>
+			);
+		}
 
     // No conflict (either no DB rating, or ratings match)
-    if ((dbRating && exifRating) && exifRating === dbRating) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
+		if((dbRating && exifRating) && exifRating === dbRating) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
             = match
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             JPG: {exifRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // No conflict (either no DB rating, or ratings match)
-    if ((dbRating && !exifRating)) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		if((dbRating && !exifRating)) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ db only
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             JPG: {exifRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // No conflict (either no DB rating, or ratings match)
-    return (
-      <div className="flex items-center gap-2 flex-col">
-        <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		return (
+			<div className="flex items-center gap-2 flex-col">
+				<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
           file only
-        </div>
-        <div className="text-zinc-500 text-xs">
+				</div>
+				<div className="text-zinc-500 text-xs">
           JPG: {exifRating} ★ / DB: {dbRating} ★
-        </div>
-      </div>
-    )
-  }
+				</div>
+			</div>
+		);
+	}
 
-  function renderRawConflictIndicator(fileName: string) {
-    const fileId = getFileId(fileName);
-    const rawRating = rawExifData.get(fileId);
-    const dbRating = ratings.get(fileId)?.rating ?? null;
-    const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
+	function renderRawConflictIndicator(fileName: string) {
+		const fileId = getFileId(fileName);
+		const rawRating = rawExifData.get(fileId);
+		const dbRating = ratings.get(fileId)?.rating ?? null;
+		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
     // No ratings at all (neither RAW nor DB) = no conflict, show "No rating"
-    if (!dbRating && !rawRating) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="text-zinc-500 text-xs">
+		if(!dbRating && !rawRating) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="text-zinc-500 text-xs">
             No rating
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Ratings differ = conflict
-    if ((dbRating && rawRating) && rawRating !== dbRating && !dbOverRule) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <button
-            onClick={() => setSelectedConflict({ fileName, exifRating: rawRating, dbRating, newRating: null })}
-            className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
-          >
+		if((dbRating && rawRating) && rawRating !== dbRating && !dbOverRule) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<button
+						onClick={() => setSelectedConflict({ fileName, exifRating: rawRating, dbRating, newRating: null })}
+						className="px-2 py-1 bg-red-950 text-red-400 text-xs rounded border border-red-700 hover:bg-red-900 transition cursor-pointer"
+					>
             ≠ Conflict
-          </button>
-          <div className="text-zinc-500 text-xs">
+					</button>
+					<div className="text-zinc-500 text-xs">
             RAW: {rawRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      );
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Ratings differ but overruled = resolved
-    if ((dbRating && rawRating) && rawRating !== dbRating && dbOverRule) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		if((dbRating && rawRating) && rawRating !== dbRating && dbOverRule) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ Resolved
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             RAW: {rawRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      );
-    }
+					</div>
+				</div>
+			);
+		}
 
     // No conflict (ratings match)
-    if ((dbRating && rawRating) && rawRating === dbRating) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
+		if((dbRating && rawRating) && rawRating === dbRating) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 bg-green-950 text-green-400 text-xs rounded border border-green-700">
             = match
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             RAW: {rawRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Only DB rating (no RAW rating)
-    if ((dbRating && !rawRating)) {
-      return (
-        <div className="flex items-center gap-2 flex-col">
-          <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		if((dbRating && !rawRating)) {
+			return (
+				<div className="flex items-center gap-2 flex-col">
+					<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
             ✓ db only
-          </div>
-          <div className="text-zinc-500 text-xs">
+					</div>
+					<div className="text-zinc-500 text-xs">
             RAW: {rawRating} ★ / DB: {dbRating} ★
-          </div>
-        </div>
-      )
-    }
+					</div>
+				</div>
+			);
+		}
 
     // Only RAW rating (no DB rating)
-    return (
-      <div className="flex items-center gap-2 flex-col">
-        <div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
+		return (
+			<div className="flex items-center gap-2 flex-col">
+				<div className="px-2 py-1 text-gray-400 text-xs rounded border border-white-700">
           file only
-        </div>
-        <div className="text-zinc-500 text-xs">
+				</div>
+				<div className="text-zinc-500 text-xs">
           RAW: {rawRating} ★ / DB: {dbRating} ★
-        </div>
-      </div>
-    )
-  }
+				</div>
+			</div>
+		);
+	}
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col bg-black font-sans">
-        <main className="flex-1 flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center gap-6 p-8">
-            <div className="text-zinc-200 text-2xl font-semibold">
+	if(isLoading) {
+		return (
+			<div className="flex min-h-screen flex-col bg-black font-sans">
+				<main className="flex-1 flex flex-col items-center justify-center">
+					<div className="flex flex-col items-center gap-6 p-8">
+						<div className="text-zinc-200 text-2xl font-semibold">
               Loading images...
-            </div>
-            <div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
-              <div
-                className="bg-zinc-400 h-full transition-all duration-300 ease-out"
-                style={{ width: `${loadProgress}%` }}
-              />
-            </div>
-            <div className="text-zinc-400 text-sm">
-              {loadProgress}% complete
-            </div>
-            {folderName && (
-              <div className="text-zinc-500 text-sm">
+						</div>
+						<div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
+							<div
+								className="bg-zinc-400 h-full transition-all duration-300 ease-out"
+								style={{ width: `${loadProgress}%` }}
+							/>
+						</div>
+						<div className="text-zinc-400 text-sm">
+							{loadProgress}% complete
+						</div>
+						{folderName && (
+							<div className="text-zinc-500 text-sm">
                 Folder: <b>{folderName}</b>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
+							</div>
+						)}
+					</div>
+				</main>
+			</div>
+		);
+	}
 
-  return (
-    <div className="flex min-h-screen flex-col bg-black font-sans">
-      <Header
-        folderName={folderName}
-        title={folderPath}
-      >
-        <div className="flex items-center gap-4">
-          <div className="text-zinc-400 text-sm">{imageFiles.filter(img => shouldShowImage(img.fileName)).length} / {imageFiles.length} images</div>
-          <button
-            className="header-button"
-            onClick={() => {
-              void loadGroupFilters(folderPath);
-              setShowFilterModal(true);
-            }}
-            title="Filter images by rating"
-            disabled={statusModal.isOpen}
-          >
-            <Icon name="filter_list" />
-          </button>
-          <button
-            className="header-button"
-            onClick={() => setShowExportModal(true)}
-            title="Export ratings to JSON"
-            disabled={statusModal.isOpen}
-          >
-            <Icon name="download" />
-          </button>
-          <button
-            className="header-button"
-            onClick={() => setShowImportModal(true)}
-            title="Import ratings from JSON"
-            disabled={statusModal.isOpen}
-          >
-            <Icon name="upload" />
-          </button>
-          <button
-            className={`header-button ${hasAnyConflicts() ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={handleApplyRatings}
-            disabled={hasAnyConflicts() || statusModal.isOpen}
-            title={hasAnyConflicts() ? 'Cannot apply ratings with conflicts' : 'Apply ratings'}
-          >
+	return (
+		<div className="flex min-h-screen flex-col bg-black font-sans">
+			<Header
+				folderName={folderName}
+				title={folderPath}
+			>
+				<div className="flex items-center gap-4">
+					<div className="text-zinc-400 text-sm">{imageFiles.filter(img => shouldShowImage(img.fileName)).length} / {imageFiles.length} images</div>
+					<button
+						className="header-button"
+						onClick={() => {
+							void loadGroupFilters(folderPath);
+							setShowFilterModal(true);
+						}}
+						title="Filter images by rating"
+						disabled={statusModal.isOpen}
+					>
+						<Icon name="filter_list" />
+					</button>
+					<button
+						className="header-button"
+						onClick={() => setShowExportModal(true)}
+						title="Export ratings to JSON"
+						disabled={statusModal.isOpen}
+					>
+						<Icon name="download" />
+					</button>
+					<button
+						className="header-button"
+						onClick={() => setShowImportModal(true)}
+						title="Import ratings from JSON"
+						disabled={statusModal.isOpen}
+					>
+						<Icon name="upload" />
+					</button>
+					<button
+						className={`header-button ${hasAnyConflicts() ? 'opacity-50 cursor-not-allowed' : ''}`}
+						onClick={handleApplyRatings}
+						disabled={hasAnyConflicts() || statusModal.isOpen}
+						title={hasAnyConflicts() ? 'Cannot apply ratings with conflicts' : 'Apply ratings'}
+					>
             Apply
-          </button>
-        </div>
-      </Header>
+					</button>
+				</div>
+			</Header>
 
-      <main className={`flex-1 px-6 py-6 ${statusModal.isOpen ? 'pointer-events-none opacity-50' : ''}`}>
-        {error ? (
-          <div className="text-red-500 text-center py-8">{error}</div>
-        ) : imageFiles.length === 0 ? (
-          <div className="text-zinc-400 text-center py-8">No images found</div>
-        ) : (
-          <div className="overflow-x-auto w-8/12 mx-auto rounded border border-zinc-700">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-24">Thumbnail</th>
-                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold w-48">Filename</th>
-                  <th className="text-left py-3 px-4 text-zinc-300 font-semibold">RAW</th>
-                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-40">DB Rating</th>
-                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">JPG Conflict</th>
-                  <th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">RAW Conflict</th>
-                </tr>
-              </thead>
-              <tbody>
-                {imageFiles.filter(image => shouldShowImage(image.fileName)).map((image, idx) => (
-                  <tr
-                    key={idx}
-                    className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${hasAllRatingsMatch(image.fileName)
-                      ? 'bg-green-950 bg-opacity-20'
-                      : hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
-                        ? 'bg-red-950 bg-opacity-20 conflict'
-                        : 'no-conflict'
-                      }`}
-                  >
-                    <td className="py-3 px-4">
-                      <div className="w-20 h-20 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
-                        <img
-                          src={image.thumbnailPath}
-                          alt={image.fileName}
-                          width={CONFIG.THUMBNAIL_WIDTH}
-                          height={CONFIG.THUMBNAIL_WIDTH}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-zinc-300 text-sm break-all">
-                      {image.fileName}
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400 text-sm">
-                      {rawFiles.get(getFileId(image.fileName)) ? (
-                        <div className="flex items-center gap-2">
-                          <span>{rawFiles.get(getFileId(image.fileName))}</span>
-                          {hasXmpMap.get(getFileId(image.fileName)) && (
-                            <Icon name="settings_photo_camera" size={16} />
-                          )}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {renderRatingStars(image.fileName)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {renderConflictIndicator(image.fileName)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {renderRawConflictIndicator(image.fileName)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </main>
+			<main className={`flex-1 px-6 py-6 ${statusModal.isOpen ? 'pointer-events-none opacity-50' : ''}`}>
+				{error ? (
+					<div className="text-red-500 text-center py-8">{error}</div>
+				) : imageFiles.length === 0 ? (
+					<div className="text-zinc-400 text-center py-8">No images found</div>
+				) : (
+					<div className="overflow-x-auto w-8/12 mx-auto rounded border border-zinc-700">
+						<table className="w-full border-collapse">
+							<thead>
+								<tr className="border-b border-zinc-700">
+									<th className="text-left py-3 px-4 text-zinc-300 font-semibold w-24">Thumbnail</th>
+									<th className="text-left py-3 px-4 text-zinc-300 font-semibold w-48">Filename</th>
+									<th className="text-left py-3 px-4 text-zinc-300 font-semibold">RAW</th>
+									<th className="text-center py-3 px-4 text-zinc-300 font-semibold w-40">DB Rating</th>
+									<th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">JPG Conflict</th>
+									<th className="text-center py-3 px-4 text-zinc-300 font-semibold w-56">RAW Conflict</th>
+								</tr>
+							</thead>
+							<tbody>
+								{imageFiles.filter(image => shouldShowImage(image.fileName)).map((image, idx) => (
+									<tr
+										key={idx}
+										className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${hasAllRatingsMatch(image.fileName)
+											? 'bg-green-950 bg-opacity-20'
+											: hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
+												? 'bg-red-950 bg-opacity-20 conflict'
+												: 'no-conflict'
+										}`}
+									>
+										<td className="py-3 px-4">
+											<div className="w-20 h-20 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
+												<img
+													src={image.thumbnailPath}
+													alt={image.fileName}
+													width={CONFIG.THUMBNAIL_WIDTH}
+													height={CONFIG.THUMBNAIL_WIDTH}
+													className="w-full h-full object-cover"
+												/>
+											</div>
+										</td>
+										<td className="py-3 px-4 text-zinc-300 text-sm break-all">
+											{image.fileName}
+										</td>
+										<td className="py-3 px-4 text-zinc-400 text-sm">
+											{rawFiles.get(getFileId(image.fileName)) ? (
+												<div className="flex items-center gap-2">
+													<span>{rawFiles.get(getFileId(image.fileName))}</span>
+													{hasXmpMap.get(getFileId(image.fileName)) && (
+														<Icon name="settings_photo_camera" size={16} />
+													)}
+												</div>
+											) : (
+												'-'
+											)}
+										</td>
+										<td className="py-3 px-4 text-center">
+											{renderRatingStars(image.fileName)}
+										</td>
+										<td className="py-3 px-4">
+											{renderConflictIndicator(image.fileName)}
+										</td>
+										<td className="py-3 px-4">
+											{renderRawConflictIndicator(image.fileName)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</main>
 
-      <ConflictModal
-        isOpen={selectedConflict !== null}
-        conflictData={selectedConflict}
-        onUseNewRating={handleUseNewRating}
-        onUseExifRating={handleUseExifRating}
-        onUseDatabaseRating={handleUseDatabaseRating}
-        onIgnore={handleIgnoreConflict}
-      />
+			<ConflictModal
+				isOpen={selectedConflict !== null}
+				conflictData={selectedConflict}
+				onUseNewRating={handleUseNewRating}
+				onUseExifRating={handleUseExifRating}
+				onUseDatabaseRating={handleUseDatabaseRating}
+				onIgnore={handleIgnoreConflict}
+			/>
 
-      <FilterModal
-        isOpen={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        showUnrated={showUnrated}
-        setShowUnrated={setShowUnrated}
-        selectedRatings={selectedRatings}
-        setSelectedRatings={setSelectedRatings}
-        availableGroups={availableGroups.map((group) => ({
-          ...group,
-          imageCount: groupCounts.get(group.id) ?? 0,
-        }))}
-        selectedGroupIds={selectedGroupIds}
-        setSelectedGroupIds={setSelectedGroupIds}
-        conflictOption={true}
-        showConflictsOnly={showConflictsOnly}
-        setShowConflictsOnly={setShowConflictsOnly}
-      />
+			<FilterModal
+				isOpen={showFilterModal}
+				onClose={() => setShowFilterModal(false)}
+				showUnrated={showUnrated}
+				setShowUnrated={setShowUnrated}
+				selectedRatings={selectedRatings}
+				setSelectedRatings={setSelectedRatings}
+				availableGroups={availableGroups.map((group) => ({
+					...group,
+					imageCount: groupCounts.get(group.id) ?? 0,
+				}))}
+				selectedGroupIds={selectedGroupIds}
+				setSelectedGroupIds={setSelectedGroupIds}
+				conflictOption={true}
+				showConflictsOnly={showConflictsOnly}
+				setShowConflictsOnly={setShowConflictsOnly}
+			/>
 
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        onExport={(filename, prefix) => {
-          handleExportRatings(filename, prefix);
-          setShowExportModal(false);
-        }}
-        defaultFilename={`${folderName}_ratings`}
-      />
+			<ExportModal
+				isOpen={showExportModal}
+				onClose={() => setShowExportModal(false)}
+				onExport={(filename, prefix) => {
+					handleExportRatings(filename, prefix);
+					setShowExportModal(false);
+				}}
+				defaultFilename={`${folderName}_ratings`}
+			/>
 
-      <ImportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImport={handleImportRatings}
-        isLoading={statusModal.isOpen && statusModal.status === 'loading'}
-      />
+			<ImportModal
+				isOpen={showImportModal}
+				onClose={() => setShowImportModal(false)}
+				onImport={handleImportRatings}
+				isLoading={statusModal.isOpen && statusModal.status === 'loading'}
+			/>
 
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        status={statusModal.status}
-        message={statusModal.message}
-        errorDetails={statusModal.errorDetails}
-        onClose={handleStatusModalClose}
-        showProgress={statusModal.isOpen && (statusModal.message.includes('Applying') || statusModal.message.includes('Moving')) && statusModal.status === 'loading'}
-      />
-    </div>
-  );
+			<StatusModal
+				isOpen={statusModal.isOpen}
+				status={statusModal.status}
+				message={statusModal.message}
+				errorDetails={statusModal.errorDetails}
+				onClose={handleStatusModalClose}
+				showProgress={statusModal.isOpen && (statusModal.message.includes('Applying') || statusModal.message.includes('Moving')) && statusModal.status === 'loading'}
+			/>
+		</div>
+	);
 }

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 	try {
 		const { folderPath } = await request.json();
 
-		if (!folderPath) {
+		if(!folderPath) {
 			return NextResponse.json({ error: 'Folder path is required' }, { status: 400 });
 		}
 

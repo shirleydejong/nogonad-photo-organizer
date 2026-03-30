@@ -31,12 +31,12 @@ export async function moveToTrash(folderPath: string) {
 	const trashPath = path.join(npoPath, config.TRASH_FOLDER);
 
 	// Ensure NPO folder exists
-	if (!(await fileExists(npoPath))) {
+	if(!(await fileExists(npoPath))) {
 		await fs.mkdir(npoPath, { recursive: true });
 	}
 
 	// Ensure trash folder exists
-	if (!(await fileExists(trashPath))) {
+	if(!(await fileExists(trashPath))) {
 		await fs.mkdir(trashPath, { recursive: true });
 	}
 
@@ -44,21 +44,21 @@ export async function moveToTrash(folderPath: string) {
 	const foldersToScan = [folderPath];
 	const rawFolderPath = path.join(folderPath, config.RAW_FOLDER);
 
-	if (await fileExists(rawFolderPath)) {
+	if(await fileExists(rawFolderPath)) {
 		foldersToScan.push(rawFolderPath);
 	}
 
 	const movedFiles: string[] = [];
 	const alreadyMoved = new Set<string>();
 
-	for (const scanPath of foldersToScan) {
+	for(const scanPath of foldersToScan) {
 		const metadata = await getBatchExifJson(scanPath);
 
-		for (const item of metadata) {
+		for(const item of metadata) {
 			// Check if rating is exactly 1 (from exiftool -json output)
-			if (item.Rating === 1) {
+			if(item.Rating === 1) {
 				const sourceFile = item.SourceFile; // Full path provided by exiftool -json
-				if (!sourceFile || alreadyMoved.has(sourceFile)) continue;
+				if(!sourceFile || alreadyMoved.has(sourceFile)) {continue;}
 
 				const parsed = path.parse(sourceFile);
 				const isRaw = /\.(raw|dng|nef|cr2|crw|arw|raf|rw2|orf|pef)$/i.test(sourceFile);
@@ -68,26 +68,26 @@ export async function moveToTrash(folderPath: string) {
 					// 1. Determine files to move
 					const filesToMove: string[] = [];
 
-					if (isRaw) {
+					if(isRaw) {
 						filesToMove.push(sourceFile);
 						// Look for corresponding XMP
 						const xmpPath = path.join(parsed.dir, parsed.name + '.xmp');
-						if (await fileExists(xmpPath)) {
+						if(await fileExists(xmpPath)) {
 							filesToMove.push(xmpPath);
 						}
-					} else if (isXmp) {
+					} else if(isXmp) {
 						filesToMove.push(sourceFile);
 						// Look for corresponding RAW (iterate common extensions)
 						const rawExtensions = ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'];
-						for (const ext of rawExtensions) {
+						for(const ext of rawExtensions) {
 							const rawPath = path.join(parsed.dir, parsed.name + ext);
-							if (await fileExists(rawPath)) {
+							if(await fileExists(rawPath)) {
 								filesToMove.push(rawPath);
 								break; // Assume only one RAW per XMP
 							}
 							// Also check with uppercase if needed, but fileExists should be case-insensitive on Windows anyway
 							const rawPathUpper = path.join(parsed.dir, parsed.name + ext.toUpperCase());
-							if (ext.toUpperCase() !== ext && await fileExists(rawPathUpper)) {
+							if(ext.toUpperCase() !== ext && await fileExists(rawPathUpper)) {
 								filesToMove.push(rawPathUpper);
 								break;
 							}
@@ -98,8 +98,8 @@ export async function moveToTrash(folderPath: string) {
 					}
 
 					// 2. Perform moves
-					for (const file of filesToMove) {
-						if (!alreadyMoved.has(file) && await fileExists(file)) {
+					for(const file of filesToMove) {
+						if(!alreadyMoved.has(file) && await fileExists(file)) {
 							const fileName = path.basename(file);
 							const destinationFile = path.join(trashPath, fileName);
 

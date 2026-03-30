@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 interface IconProps {
   name: string;
@@ -7,9 +7,9 @@ interface IconProps {
 }
   
 export function Icon({ name, size, color }: IconProps) {
-  return (
-    <span className="material-symbols-rounded text-2xl" style={{ fontSize: size || 24, color: color || 'inherit' }}>
-      {name}
-    </span>
-  );
+	return (
+		<span className="material-symbols-rounded text-2xl" style={{ fontSize: size || 24, color: color || 'inherit' }}>
+			{name}
+		</span>
+	);
 }

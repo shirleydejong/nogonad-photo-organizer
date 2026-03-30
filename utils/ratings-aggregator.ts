@@ -6,22 +6,22 @@
  */
 
 export interface RatingItem {
-  fileName: string;
-  rating: number;
+	fileName: string;
+	rating: number;
 }
 
 export interface AggregatedRatings {
-  dbRatings: RatingItem[];
-  jpgRatings: RatingItem[];
-  rawRatings: RatingItem[];
+	dbRatings: RatingItem[];
+	jpgRatings: RatingItem[];
+	rawRatings: RatingItem[];
 }
 
 /**
  * Rating interface matching the database rating structure
  */
 export interface DbRating {
-  rating: number | null;
-  overRuleFileRating: boolean;
+	rating: number | null;
+	overRuleFileRating: boolean;
 }
 
 /**
@@ -50,78 +50,78 @@ export interface DbRating {
  * // Use aggregated.dbRatings, aggregated.jpgRatings, aggregated.rawRatings
  */
 export function aggregateRatings(
-  dbRatingsMap: Map<string, DbRating | null>,
-  jpgRatingsMap: Map<string, number | null>,
-  rawRatingsMap: Map<string, number | null>,
-  hasConflicts: boolean = false
+	dbRatingsMap: Map<string, DbRating | null>,
+	jpgRatingsMap: Map<string, number | null>,
+	rawRatingsMap: Map<string, number | null>,
+	hasConflicts: boolean = false
 ): AggregatedRatings {
-  const result: AggregatedRatings = {
-    dbRatings: [],
-    jpgRatings: [],
-    rawRatings: [],
-  };
+	const result: AggregatedRatings = {
+		dbRatings: [],
+		jpgRatings: [],
+		rawRatings: [],
+	};
 
-  // Cannot use this function if there are conflicts
-  if (hasConflicts) {
-    console.log('Cannot aggregate ratings: conflicts exist');
-    return result;
-  }
+// Cannot use this function if there are conflicts
+	if(hasConflicts) {
+		console.log('Cannot aggregate ratings: conflicts exist');
+		return result;
+	}
 
-  // Collect all fileIds from all sources
-  const allFileIds = new Set<string>();
-  dbRatingsMap.forEach((value, fileId) => {
-    if (value && value.rating !== null && value.rating !== 0) {
-      allFileIds.add(fileId);
-    }
-  });
-  jpgRatingsMap.forEach((value, fileId) => {
-    if (value !== null && value !== 0) {
-      allFileIds.add(fileId);
-    }
-  });
-  rawRatingsMap.forEach((value, fileId) => {
-    if (value !== null && value !== 0) {
-      allFileIds.add(fileId);
-    }
-  });
+// Collect all fileIds from all sources
+	const allFileIds = new Set<string>();
+	dbRatingsMap.forEach((value, fileId) => {
+		if(value && value.rating !== null && value.rating !== 0) {
+			allFileIds.add(fileId);
+		}
+	});
+	jpgRatingsMap.forEach((value, fileId) => {
+		if(value !== null && value !== 0) {
+			allFileIds.add(fileId);
+		}
+	});
+	rawRatingsMap.forEach((value, fileId) => {
+		if(value !== null && value !== 0) {
+			allFileIds.add(fileId);
+		}
+	});
 
-  // Process each file
-  for (const fileId of allFileIds) {
-    const dbData = dbRatingsMap.get(fileId);
-    const dbRating = dbData?.rating ?? null;
-    const overRuleFlag = dbData?.overRuleFileRating ?? false;
-    const jpgRating = jpgRatingsMap.get(fileId) ?? null;
-    const rawRating = rawRatingsMap.get(fileId) ?? null;
+// Process each file
+	for(const fileId of allFileIds) {
+		const dbData = dbRatingsMap.get(fileId);
+		const dbRating = dbData?.rating ?? null;
+		const overRuleFlag = dbData?.overRuleFileRating ?? false;
+		const jpgRating = jpgRatingsMap.get(fileId) ?? null;
+		const rawRating = rawRatingsMap.get(fileId) ?? null;
 
-    // OverRule flag: if true, database rating ALWAYS takes precedence
-    if (overRuleFlag && dbRating !== null && dbRating !== 0) {
-      result.dbRatings.push({
-        fileName: fileId,
-        rating: dbRating,
-      });
-    }
-    // Database rating: only if no JPG AND no RAW rating (and rating is not 0)
-    else if (dbRating !== null && dbRating !== 0 && (jpgRating === null || rawRating === null)) {
-      result.dbRatings.push({
-        fileName: fileId,
-        rating: dbRating,
-      });
-    }
-    // JPG rating: only if no RAW rating AND no DB rating (and rating is not 0)
-    else if (jpgRating !== null && jpgRating !== 0 && rawRating === null && dbRating === null) {
-      result.jpgRatings.push({
-        fileName: fileId,
-        rating: jpgRating,
-      });
-    }
-    // RAW rating: only if no JPG rating AND no DB rating (and rating is not 0)
-    else if (rawRating !== null && rawRating !== 0 && jpgRating === null && dbRating === null) {
-      result.rawRatings.push({
-        fileName: fileId,
-        rating: rawRating,
-      });
-    }
-  }
+	// OverRule flag: if true, database rating ALWAYS takes precedence
+		if(overRuleFlag && dbRating !== null && dbRating !== 0) {
+			result.dbRatings.push({
+				fileName: fileId,
+				rating: dbRating,
+			});
+		}
+	// Database rating: only if no JPG AND no RAW rating (and rating is not 0)
+		else if(dbRating !== null && dbRating !== 0 && (jpgRating === null || rawRating === null)) {
+			result.dbRatings.push({
+				fileName: fileId,
+				rating: dbRating,
+			});
+		}
+	// JPG rating: only if no RAW rating AND no DB rating (and rating is not 0)
+		else if(jpgRating !== null && jpgRating !== 0 && rawRating === null && dbRating === null) {
+			result.jpgRatings.push({
+				fileName: fileId,
+				rating: jpgRating,
+			});
+		}
+	// RAW rating: only if no JPG rating AND no DB rating (and rating is not 0)
+		else if(rawRating !== null && rawRating !== 0 && jpgRating === null && dbRating === null) {
+			result.rawRatings.push({
+				fileName: fileId,
+				rating: rawRating,
+			});
+		}
+	}
 
-  return result;
+	return result;
 }

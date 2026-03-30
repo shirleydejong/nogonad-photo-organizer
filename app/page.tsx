@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from "react";
-import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
-import { getSocket } from "@/utils/socket";
-import { Socket } from "socket.io-client";
-import { Icon } from "@/components/icon";
-import { ExifItem } from "@/components/exif-item";
-import { Header } from "@/components/header";
-import { FilterModal } from "@/components/filter-modal";
-import { ConflictModal } from "@/components/conflict-modal";
-import { CameraControlModal } from "@/components/camera-control-modal";
-import CONFIG from "@/config";
+import { useState, useEffect, useRef, useCallback, type PointerEvent, type WheelEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { getSocket } from '@/utils/socket';
+import { Socket } from 'socket.io-client';
+import { Icon } from '@/components/icon';
+import { ExifItem } from '@/components/exif-item';
+import { Header } from '@/components/header';
+import { FilterModal } from '@/components/filter-modal';
+import { ConflictModal } from '@/components/conflict-modal';
+import { CameraControlModal } from '@/components/camera-control-modal';
+import CONFIG from '@/config';
 import {
-  formatAperture,
-  formatExposureTime,
-  formatISO,
-  formatFocalLength,
-  formatCropFactor,
-  formatMegapixels,
-  formatDPI,
-  formatDate,
-  formatFlash,
-  formatWhiteBalance,
-  formatExposure,
-  formatFileSize,
-  formatColor,
-} from "@/utils/exif-formatters";
-import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from "@/utils/group-filters";
+	formatAperture,
+	formatExposureTime,
+	formatISO,
+	formatFocalLength,
+	formatCropFactor,
+	formatMegapixels,
+	formatDPI,
+	formatDate,
+	formatFlash,
+	formatWhiteBalance,
+	formatExposure,
+	formatFileSize,
+	formatColor,
+} from '@/utils/exif-formatters';
+import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
   originalFile: File;
@@ -37,1639 +37,1637 @@ interface ImageData {
 }
 
 export default function Home() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
-  const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
-  const [activeIndex, setActiveIndex] = useState<number>(0);
-  const [folderPath, setFolderPath] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isExifOpen, setIsExifOpen] = useState<boolean>(false);
-  const [exifData, setExifData] = useState<Record<string, any> | null>(null);
-  const [exifError, setExifError] = useState<string | null>(null);
-  const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
-  const [isMainImageDragging, setIsMainImageDragging] = useState<boolean>(false);
-  const [isFilmstripDragging, setIsFilmstripDragging] = useState<boolean>(false);
-  const [zoomLevel, setZoomLevel] = useState<number>(100);
-  const [panX, setPanX] = useState<number>(0);
-  const [panY, setPanY] = useState<number>(0);
-  const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
-  const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
-  const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null, newRating: number | null } | null>(null);
-  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
-  const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
-  const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
-  const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
-  const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
-  const [, setIsWatcherActive] = useState<boolean>(false);
-  const [sessionId, setSessionId] = useState<string>("");
+	const router = useRouter();
+	const [error, setError] = useState<string | null>(null);
+	const [folderName, setFolderName] = useState<string | null>(null);
+	const [imageFiles, setImageFiles] = useState<ImageData[]>([]);
+	const [activeIndex, setActiveIndex] = useState<number>(0);
+	const [folderPath, setFolderPath] = useState<string>('');
+	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const [isExifOpen, setIsExifOpen] = useState<boolean>(false);
+	const [exifData, setExifData] = useState<Record<string, any> | null>(null);
+	const [exifError, setExifError] = useState<string | null>(null);
+	const [isExifLoading, setIsExifLoading] = useState<boolean>(false);
+	const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+	const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
+	const [isMainImageDragging, setIsMainImageDragging] = useState<boolean>(false);
+	const [isFilmstripDragging, setIsFilmstripDragging] = useState<boolean>(false);
+	const [zoomLevel, setZoomLevel] = useState<number>(100);
+	const [panX, setPanX] = useState<number>(0);
+	const [panY, setPanY] = useState<number>(0);
+	const [ratings, setRatings] = useState<Map<string, any | null>>(new Map());
+	const [isRatingConflictModalOpen, setIsRatingConflictModalOpen] = useState<boolean>(false);
+	const [ratingConflictData, setRatingConflictData] = useState<{ fileName: string, exifRating: number, dbRating: number | null, newRating: number | null } | null>(null);
+	const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+	const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
+	const [filterShowUnrated, setFilterShowUnrated] = useState<boolean>(true);
+	const [filterSelectedRatings, setFilterSelectedRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+	const [availableGroups, setAvailableGroups] = useState<GroupRecord[]>([]);
+	const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
+	const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
+	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+	const [, setIsWatcherActive] = useState<boolean>(false);
+	const [sessionId, setSessionId] = useState<string>('');
   
   // Camera Control state
-  const [isCameraControlModalOpen, setIsCameraControlModalOpen] = useState<boolean>(false);
-  const [isShootAssistRunning, setIsShootAssistRunning] = useState<boolean>(false);
-  const [isCapturing, setIsCapturing] = useState<boolean>(false);
-  const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; percentage: number } | null>(null);
+	const [isCameraControlModalOpen, setIsCameraControlModalOpen] = useState<boolean>(false);
+	const [isShootAssistRunning, setIsShootAssistRunning] = useState<boolean>(false);
+	const [isCapturing, setIsCapturing] = useState<boolean>(false);
+	const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; percentage: number } | null>(null);
   
-  const socketRef = useRef<Socket | null>(null);
-  const filmstripRef = useRef<HTMLDivElement>(null);
-  const isFilmstripDraggingRef = useRef(false);
-  const filmstripDragStartXRef = useRef(0);
-  const filmstripStartScrollLeftRef = useRef(0);
-  const isMainImageSwipingRef = useRef(false);
-  const mainImageStartXRef = useRef(0);
-  const mainImageStartYRef = useRef(0);
-  const mainImageSwipeTriggeredRef = useRef(false);
-  const swipeButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const touchPinchRef = useRef({ distance: 0, startZoom: 100 });
-  const panStartXRef = useRef(0);
-  const panStartYRef = useRef(0);
-  const sessionIdRef = useRef<string>("");
-  const folderPathRef = useRef<string>("");
-  const imageFilesRef = useRef<ImageData[]>([]);
-  const activeIndexRef = useRef<number>(0);
-  const maxZoom = 400;
-  const pinchFactor = 1.5;
+	const socketRef = useRef<Socket | null>(null);
+	const filmstripRef = useRef<HTMLDivElement>(null);
+	const isFilmstripDraggingRef = useRef(false);
+	const filmstripDragStartXRef = useRef(0);
+	const filmstripStartScrollLeftRef = useRef(0);
+	const isMainImageSwipingRef = useRef(false);
+	const mainImageStartXRef = useRef(0);
+	const mainImageStartYRef = useRef(0);
+	const mainImageSwipeTriggeredRef = useRef(false);
+	const swipeButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const touchPinchRef = useRef({ distance: 0, startZoom: 100 });
+	const panStartXRef = useRef(0);
+	const panStartYRef = useRef(0);
+	const sessionIdRef = useRef<string>('');
+	const folderPathRef = useRef<string>('');
+	const imageFilesRef = useRef<ImageData[]>([]);
+	const activeIndexRef = useRef<number>(0);
+	const maxZoom = 400;
+	const pinchFactor = 1.5;
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
+	const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Calculate filtered images based on current filter settings
-  const filteredImageFiles = imageFiles.filter((img) => {
-    const fileId = getFileId(img.fileName);
-    const rating = ratings.get(fileId)?.rating ?? null;
+	const filteredImageFiles = imageFiles.filter((img) => {
+		const fileId = getFileId(img.fileName);
+		const rating = ratings.get(fileId)?.rating ?? null;
 
     // If no filters are active, show all.
-    if (filterSelectedRatings.size === 5 && filterShowUnrated && selectedGroupIds.size === 0) {
-      return true;
-    }
+		if(filterSelectedRatings.size === 5 && filterShowUnrated && selectedGroupIds.size === 0) {
+			return true;
+		}
 
-    let matchesRating = false;
+		let matchesRating = false;
 
     // If image is unrated (null, undefined, 0, or less than 1)
-    if (rating === null || rating === undefined || rating < 1) {
-      matchesRating = filterShowUnrated;
-    }
+		if(rating === null || rating === undefined || rating < 1) {
+			matchesRating = filterShowUnrated;
+		}
 
     // If image has a rating, check if it's in the selected ratings
-    if (rating !== null && rating !== undefined && rating >= 1) {
-      matchesRating = filterSelectedRatings.has(rating);
-    }
+		if(rating !== null && rating !== undefined && rating >= 1) {
+			matchesRating = filterSelectedRatings.has(rating);
+		}
 
-    if (!matchesRating) {
-      return false;
-    }
+		if(!matchesRating) {
+			return false;
+		}
 
     // No selected groups keeps existing behavior.
-    if (selectedGroupIds.size === 0) {
-      return true;
-    }
+		if(selectedGroupIds.size === 0) {
+			return true;
+		}
 
-    const imageGroups = imageGroupIdsByImageId.get(fileId);
-    if (!imageGroups || imageGroups.size === 0) {
-      return false;
-    }
+		const imageGroups = imageGroupIdsByImageId.get(fileId);
+		if(!imageGroups || imageGroups.size === 0) {
+			return false;
+		}
 
-    for (const groupId of selectedGroupIds) {
-      if (imageGroups.has(groupId)) {
-        return true;
-      }
-    }
+		for(const groupId of selectedGroupIds) {
+			if(imageGroups.has(groupId)) {
+				return true;
+			}
+		}
 
-    return false;
-  });
+		return false;
+	});
 
   // Adjust activeIndex if current image is filtered out
-  useEffect(() => {
-    if (imageFiles.length === 0 || filteredImageFiles.length === 0) {
-      setActiveIndex(0);
-      return;
-    }
+	useEffect(() => {
+		if(imageFiles.length === 0 || filteredImageFiles.length === 0) {
+			setActiveIndex(0);
+			return;
+		}
     
-    const currentImage = imageFiles[activeIndex];
-    if (currentImage && !filteredImageFiles.includes(currentImage)) {
+		const currentImage = imageFiles[activeIndex];
+		if(currentImage && !filteredImageFiles.includes(currentImage)) {
       // Current image is filtered out, find first filtered image
-      const firstFilteredIndex = imageFiles.findIndex(img => 
-        filteredImageFiles.includes(img)
-      );
-      setActiveIndex(firstFilteredIndex >= 0 ? firstFilteredIndex : 0);
-    }
-  }, [filteredImageFiles.length, imageFiles.length]);
+			const firstFilteredIndex = imageFiles.findIndex(img =>
+				filteredImageFiles.includes(img)
+			);
+			setActiveIndex(firstFilteredIndex >= 0 ? firstFilteredIndex : 0);
+		}
+	}, [filteredImageFiles.length, imageFiles.length]);
 
-  useEffect(() => {
-    function onFullscreenChange() {
-      setIsFullscreen(!!document.fullscreenElement);
-    }
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
+	useEffect(() => {
+		function onFullscreenChange() {
+			setIsFullscreen(!!document.fullscreenElement);
+		}
+		document.addEventListener('fullscreenchange', onFullscreenChange);
+		return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+	}, []);
 
   // Initialize session ID for display synchronization
-  useEffect(() => {
-    let storedSessionId = localStorage.getItem('displaySessionId');
-    if (!storedSessionId) {
+	useEffect(() => {
+		let storedSessionId = localStorage.getItem('displaySessionId');
+		if(!storedSessionId) {
       // Generate a simple session ID
-      storedSessionId = Math.random().toString(36).substring(2, 10);
-      localStorage.setItem('displaySessionId', storedSessionId);
-    }
-    setSessionId(storedSessionId);
-    sessionIdRef.current = storedSessionId;
-  }, []);
+			storedSessionId = Math.random().toString(36).substring(2, 10);
+			localStorage.setItem('displaySessionId', storedSessionId);
+		}
+		setSessionId(storedSessionId);
+		sessionIdRef.current = storedSessionId;
+	}, []);
 
   // Keep refs in sync with state
-  useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
+	useEffect(() => {
+		sessionIdRef.current = sessionId;
+	}, [sessionId]);
 
-  useEffect(() => {
-    folderPathRef.current = folderPath;
-  }, [folderPath]);
+	useEffect(() => {
+		folderPathRef.current = folderPath;
+	}, [folderPath]);
 
-  useEffect(() => {
-    imageFilesRef.current = imageFiles;
-  }, [imageFiles]);
+	useEffect(() => {
+		imageFilesRef.current = imageFiles;
+	}, [imageFiles]);
 
-  useEffect(() => {
-    activeIndexRef.current = activeIndex;
-  }, [activeIndex]);
+	useEffect(() => {
+		activeIndexRef.current = activeIndex;
+	}, [activeIndex]);
 
-  const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
+	const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
   // Initialize Socket.IO connection
-  useEffect(() => {
-    const socket = getSocket();
-    socketRef.current = socket;
+	useEffect(() => {
+		const socket = getSocket();
+		socketRef.current = socket;
 
-    const handleConnect = () => {
-      console.log('Socket.IO connected:', socket.id);
+		const handleConnect = () => {
+			console.log('Socket.IO connected:', socket.id);
       // Join viewer session when connected
-      if (sessionIdRef.current) {
-        console.log('Joining viewer session:', sessionIdRef.current);
-        socket.emit('join-viewer-session', sessionIdRef.current);
-      }
-    };
+			if(sessionIdRef.current) {
+				console.log('Joining viewer session:', sessionIdRef.current);
+				socket.emit('join-viewer-session', sessionIdRef.current);
+			}
+		};
 
-    const handleDisconnect = () => {
-      console.log('Socket.IO disconnected');
-    };
+		const handleDisconnect = () => {
+			console.log('Socket.IO disconnected');
+		};
 
-    const handleWatchStarted = ({ folderPath }: { folderPath: string }) => {
-      console.log('Watch started for:', folderPath);
-      setIsWatcherActive(true);
-    };
+		const handleWatchStarted = ({ folderPath }: { folderPath: string }) => {
+			console.log('Watch started for:', folderPath);
+			setIsWatcherActive(true);
+		};
 
-    const handleWatchStopped = ({ folderPath }: { folderPath: string }) => {
-      console.log('Watch stopped for:', folderPath);
-      setIsWatcherActive(false);
-    };
+		const handleWatchStopped = ({ folderPath }: { folderPath: string }) => {
+			console.log('Watch stopped for:', folderPath);
+			setIsWatcherActive(false);
+		};
 
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    socket.on('watch-started', handleWatchStarted);
-    socket.on('watch-stopped', handleWatchStopped);
+		socket.on('connect', handleConnect);
+		socket.on('disconnect', handleDisconnect);
+		socket.on('watch-started', handleWatchStarted);
+		socket.on('watch-stopped', handleWatchStopped);
 
-    const handleFileAdded = ({ fileName, hasRating, folderPath }: { fileName: string; hasRating: boolean; folderPath: string }) => {
-      handleWatcherEvent({ type: 'added', fileName, hasRating }, folderPath);
-    };
+		const handleFileAdded = ({ fileName, hasRating, folderPath }: { fileName: string; hasRating: boolean; folderPath: string }) => {
+			handleWatcherEvent({ type: 'added', fileName, hasRating }, folderPath);
+		};
 
-    const handleFileChanged = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
-      handleWatcherEvent({ type: 'changed', fileName }, folderPath);
-    };
+		const handleFileChanged = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+			handleWatcherEvent({ type: 'changed', fileName }, folderPath);
+		};
 
-    const handleFileDeleted = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
-      handleWatcherEvent({ type: 'deleted', fileName }, folderPath);
-    };
+		const handleFileDeleted = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+			handleWatcherEvent({ type: 'deleted', fileName }, folderPath);
+		};
 
-    const handleWatcherError = ({ error, folderPath }: { error: string; folderPath: string }) => {
-      console.error(`Watcher error for folder ${folderPath}:`, error);
-    };
+		const handleWatcherError = ({ error, folderPath }: { error: string; folderPath: string }) => {
+			console.error(`Watcher error for folder ${folderPath}:`, error);
+		};
 
-    socket.on('file-added', handleFileAdded);
-    socket.on('file-changed', handleFileChanged);
-    socket.on('file-deleted', handleFileDeleted);
-    socket.on('watcher-error', handleWatcherError);
+		socket.on('file-added', handleFileAdded);
+		socket.on('file-changed', handleFileChanged);
+		socket.on('file-deleted', handleFileDeleted);
+		socket.on('watcher-error', handleWatcherError);
 
     // Handle display joined event - send current image
-    const handleDisplayJoined = () => {
-      console.log('Display joined, sending current image');
-      const currSessionId = sessionIdRef.current;
-      const currFolderPath = folderPathRef.current;
-      const currImageFiles = imageFilesRef.current;
-      const currActiveIndex = activeIndexRef.current;
+		const handleDisplayJoined = () => {
+			console.log('Display joined, sending current image');
+			const currSessionId = sessionIdRef.current;
+			const currFolderPath = folderPathRef.current;
+			const currImageFiles = imageFilesRef.current;
+			const currActiveIndex = activeIndexRef.current;
       
-      if (currSessionId && currFolderPath && currImageFiles.length > 0) {
-        const currentImage = currImageFiles[currActiveIndex];
-        if (currentImage && socket.connected) {
-          console.log('Sending image:', currentImage.fileName);
-          socket.emit('sync-image-to-display', {
-            sessionId: currSessionId,
-            folderPath: currFolderPath,
-            fileName: currentImage.fileName,
-          });
-        }
-      }
-    };
+			if(currSessionId && currFolderPath && currImageFiles.length > 0) {
+				const currentImage = currImageFiles[currActiveIndex];
+				if(currentImage && socket.connected) {
+					console.log('Sending image:', currentImage.fileName);
+					socket.emit('sync-image-to-display', {
+						sessionId: currSessionId,
+						folderPath: currFolderPath,
+						fileName: currentImage.fileName,
+					});
+				}
+			}
+		};
 
-    socket.on('display-joined', handleDisplayJoined);
+		socket.on('display-joined', handleDisplayJoined);
 
     // ShootAssist event handlers
-    const handleShootAssistStatus = ({ isRunning }: { isRunning: boolean }) => {
-      console.log('ShootAssist status:', isRunning);
-      setIsShootAssistRunning(isRunning);
-      if (!isRunning) {
-        setIsCapturing(false);
-        setCaptureProgress(null);
-      }
-    };
+		const handleShootAssistStatus = ({ isRunning }: { isRunning: boolean }) => {
+			console.log('ShootAssist status:', isRunning);
+			setIsShootAssistRunning(isRunning);
+			if(!isRunning) {
+				setIsCapturing(false);
+				setCaptureProgress(null);
+			}
+		};
 
-    const handleShootAssistReady = () => {
-      console.log('ShootAssist ready');
-      setIsShootAssistRunning(true);
-    };
+		const handleShootAssistReady = () => {
+			console.log('ShootAssist ready');
+			setIsShootAssistRunning(true);
+		};
 
-    const handleShootAssistStopped = () => {
-      console.log('ShootAssist stopped');
-      setIsShootAssistRunning(false);
-      setIsCapturing(false);
-      setCaptureProgress(null);
-    };
+		const handleShootAssistStopped = () => {
+			console.log('ShootAssist stopped');
+			setIsShootAssistRunning(false);
+			setIsCapturing(false);
+			setCaptureProgress(null);
+		};
 
-    const handleCaptureStarted = ({ total, interval }: { total: number; interval: number }) => {
-      console.log(`Capture started: ${total} shots, with interval of ${interval}ms`);
-      setIsCapturing(true);
-      setCaptureProgress({ current: 0, total, percentage: 0 });
-    };
+		const handleCaptureStarted = ({ total, interval }: { total: number; interval: number }) => {
+			console.log(`Capture started: ${total} shots, with interval of ${interval}ms`);
+			setIsCapturing(true);
+			setCaptureProgress({ current: 0, total, percentage: 0 });
+		};
 
-    const handleCaptureProgress = ({ current, total, percentage }: { current: number; total: number; percentage: number }) => {
-      console.log(`Capture progress: ${current} / ${total} (${percentage}%)`);
-      setCaptureProgress({ current, total, percentage });
-    };
+		const handleCaptureProgress = ({ current, total, percentage }: { current: number; total: number; percentage: number }) => {
+			console.log(`Capture progress: ${current} / ${total} (${percentage}%)`);
+			setCaptureProgress({ current, total, percentage });
+		};
 
-    const handleCaptureComplete = ({ total }: { total: number }) => {
-      console.log(`Capture complete: ${total} shots`);
-      setIsCapturing(false);
-      setCaptureProgress(null);
-    };
+		const handleCaptureComplete = ({ total }: { total: number }) => {
+			console.log(`Capture complete: ${total} shots`);
+			setIsCapturing(false);
+			setCaptureProgress(null);
+		};
     
-    const handleCaptureStopped = () => {
-      console.log('Capture stopped');
-      setIsCapturing(false);
-      setCaptureProgress(null);
-    };
+		const handleCaptureStopped = () => {
+			console.log('Capture stopped');
+			setIsCapturing(false);
+			setCaptureProgress(null);
+		};
 
-    const handleShootAssistError = ({ message }: { message: string }) => {
-      console.error('ShootAssist error:', message);
-      toast.error(`Camera error: ${message}`);
-    };
+		const handleShootAssistError = ({ message }: { message: string }) => {
+			console.error('ShootAssist error:', message);
+			toast.error(`Camera error: ${message}`);
+		};
 
-    socket.on('shoot-assist-status', handleShootAssistStatus);
-    socket.on('shoot-assist-ready', handleShootAssistReady);
-    socket.on('shoot-assist-stopped', handleShootAssistStopped);
-    socket.on('capture-started', handleCaptureStarted);
-    socket.on('capture-progress', handleCaptureProgress);
-    socket.on('capture-complete', handleCaptureComplete);
-    socket.on('capture-stopped', handleCaptureStopped);
-    socket.on('shoot-assist-error', handleShootAssistError);
+		socket.on('shoot-assist-status', handleShootAssistStatus);
+		socket.on('shoot-assist-ready', handleShootAssistReady);
+		socket.on('shoot-assist-stopped', handleShootAssistStopped);
+		socket.on('capture-started', handleCaptureStarted);
+		socket.on('capture-progress', handleCaptureProgress);
+		socket.on('capture-complete', handleCaptureComplete);
+		socket.on('capture-stopped', handleCaptureStopped);
+		socket.on('shoot-assist-error', handleShootAssistError);
 
     // If already connected, join viewer session
-    if (socket.connected && sessionIdRef.current) {
-      socket.emit('join-viewer-session', sessionIdRef.current);
-    }
+		if(socket.connected && sessionIdRef.current) {
+			socket.emit('join-viewer-session', sessionIdRef.current);
+		}
 
-    return () => {
+		return () => {
       // Remove only our listeners, don't disconnect the socket
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-      socket.off('watch-started', handleWatchStarted);
-      socket.off('watch-stopped', handleWatchStopped);
-      socket.off('file-added', handleFileAdded);
-      socket.off('file-changed', handleFileChanged);
-      socket.off('file-deleted', handleFileDeleted);
-      socket.off('watcher-error', handleWatcherError);
-      socket.off('display-joined', handleDisplayJoined);
-      socket.off('shoot-assist-status', handleShootAssistStatus);
-      socket.off('shoot-assist-ready', handleShootAssistReady);
-      socket.off('shoot-assist-stopped', handleShootAssistStopped);
-      socket.off('capture-started', handleCaptureStarted);
-      socket.off('capture-progress', handleCaptureProgress);
-      socket.off('capture-complete', handleCaptureComplete);
-      socket.off('capture-stopped', handleCaptureStopped);
-      socket.off('shoot-assist-error', handleShootAssistError);
-      if (sessionIdRef.current) {
-        socket.emit('leave-viewer-session', sessionIdRef.current);
-      }
-    };
-  }, []);
+			socket.off('connect', handleConnect);
+			socket.off('disconnect', handleDisconnect);
+			socket.off('watch-started', handleWatchStarted);
+			socket.off('watch-stopped', handleWatchStopped);
+			socket.off('file-added', handleFileAdded);
+			socket.off('file-changed', handleFileChanged);
+			socket.off('file-deleted', handleFileDeleted);
+			socket.off('watcher-error', handleWatcherError);
+			socket.off('display-joined', handleDisplayJoined);
+			socket.off('shoot-assist-status', handleShootAssistStatus);
+			socket.off('shoot-assist-ready', handleShootAssistReady);
+			socket.off('shoot-assist-stopped', handleShootAssistStopped);
+			socket.off('capture-started', handleCaptureStarted);
+			socket.off('capture-progress', handleCaptureProgress);
+			socket.off('capture-complete', handleCaptureComplete);
+			socket.off('capture-stopped', handleCaptureStopped);
+			socket.off('shoot-assist-error', handleShootAssistError);
+			if(sessionIdRef.current) {
+				socket.emit('leave-viewer-session', sessionIdRef.current);
+			}
+		};
+	}, []);
 
   // Synchronize current image to display page
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
-    if (!sessionId || !folderPath || imageFiles.length === 0) return;
+	useEffect(() => {
+		const socket = socketRef.current;
+		if(!socket || !socket.connected) {return;}
+		if(!sessionId || !folderPath || imageFiles.length === 0) {return;}
     
-    const currentImage = imageFiles[activeIndex];
-    if (!currentImage) return;
+		const currentImage = imageFiles[activeIndex];
+		if(!currentImage) {return;}
 
-    console.log('Syncing image to displays:', currentImage.fileName);
-    socket.emit('sync-image-to-display', {
-      sessionId,
-      folderPath,
-      fileName: currentImage.fileName,
-    });
-  }, [activeIndex, folderPath, imageFiles, sessionId]);
+		console.log('Syncing image to displays:', currentImage.fileName);
+		socket.emit('sync-image-to-display', {
+			sessionId,
+			folderPath,
+			fileName: currentImage.fileName,
+		});
+	}, [activeIndex, folderPath, imageFiles, sessionId]);
 
   // Load folder from localStorage on mount
-  useEffect(() => {
-    const activeFolder = localStorage.getItem('activeFolder');
-    if (activeFolder) {
-      loadFolder(activeFolder);
+	useEffect(() => {
+		const activeFolder = localStorage.getItem('activeFolder');
+		if(activeFolder) {
+			loadFolder(activeFolder);
 
-    } else {
-      router.push('/select-folder');
-    }
-  }, [router]);
+		} else {
+			router.push('/select-folder');
+		}
+	}, [router]);
 
-  const loadGroupFilters = useCallback(async (normalizedPath: string) => {
-    if (!normalizedPath) {
-      const emptyData = emptyGroupFilterData();
-      setAvailableGroups(emptyData.groups);
-      setGroupCounts(emptyData.groupCounts);
-      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
-      setSelectedGroupIds(new Set());
-      return;
-    }
+	const loadGroupFilters = useCallback(async(normalizedPath: string) => {
+		if(!normalizedPath) {
+			const emptyData = emptyGroupFilterData();
+			setAvailableGroups(emptyData.groups);
+			setGroupCounts(emptyData.groupCounts);
+			setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+			setSelectedGroupIds(new Set());
+			return;
+		}
 
-    try {
-      const groupFilterData = await fetchGroupFilterData(normalizedPath);
-      setAvailableGroups(groupFilterData.groups);
-      setGroupCounts(groupFilterData.groupCounts);
-      setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
-      setSelectedGroupIds((prev) => {
-        const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
-        return next.size === prev.size ? prev : next;
-      });
-    } catch (groupErr) {
-      console.error('Failed to load group filters:', groupErr);
-      const emptyData = emptyGroupFilterData();
-      setAvailableGroups(emptyData.groups);
-      setGroupCounts(emptyData.groupCounts);
-      setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
-      setSelectedGroupIds(new Set());
-    }
-  }, []);
+		try {
+			const groupFilterData = await fetchGroupFilterData(normalizedPath);
+			setAvailableGroups(groupFilterData.groups);
+			setGroupCounts(groupFilterData.groupCounts);
+			setImageGroupIdsByImageId(groupFilterData.imageGroupIdsByImageId);
+			setSelectedGroupIds((prev) => {
+				const next = sanitizeSelectedGroupIds(prev, groupFilterData.groups);
+				return next.size === prev.size ? prev : next;
+			});
+		} catch (groupErr) {
+			console.error('Failed to load group filters:', groupErr);
+			const emptyData = emptyGroupFilterData();
+			setAvailableGroups(emptyData.groups);
+			setGroupCounts(emptyData.groupCounts);
+			setImageGroupIdsByImageId(emptyData.imageGroupIdsByImageId);
+			setSelectedGroupIds(new Set());
+		}
+	}, []);
 
   // Load folder and images
-  async function loadFolder(path: string) {
-    setIsLoading(true);
-    setError(null);
+	async function loadFolder(path: string) {
+		setIsLoading(true);
+		setError(null);
 
-    try {
-      const normalizedPath = path.replace(/\//g, '\\');
-      const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
-      setFolderPath(normalizedPath);
+		try {
+			const normalizedPath = path.replace(/\//g, '\\');
+			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+			setFolderPath(normalizedPath);
 
       // Save to localStorage as activeFolder
-      localStorage.setItem('activeFolder', normalizedPath);
+			localStorage.setItem('activeFolder', normalizedPath);
 
       // Get the folder name from the path
-      const parts = normalizedPath.split('\\');
-      const lastPart = parts[parts.length - 1];
-      setFolderName(lastPart || normalizedPath);
+			const parts = normalizedPath.split('\\');
+			const lastPart = parts[parts.length - 1];
+			setFolderName(lastPart || normalizedPath);
 
       // Get list of files (thumbnails should already exist)
-      const startResponse = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
-      });
+			const startResponse = await fetch('/api/image', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ folderPath: normalizedPath, action: 'start' }),
+			});
 
-      if (!startResponse.ok) {
-        const errorData = await startResponse.json();
-        throw new Error(errorData.error || 'Could not load images');
-      }
+			if(!startResponse.ok) {
+				const errorData = await startResponse.json();
+				throw new Error(errorData.error || 'Could not load images');
+			}
 
-      const startData = await startResponse.json();
+			const startData = await startResponse.json();
 
       // Get files (can be empty array for empty folders)
-      const files = (startData.files || []) as string[];
+			const files = (startData.files || []) as string[];
 
       // Create ImageData objects
-      const imageData: ImageData[] = files.map((fileName) => {
-        const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
-        const encodedPath = encodeURIComponent(fileName);
-        return {
-          originalFile: null as any,
-          fileName: fileName,
-          thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
-          originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
-        };
-      });
+			const imageData: ImageData[] = files.map((fileName) => {
+				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
+				const encodedPath = encodeURIComponent(fileName);
+				return {
+					originalFile: null as any,
+					fileName: fileName,
+					thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+					originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(normalizedPath)}&fileName=${encodedPath}`,
+				};
+			});
 
-      setImageFiles(imageData);
+			setImageFiles(imageData);
 
       // Load batch EXIF data from localStorage and merge with database ratings
-      let batchExifData: any[] = [];
-      try {
-        const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
-        if (storedExifData) {
-          batchExifData = JSON.parse(storedExifData);
-        }
-      } catch (exifErr) {
-        console.error('Failed to load batch EXIF data:', exifErr);
-      }
+			let batchExifData: any[] = [];
+			try {
+				const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
+				if(storedExifData) {
+					batchExifData = JSON.parse(storedExifData);
+				}
+			} catch (exifErr) {
+				console.error('Failed to load batch EXIF data:', exifErr);
+			}
 
       // Fetch ratings for this folder
-      try {
-        const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
+			try {
+				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
 
-        if (ratingsResponse.ok) {
-          const ratingsData = await ratingsResponse.json();
-          if (ratingsData.success && ratingsData.ratings) {
-            const ratingsMap = new Map<string, any | null>();
-            for (const rating of ratingsData.ratings) {
-              ratingsMap.set(rating.id, rating);
-            }
+				if(ratingsResponse.ok) {
+					const ratingsData = await ratingsResponse.json();
+					if(ratingsData.success && ratingsData.ratings) {
+						const ratingsMap = new Map<string, any | null>();
+						for(const rating of ratingsData.ratings) {
+							ratingsMap.set(rating.id, rating);
+						}
 
             // Merge EXIF ratings with database ratings
             // EXIF ratings are used to pre-populate if there's no database rating
-            for (const exifFile of batchExifData) {
-              if (exifFile.FileName && exifFile.Rating != null) {
-                const fileId = getFileId(exifFile.FileName);
+						for(const exifFile of batchExifData) {
+							if(exifFile.FileName && exifFile.Rating != null) {
+								const fileId = getFileId(exifFile.FileName);
                 // Only pre-populate from EXIF if there's no database rating yet
-                if (!ratingsMap.has(fileId)) {
-                  ratingsMap.set(fileId, {
-                    id: fileId,
-                    rating: exifFile.Rating,
-                    overRuleFileRating: false,
-                    fromExif: true, // Mark as coming from EXIF for UI distinction
-                  });
-                }
-              }
-            }
+								if(!ratingsMap.has(fileId)) {
+									ratingsMap.set(fileId, {
+										id: fileId,
+										rating: exifFile.Rating,
+										overRuleFileRating: false,
+										fromExif: true, // Mark as coming from EXIF for UI distinction
+									});
+								}
+							}
+						}
 
-            setRatings(ratingsMap);
-          }
-        }
-      } catch (ratingErr) {
-        console.error('Failed to fetch ratings:', ratingErr);
-      }
+						setRatings(ratingsMap);
+					}
+				}
+			} catch (ratingErr) {
+				console.error('Failed to fetch ratings:', ratingErr);
+			}
 
-      await loadGroupFilters(normalizedPath);
+			await loadGroupFilters(normalizedPath);
 
-      setIsLoading(false);
+			setIsLoading(false);
 
       // Start folder watcher via Socket.IO
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('watch-folder', normalizedPath);
-      }
+			if(socketRef.current && socketRef.current.connected) {
+				socketRef.current.emit('watch-folder', normalizedPath);
+			}
 
-    } catch (e: any) {
-      console.error('Error:', e);
-      setError(e.message || "Could not load folder.");
-      setIsLoading(false);
-    }
-  }
+		} catch (e: any) {
+			console.error('Error:', e);
+			setError(e.message || 'Could not load folder.');
+			setIsLoading(false);
+		}
+	}
 
 
 
   // Handle watcher events
-  function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted'; fileName: string; hasRating?: boolean }, path: string) {
-    const normalizedThumbPath = `${path}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+	function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted'; fileName: string; hasRating?: boolean }, path: string) {
+		const normalizedThumbPath = `${path}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 
-    if (event.type === 'added') {
-      console.log('File added:', event.fileName);
+		if(event.type === 'added') {
+			console.log('File added:', event.fileName);
 
       // Check if file already exists
-      const exists = imageFiles.some(img => img.fileName === event.fileName);
-      if (exists) return;
+			const exists = imageFiles.some(img => img.fileName === event.fileName);
+			if(exists) {return;}
 
       // Add new image to the list
-      const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
-      const encodedPath = encodeURIComponent(event.fileName);
-      const newImage = {
-        originalFile: null as any,
-        fileName: event.fileName,
-        thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
-        originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}`,
-      };
+			const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+			const encodedPath = encodeURIComponent(event.fileName);
+			const newImage = {
+				originalFile: null as any,
+				fileName: event.fileName,
+				thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+				originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}`,
+			};
 
       // Update state and set new image as active
-      setImageFiles(prev => {
-        const newList = [...prev, newImage];
+			setImageFiles(prev => {
+				const newList = [...prev, newImage];
         // Use setTimeout to ensure activeIndex is set after state updates
-        setTimeout(() => {
-          setActiveIndex(newList.length - 1);
-        }, 0);
-        return newList;
-      });
+				setTimeout(() => {
+					setActiveIndex(newList.length - 1);
+				}, 0);
+				return newList;
+			});
 
       // Update ratings if file has rating
-      if (event.hasRating) {
-        fetchRatingForFile(event.fileName, path);
-      }
+			if(event.hasRating) {
+				fetchRatingForFile(event.fileName, path);
+			}
 
-    } else if (event.type === 'changed') {
-      console.log('File changed:', event.fileName);
+		} else if(event.type === 'changed') {
+			console.log('File changed:', event.fileName);
       // Force reload of the thumbnail by updating the path with a timestamp
-      setImageFiles(prev => prev.map(img => {
-        if (img.fileName === event.fileName) {
-          const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
-          const encodedPath = encodeURIComponent(event.fileName);
-          const timestamp = Date.now();
-          return {
-            ...img,
-            thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}&t=${timestamp}`,
-            originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}&t=${timestamp}`,
-          };
-        }
-        return img;
-      }));
+			setImageFiles(prev => prev.map(img => {
+				if(img.fileName === event.fileName) {
+					const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+					const encodedPath = encodeURIComponent(event.fileName);
+					const timestamp = Date.now();
+					return {
+						...img,
+						thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}&t=${timestamp}`,
+						originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}&t=${timestamp}`,
+					};
+				}
+				return img;
+			}));
 
-    } else if (event.type === 'deleted') {
-      console.log('File deleted:', event.fileName);
+		} else if(event.type === 'deleted') {
+			console.log('File deleted:', event.fileName);
       
       // Find the index of the deleted file
-      const deletedIndex = imageFiles.findIndex(img => img.fileName === event.fileName);
+			const deletedIndex = imageFiles.findIndex(img => img.fileName === event.fileName);
       
       // Remove from list
-      setImageFiles(prev => prev.filter(img => img.fileName !== event.fileName));
+			setImageFiles(prev => prev.filter(img => img.fileName !== event.fileName));
 
       // Adjust activeIndex if needed
-      if (deletedIndex !== -1) {
-        setActiveIndex(prev => {
-          if (deletedIndex === prev) {
+			if(deletedIndex !== -1) {
+				setActiveIndex(prev => {
+					if(deletedIndex === prev) {
             // The active image was deleted, show previous or stay at same position
-            return Math.max(0, Math.min(prev, imageFiles.length - 2));
-          } else if (deletedIndex < prev) {
+						return Math.max(0, Math.min(prev, imageFiles.length - 2));
+					} else if(deletedIndex < prev) {
             // An image before the active one was deleted, shift index down
-            return prev - 1;
-          }
+						return prev - 1;
+					}
           // deletedIndex > prev, no change needed
-          return prev;
-        });
-      }
-    }
-  }
+					return prev;
+				});
+			}
+		}
+	}
 
   // Fetch rating for a single file
-  async function fetchRatingForFile(fileName: string, path: string) {
-    try {
-      const response = await fetch(`/api/ratings?folderPath=${encodeURIComponent(path)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.ratings) {
-          const fileId = getFileId(fileName);
-          const rating = data.ratings.find((r: any) => r.id === fileId);
-          if (rating) {
-            setRatings(prev => {
-              const newMap = new Map(prev);
-              newMap.set(fileId, rating);
-              return newMap;
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch rating:', error);
-    }
-  }
+	async function fetchRatingForFile(fileName: string, path: string) {
+		try {
+			const response = await fetch(`/api/ratings?folderPath=${encodeURIComponent(path)}`);
+			if(response.ok) {
+				const data = await response.json();
+				if(data.success && data.ratings) {
+					const fileId = getFileId(fileName);
+					const rating = data.ratings.find((r: any) => r.id === fileId);
+					if(rating) {
+						setRatings(prev => {
+							const newMap = new Map(prev);
+							newMap.set(fileId, rating);
+							return newMap;
+						});
+					}
+				}
+			}
+		} catch (error) {
+			console.error('Failed to fetch rating:', error);
+		}
+	}
 
-  function getThumbnailFilename(filename: string): string {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1) return filename + '-thumb';
-    return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
-  }
+	function getThumbnailFilename(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return filename + '-thumb';}
+		return filename.substring(0, lastDot) + '-thumb' + filename.substring(lastDot);
+	}
 
-  function getFileId(filename: string): string {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1) return filename;
-    return filename.substring(0, lastDot);
-  }
+	function getFileId(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return filename;}
+		return filename.substring(0, lastDot);
+	}
 
-  const updateRatingInDatabase = useCallback(async (fileName: string, rating: number | null, overRuleFileRating = false) => {
-    try {
+	const updateRatingInDatabase = useCallback(async(fileName: string, rating: number | null, overRuleFileRating = false) => {
+		try {
 
-      const response = await fetch('/api/ratings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName,
-          rating,
-          folderPath,
-          overRuleFileRating,
-        }),
-      });
+			const response = await fetch('/api/ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName,
+					rating,
+					folderPath,
+					overRuleFileRating,
+				}),
+			});
 
-      if (response.ok) {
-        const fileId = getFileId(fileName);
-        setRatings(prev => {
-          const newMap = new Map(prev);
-          newMap.set(fileId, { id: fileName, rating, overRuleFileRating });
-          return newMap;
-        });
-      }
-    } catch (err) {
-      console.error('Failed to update rating:', err);
-    }
-  }, [folderPath]);
+			if(response.ok) {
+				const fileId = getFileId(fileName);
+				setRatings(prev => {
+					const newMap = new Map(prev);
+					newMap.set(fileId, { id: fileName, rating, overRuleFileRating });
+					return newMap;
+				});
+			}
+		} catch (err) {
+			console.error('Failed to update rating:', err);
+		}
+	}, [folderPath]);
 
-  const handleOpenWith = useCallback(async () => {
-    if (imageFiles.length === 0 || !folderPath) return;
+	const handleOpenWith = useCallback(async() => {
+		if(imageFiles.length === 0 || !folderPath) {return;}
 
-    const currentImage = imageFiles[activeIndex];
-    if (!currentImage) return;
+		const currentImage = imageFiles[activeIndex];
+		if(!currentImage) {return;}
 
-    const fullPath = `${folderPath}\\${currentImage.fileName}`;
+		const fullPath = `${folderPath}\\${currentImage.fileName}`;
 
-    try {
-      const response = await fetch('/api/open-with', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: fullPath }),
-      });
+		try {
+			const response = await fetch('/api/open-with', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ filePath: fullPath }),
+			});
 
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to open with dialog:', error);
-      }
-    } catch (err) {
-      console.error('Failed to open with dialog:', err);
-    }
-  }, [imageFiles, activeIndex, folderPath]);
+			if(!response.ok) {
+				const error = await response.json();
+				console.error('Failed to open with dialog:', error);
+			}
+		} catch (err) {
+			console.error('Failed to open with dialog:', err);
+		}
+	}, [imageFiles, activeIndex, folderPath]);
 
-  const handleRatingClick = useCallback((rating: number | null) => {
-    if (imageFiles.length === 0) return;
+	const handleRatingClick = useCallback((rating: number | null) => {
+		if(imageFiles.length === 0) {return;}
 
-    const currentImage = imageFiles[activeIndex];
-    if (!currentImage) return;
+		const currentImage = imageFiles[activeIndex];
+		if(!currentImage) {return;}
 
-    const exifRating = exifData?.Rating;
-    const hasExifRating = exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5;
-    const fileId = getFileId(currentImage.fileName);
-    const currentDbRating = ratings.get(fileId)?.rating ?? null;
+		const exifRating = exifData?.Rating;
+		const hasExifRating = exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5;
+		const fileId = getFileId(currentImage.fileName);
+		const currentDbRating = ratings.get(fileId)?.rating ?? null;
 
     // If no EXIF rating: save to database
-    if (!hasExifRating) {
-      updateRatingInDatabase(currentImage.fileName, rating);
-      return;
-    }
+		if(!hasExifRating) {
+			updateRatingInDatabase(currentImage.fileName, rating);
+			return;
+		}
 
     // Conflict exists only if file has EXIF rating AND database rating differs
-    const hasConflict = currentDbRating !== null && exifRating !== currentDbRating;
+		const hasConflict = currentDbRating !== null && exifRating !== currentDbRating;
 
-    if (hasConflict) {
+		if(hasConflict) {
       // Show conflict modal if there's a mismatch between file and database
-      setRatingConflictData({
-        fileName: currentImage.fileName,
-        exifRating,
-        dbRating: currentDbRating,
-        newRating: rating,
-      });
-      setIsRatingConflictModalOpen(true);
-      return;
-    }
+			setRatingConflictData({
+				fileName: currentImage.fileName,
+				exifRating,
+				dbRating: currentDbRating,
+				newRating: rating,
+			});
+			setIsRatingConflictModalOpen(true);
+			return;
+		}
 
     // No conflict: save to database
-    updateRatingInDatabase(currentImage.fileName, rating);
-  }, [imageFiles, activeIndex, exifData, ratings, updateRatingInDatabase]);
+		updateRatingInDatabase(currentImage.fileName, rating);
+	}, [imageFiles, activeIndex, exifData, ratings, updateRatingInDatabase]);
 
-  function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    if (el.scrollWidth <= el.clientWidth) return;
+	function handleFilmstripWheel(e: WheelEvent<HTMLDivElement>) {
+		const el = e.currentTarget;
+		if(el.scrollWidth <= el.clientWidth) {return;}
 
-    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    if (delta === 0) return;
+		const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+		if(delta === 0) {return;}
 
-    const step = Math.round(window.innerWidth * 0.6);
-    const direction = delta > 0 ? 1 : -1;
+		const step = Math.round(window.innerWidth * 0.6);
+		const direction = delta > 0 ? 1 : -1;
 
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
-  }
+		el.scrollBy({ left: direction * step, behavior: 'smooth' });
+	}
 
-  function handleFilmstripPointerDown(e: PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+	function handleFilmstripPointerDown(e: PointerEvent<HTMLDivElement>) {
+		if(e.pointerType === 'mouse' && e.button !== 0) {return;}
 
-    const el = e.currentTarget;
-    isFilmstripDraggingRef.current = true;
-    setIsFilmstripDragging(true);
-    filmstripDragStartXRef.current = e.clientX;
-    filmstripStartScrollLeftRef.current = el.scrollLeft;
-  }
+		const el = e.currentTarget;
+		isFilmstripDraggingRef.current = true;
+		setIsFilmstripDragging(true);
+		filmstripDragStartXRef.current = e.clientX;
+		filmstripStartScrollLeftRef.current = el.scrollLeft;
+	}
 
-  function handleFilmstripPointerMove(e: PointerEvent<HTMLDivElement>) {
-    if (!isFilmstripDraggingRef.current) return;
+	function handleFilmstripPointerMove(e: PointerEvent<HTMLDivElement>) {
+		if(!isFilmstripDraggingRef.current) {return;}
 
-    const el = e.currentTarget;
-    const deltaX = e.clientX - filmstripDragStartXRef.current;
-    el.scrollLeft = filmstripStartScrollLeftRef.current - (deltaX * 4);
-  }
+		const el = e.currentTarget;
+		const deltaX = e.clientX - filmstripDragStartXRef.current;
+		el.scrollLeft = filmstripStartScrollLeftRef.current - (deltaX * 4);
+	}
   
 /* eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars */
-  function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
-    if (!isFilmstripDraggingRef.current) return;
+	function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
+		if(!isFilmstripDraggingRef.current) {return;}
 
-    isFilmstripDraggingRef.current = false;
-    setIsFilmstripDragging(false);
-  }
+		isFilmstripDraggingRef.current = false;
+		setIsFilmstripDragging(false);
+	}
 
-  function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
+	function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
   // Left mouse button + zoomed in = pan mode
-    if (zoomLevel > 100 && e.button === 0) {
-      panStartXRef.current = e.clientX;
-      panStartYRef.current = e.clientY;
-      isMainImageSwipingRef.current = false;
-    }
+		if(zoomLevel > 100 && e.button === 0) {
+			panStartXRef.current = e.clientX;
+			panStartYRef.current = e.clientY;
+			isMainImageSwipingRef.current = false;
+		}
 
     // Cancel any pending timeout from previous swipe
-    if (swipeButtonTimeoutRef.current) {
-      clearTimeout(swipeButtonTimeoutRef.current);
-      swipeButtonTimeoutRef.current = null;
-    }
+		if(swipeButtonTimeoutRef.current) {
+			clearTimeout(swipeButtonTimeoutRef.current);
+			swipeButtonTimeoutRef.current = null;
+		}
 
-    isMainImageSwipingRef.current = true;
-    mainImageStartXRef.current = e.clientX;
-    mainImageStartYRef.current = e.clientY;
-    mainImageSwipeTriggeredRef.current = false;
-    setIsSwipingActive(true);
-    setIsMainImageDragging(true);
-  }
+		isMainImageSwipingRef.current = true;
+		mainImageStartXRef.current = e.clientX;
+		mainImageStartYRef.current = e.clientY;
+		mainImageSwipeTriggeredRef.current = false;
+		setIsSwipingActive(true);
+		setIsMainImageDragging(true);
+	}
 
-  function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
-    if (!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || filteredImageFiles.length === 0) return;
+	function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
+		if(!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || filteredImageFiles.length === 0) {return;}
 
   // Don't trigger navigation swipe when zoomed in
-    if (zoomLevel > 100 && (e.buttons & 1) ) {
-      pan(e);
-      return
+		if(zoomLevel > 100 && (e.buttons & 1) ) {
+			pan(e);
+			return;
       
-    } else {
-      const deltaX = e.clientX - mainImageStartXRef.current;
-      const deltaY = e.clientY - mainImageStartYRef.current;
+		}
+		const deltaX = e.clientX - mainImageStartXRef.current;
+		const deltaY = e.clientY - mainImageStartYRef.current;
 
-      if (e.pointerType === 'mouse' && Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) return;
-      if (e.pointerType === 'mouse' && Math.abs(deltaX) <= Math.abs(deltaY)) return;
+		if(e.pointerType === 'mouse' && Math.abs(deltaX) < MAIN_IMAGE_SWIPE_THRESHOLD) {return;}
+		if(e.pointerType === 'mouse' && Math.abs(deltaX) <= Math.abs(deltaY)) {return;}
 
-      const currentIdx = filteredImageFiles.findIndex(
-        img => img.fileName === imageFiles[activeIndex]?.fileName
-      );
+		const currentIdx = filteredImageFiles.findIndex(
+			img => img.fileName === imageFiles[activeIndex]?.fileName
+		);
 
     // Swipe left = next image, image goes left1
-      if (deltaX < 0 && currentIdx < filteredImageFiles.length - 1) {
-        const nextImg = filteredImageFiles[currentIdx + 1];
-        setSwipeDirection('left');
-        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+		if(deltaX < 0 && currentIdx < filteredImageFiles.length - 1) {
+			const nextImg = filteredImageFiles[currentIdx + 1];
+			setSwipeDirection('left');
+			setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
         
     // Swipe right = previous image, image goes right
-      } else if (deltaX > 0 && currentIdx > 0) {
-        const prevImg = filteredImageFiles[currentIdx - 1];
-        setSwipeDirection('right');
-        setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
-      }
+		} else if(deltaX > 0 && currentIdx > 0) {
+			const prevImg = filteredImageFiles[currentIdx - 1];
+			setSwipeDirection('right');
+			setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
+		}
 
-      mainImageSwipeTriggeredRef.current = true;
-      isMainImageSwipingRef.current = false;
+		mainImageSwipeTriggeredRef.current = true;
+		isMainImageSwipingRef.current = false;
       
-    }
+		
     
-  }
+	}
 
-  function handleMainImagePointerUp() {
-    isMainImageSwipingRef.current = false;
-    mainImageSwipeTriggeredRef.current = false;
-    setIsMainImageDragging(false);
+	function handleMainImagePointerUp() {
+		isMainImageSwipingRef.current = false;
+		mainImageSwipeTriggeredRef.current = false;
+		setIsMainImageDragging(false);
 
     // Show buttons after 1600ms
-    if (swipeButtonTimeoutRef.current) {
-      clearTimeout(swipeButtonTimeoutRef.current);
-    }
-    swipeButtonTimeoutRef.current = setTimeout(() => {
-      setIsSwipingActive(false);
-      swipeButtonTimeoutRef.current = null;
-    }, 1600);
-  }
+		if(swipeButtonTimeoutRef.current) {
+			clearTimeout(swipeButtonTimeoutRef.current);
+		}
+		swipeButtonTimeoutRef.current = setTimeout(() => {
+			setIsSwipingActive(false);
+			swipeButtonTimeoutRef.current = null;
+		}, 1600);
+	}
 
-  function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
-    if (zoomLevel === 100 && e.deltaY > 0) return; // Don't zoom out below 100%
+	function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
+		if(zoomLevel === 100 && e.deltaY > 0) {return;} // Don't zoom out below 100%
 
     //e.preventDefault();
 
-    const zoomStep = 20;
-    const newZoom = Math.max(100, Math.min(maxZoom, zoomLevel - (e.deltaY > 0 ? zoomStep : -zoomStep)));
+		const zoomStep = 20;
+		const newZoom = Math.max(100, Math.min(maxZoom, zoomLevel - (e.deltaY > 0 ? zoomStep : -zoomStep)));
 
-    if (newZoom === zoomLevel) return;
+		if(newZoom === zoomLevel) {return;}
 
     // Reset pan when zooming back to 100%
-    if (newZoom === 100) {
-      setZoomLevel(100);
-      setPanX(0);
-      setPanY(0);
-    } else {
-      setZoomLevel(newZoom);
-    }
-  }
+		if(newZoom === 100) {
+			setZoomLevel(100);
+			setPanX(0);
+			setPanY(0);
+		} else {
+			setZoomLevel(newZoom);
+		}
+	}
 
-  function getDistance(p1: React.Touch, p2: React.Touch): number {
-    const dx = p1.clientX - p2.clientX;
-    const dy = p1.clientY - p2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
+	function getDistance(p1: React.Touch, p2: React.Touch): number {
+		const dx = p1.clientX - p2.clientX;
+		const dy = p1.clientY - p2.clientY;
+		return Math.sqrt(dx * dx + dy * dy);
+	}
 
-  function handleTouchStart(e: React.TouchEvent<HTMLImageElement>) {
-    if (e.touches.length === 2) {
-      const dist = getDistance(e.touches[0], e.touches[1]);
-      touchPinchRef.current = { distance: dist, startZoom: zoomLevel };
-    }
-  }
+	function handleTouchStart(e: React.TouchEvent<HTMLImageElement>) {
+		if(e.touches.length === 2) {
+			const dist = getDistance(e.touches[0], e.touches[1]);
+			touchPinchRef.current = { distance: dist, startZoom: zoomLevel };
+		}
+	}
 
-  function handleTouchMove(e: React.TouchEvent<HTMLImageElement>) {
-    if (e.touches.length === 2) {
-      const dist = getDistance(e.touches[0], e.touches[1]);
-      const delta = dist / touchPinchRef.current.distance;
-      const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom * delta));
+	function handleTouchMove(e: React.TouchEvent<HTMLImageElement>) {
+		if(e.touches.length === 2) {
+			const dist = getDistance(e.touches[0], e.touches[1]);
+			const delta = dist / touchPinchRef.current.distance;
+			const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom * delta));
       
-      if (newZoom !== zoomLevel) {
-        if (newZoom === 100) {
-          setZoomLevel(100);
-          setPanX(0);
-          setPanY(0);
-        } else {
-          setZoomLevel(newZoom);
-        }
-      }
-    }
-  }
+			if(newZoom !== zoomLevel) {
+				if(newZoom === 100) {
+					setZoomLevel(100);
+					setPanX(0);
+					setPanY(0);
+				} else {
+					setZoomLevel(newZoom);
+				}
+			}
+		}
+	}
 
-  function pan(e: React.PointerEvent<HTMLImageElement>) {
-    const deltaX = (e.clientX - panStartXRef.current) * pinchFactor;
-    const deltaY = (e.clientY - panStartYRef.current) * pinchFactor;
+	function pan(e: React.PointerEvent<HTMLImageElement>) {
+		const deltaX = (e.clientX - panStartXRef.current) * pinchFactor;
+		const deltaY = (e.clientY - panStartYRef.current) * pinchFactor;
     
-    const zoomFactor = zoomLevel / 100;
-    const container = document.querySelector('.main-image-container');
+		const zoomFactor = zoomLevel / 100;
+		const container = document.querySelector('.main-image-container');
 
-    if (!container) return;
+		if(!container) {return;}
 
     // Adjust for zoom level to make movement feel natural
-    const moveX = deltaX / zoomFactor;
-    const moveY = deltaY / zoomFactor;
+		const moveX = deltaX / zoomFactor;
+		const moveY = deltaY / zoomFactor;
 
-    const maxPanX = ((e.currentTarget.clientWidth * zoomFactor - container.clientWidth) / 2) / zoomFactor;
-    const maxPanY = ((e.currentTarget.clientHeight * zoomFactor - container.clientHeight) / 2) / zoomFactor;
+		const maxPanX = ((e.currentTarget.clientWidth * zoomFactor - container.clientWidth) / 2) / zoomFactor;
+		const maxPanY = ((e.currentTarget.clientHeight * zoomFactor - container.clientHeight) / 2) / zoomFactor;
 
-    const newPanX = e.currentTarget.clientWidth * zoomFactor < container.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + moveX));
-    const newPanY = e.currentTarget.clientHeight * zoomFactor < container.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + moveY));
+		const newPanX = e.currentTarget.clientWidth * zoomFactor < container.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + moveX));
+		const newPanY = e.currentTarget.clientHeight * zoomFactor < container.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + moveY));
 
-    setPanX(newPanX);
-    setPanY(newPanY);
+		setPanX(newPanX);
+		setPanY(newPanY);
 
-    panStartXRef.current = e.clientX;
-    panStartYRef.current = e.clientY;
-  }
+		panStartXRef.current = e.clientX;
+		panStartYRef.current = e.clientY;
+	}
 
   // Reset swipe animation after it completes
-  useEffect(() => {
-    if (swipeDirection !== null) {
-      const timer = setTimeout(() => {
-        setSwipeDirection(null);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [swipeDirection]);
+	useEffect(() => {
+		if(swipeDirection !== null) {
+			const timer = setTimeout(() => {
+				setSwipeDirection(null);
+			}, 200);
+			return () => clearTimeout(timer);
+		}
+	}, [swipeDirection]);
 
   // Load last active index for this folder from localStorage
-  useEffect(() => {
-    const lsActiveIndex = localStorage.getItem('activeIndices');
-    if (lsActiveIndex) {
-      try {
-        const activeIndices = JSON.parse(lsActiveIndex);
-        if (folderPath in activeIndices) {
-          const index = !isNaN(Number(activeIndices[folderPath])) ? Number(activeIndices[folderPath]) : 0;
-          setActiveIndex(index);
-        }
-      } catch (e) {
-        console.error('Failed to load last index:', e);
-      }
-    }
-  }, [folderPath]);
+	useEffect(() => {
+		const lsActiveIndex = localStorage.getItem('activeIndices');
+		if(lsActiveIndex) {
+			try {
+				const activeIndices = JSON.parse(lsActiveIndex);
+				if(folderPath in activeIndices) {
+					const index = !isNaN(Number(activeIndices[folderPath])) ? Number(activeIndices[folderPath]) : 0;
+					setActiveIndex(index);
+				}
+			} catch (e) {
+				console.error('Failed to load last index:', e);
+			}
+		}
+	}, [folderPath]);
 
   // Persist activeIndex per folderPath to localStorage
-  useEffect(() => {
-    if (!folderPath) return;
-    try {
-      const stored = localStorage.getItem('activeIndices');
-      const activeIndices = stored ? JSON.parse(stored) : {};
-      activeIndices[folderPath] = activeIndex;
-      localStorage.setItem('activeIndices', JSON.stringify(activeIndices));
-    } catch (e) {
-      console.error('Failed to save active index:', e);
-    }
-  }, [activeIndex, folderPath]);
+	useEffect(() => {
+		if(!folderPath) {return;}
+		try {
+			const stored = localStorage.getItem('activeIndices');
+			const activeIndices = stored ? JSON.parse(stored) : {};
+			activeIndices[folderPath] = activeIndex;
+			localStorage.setItem('activeIndices', JSON.stringify(activeIndices));
+		} catch (e) {
+			console.error('Failed to save active index:', e);
+		}
+	}, [activeIndex, folderPath]);
 
   // Keyboard navigation and rating
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
+	useEffect(() => {
+		function handleKeyDown(e: KeyboardEvent) {
       
-       if (isCameraControlModalOpen) return;
+			if(isCameraControlModalOpen) {return;}
       
-      if (e.key === "F11") {
-        e.preventDefault();
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch((err) => {
-            console.error(`Error attempting to enable fullscreen mode: ${err.message}`);
-          });
-        } else {
-          if (document.exitFullscreen) document.exitFullscreen();
-        }
-        return;
-      }
+			if(e.key === 'F11') {
+				e.preventDefault();
+				if(!document.fullscreenElement) {
+					document.documentElement.requestFullscreen().catch((err) => {
+						console.error(`Error attempting to enable fullscreen mode: ${err.message}`);
+					});
+				} else if(document.exitFullscreen) {document.exitFullscreen();}
+				return;
+			}
 
-      if (filteredImageFiles.length === 0 || zoomLevel > 100) return;
+			if(filteredImageFiles.length === 0 || zoomLevel > 100) {return;}
 
-      switch (e.key) {
-        case "ArrowLeft": {
-          const currentIdx = filteredImageFiles.findIndex(
-            img => img.fileName === imageFiles[activeIndex]?.fileName
-          );
-          if (currentIdx > 0) {
-            const prevImg = filteredImageFiles[currentIdx - 1];
-            setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
-          }
-          break;
-        }
-        case "ArrowRight": {
-          const currentIdx = filteredImageFiles.findIndex(
-            img => img.fileName === imageFiles[activeIndex]?.fileName
-          );
-          if (currentIdx < filteredImageFiles.length - 1) {
-            const nextImg = filteredImageFiles[currentIdx + 1];
-            setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
-          }
-          break;
-        }
-        case "0":
-          handleRatingClick(null);
-          break;
-        case "1":
-          handleRatingClick(1);
-          break;
-        case "2":
-          handleRatingClick(2);
-          break;
-        case "3":
-          handleRatingClick(3);
-          break;
-        case "4":
-          handleRatingClick(4);
-          break;
-        case "5":
-          handleRatingClick(5);
-          break;
-        case "Delete":
-        case "Backspace":
-          handleRatingClick(1);
-          break;
-        default: break;
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen]);
+			switch(e.key) {
+				case 'ArrowLeft': {
+					const currentIdx = filteredImageFiles.findIndex(
+						img => img.fileName === imageFiles[activeIndex]?.fileName
+					);
+					if(currentIdx > 0) {
+						const prevImg = filteredImageFiles[currentIdx - 1];
+						setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
+					}
+					break;
+				}
+				case 'ArrowRight': {
+					const currentIdx = filteredImageFiles.findIndex(
+						img => img.fileName === imageFiles[activeIndex]?.fileName
+					);
+					if(currentIdx < filteredImageFiles.length - 1) {
+						const nextImg = filteredImageFiles[currentIdx + 1];
+						setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+					}
+					break;
+				}
+				case '0':
+					handleRatingClick(null);
+					break;
+				case '1':
+					handleRatingClick(1);
+					break;
+				case '2':
+					handleRatingClick(2);
+					break;
+				case '3':
+					handleRatingClick(3);
+					break;
+				case '4':
+					handleRatingClick(4);
+					break;
+				case '5':
+					handleRatingClick(5);
+					break;
+				case 'Delete':
+				case 'Backspace':
+					handleRatingClick(1);
+					break;
+				default: break;
+			}
+		}
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen]);
 
   // Reset zoom and pan when changing photos
-  useEffect(() => {
-    setZoomLevel(100);
-    setPanX(0);
-    setPanY(0);
-  }, [activeIndex]);
+	useEffect(() => {
+		setZoomLevel(100);
+		setPanX(0);
+		setPanY(0);
+	}, [activeIndex]);
 
   // Fetch EXIF data when active image changes
-  useEffect(() => {
-    if (imageFiles.length === 0 || !folderPath) {
-      setExifData(null);
-      setExifError(null);
-      setIsExifLoading(false);
-      return;
-    }
+	useEffect(() => {
+		if(imageFiles.length === 0 || !folderPath) {
+			setExifData(null);
+			setExifError(null);
+			setIsExifLoading(false);
+			return;
+		}
 
-    const currentImage = imageFiles[activeIndex];
-    if (!currentImage) return;
+		const currentImage = imageFiles[activeIndex];
+		if(!currentImage) {return;}
 
-    let canceled = false;
-    setIsExifLoading(true);
-    setExifError(null);
-    setExifData(null);
+		let canceled = false;
+		setIsExifLoading(true);
+		setExifError(null);
+		setExifData(null);
 
-    async function fetchExifData() {
-      try {
-        const response = await fetch('/api/exif', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folderPath,
-            fileName: currentImage.fileName,
-          }),
-        });
+		async function fetchExifData() {
+			try {
+				const response = await fetch('/api/exif', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						folderPath,
+						fileName: currentImage.fileName,
+					}),
+				});
 
-        if (!response.ok) {
-          const error = await response.json();
-          if (!canceled) {
-            setExifError(error?.error || 'No EXIF data found');
-          }
-          return;
-        }
-        const data = await response.json();
+				if(!response.ok) {
+					const error = await response.json();
+					if(!canceled) {
+						setExifError(error?.error || 'No EXIF data found');
+					}
+					return;
+				}
+				const data = await response.json();
 
-        if (!canceled) {
-          const exifData = data?.exifData ?? null;
-          setExifData(exifData);
+				if(!canceled) {
+					const exifData = data?.exifData ?? null;
+					setExifData(exifData);
 
           // Compare EXIF rating with database rating
-          if (exifData) {
-            const exifRating = exifData?.Rating;
-            const fileId = getFileId(currentImage.fileName);
-            const dbRating = ratings.get(fileId) ?? null;
+					if(exifData) {
+						const exifRating = exifData?.Rating;
+						const fileId = getFileId(currentImage.fileName);
+						const dbRating = ratings.get(fileId) ?? null;
 
-            console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);
+						console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);
 
             // Only process if EXIF has a valid rating (1-5)
-            if (exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
+						if(exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
               // EXIF has rating, database doesn't → add to database
-              if ((dbRating?.rating === null || dbRating?.rating === undefined) && !dbRating?.overRuleFileRating) {
-                await updateRatingInDatabase(currentImage.fileName, exifRating);
-              }
+							if((dbRating?.rating === null || dbRating?.rating === undefined) && !dbRating?.overRuleFileRating) {
+								await updateRatingInDatabase(currentImage.fileName, exifRating);
+							}
               // EXIF rating differs from database → show modal
-              else if (exifRating !== dbRating?.rating && !dbRating?.overRuleFileRating) {
-                setRatingConflictData({
-                  fileName: currentImage.fileName,
-                  exifRating,
-                  dbRating: dbRating?.rating,
-                  newRating: null,
-                });
-                setIsRatingConflictModalOpen(true);
-              }
+							else if(exifRating !== dbRating?.rating && !dbRating?.overRuleFileRating) {
+								setRatingConflictData({
+									fileName: currentImage.fileName,
+									exifRating,
+									dbRating: dbRating?.rating,
+									newRating: null,
+								});
+								setIsRatingConflictModalOpen(true);
+							}
               // Else: ratings match, do nothing
-            }
-          }
-        }
-      } catch (err) {
-        if (!canceled) {
-          setExifError(err instanceof Error ? err.message : 'Could not retrieve EXIF data');
-        }
-      } finally {
-        if (!canceled) {
-          setIsExifLoading(false);
-        }
-      }
-    }
+						}
+					}
+				}
+			} catch (err) {
+				if(!canceled) {
+					setExifError(err instanceof Error ? err.message : 'Could not retrieve EXIF data');
+				}
+			} finally {
+				if(!canceled) {
+					setIsExifLoading(false);
+				}
+			}
+		}
 
-    fetchExifData();
-    return () => {
-      canceled = true;
-    };
-  }, [activeIndex, imageFiles, folderPath, ratings]);
+		fetchExifData();
+		return () => {
+			canceled = true;
+		};
+	}, [activeIndex, imageFiles, folderPath, ratings]);
 
 
-  const handleCopyDisplayUrl = useCallback(() => {
-    if (!sessionId) return;
+	const handleCopyDisplayUrl = useCallback(() => {
+		if(!sessionId) {return;}
     
-    const displayUrl = `${window.location.origin}/display?session=${sessionId}`;
-    navigator.clipboard.writeText(displayUrl).then(() => {
-      toast.success('Display URL copied to clipboard!');
-    }).catch(err => {
-      console.error('Failed to copy URL:', err);
-      toast.error(`Failed to copy URL: ${displayUrl}`);
-    });
-  }, [sessionId]);
+		const displayUrl = `${window.location.origin}/display?session=${sessionId}`;
+		navigator.clipboard.writeText(displayUrl).then(() => {
+			toast.success('Display URL copied to clipboard!');
+		}).catch(err => {
+			console.error('Failed to copy URL:', err);
+			toast.error(`Failed to copy URL: ${displayUrl}`);
+		});
+	}, [sessionId]);
 
   // Camera Control (ShootAssist) handlers
-  const handleStartShootAssist = useCallback(async () => {
-    try {
-      const response = await fetch('/api/shoot-assist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' }),
-      });
+	const handleStartShootAssist = useCallback(async() => {
+		try {
+			const response = await fetch('/api/shoot-assist', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'start' }),
+			});
 
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(`Failed to start ShootAssist: ${error.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Failed to start ShootAssist:', err);
-      toast.error(`Failed to start ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }, []);
+			if(!response.ok) {
+				const error = await response.json();
+				toast.error(`Failed to start ShootAssist: ${error.error || 'Unknown error'}`);
+			}
+		} catch (err) {
+			console.error('Failed to start ShootAssist:', err);
+			toast.error(`Failed to start ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+		}
+	}, []);
 
-  const handleStopShootAssist = useCallback(async () => {
-    try {
-      const response = await fetch('/api/shoot-assist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop' }),
-      });
+	const handleStopShootAssist = useCallback(async() => {
+		try {
+			const response = await fetch('/api/shoot-assist', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'stop' }),
+			});
 
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(`Failed to stop ShootAssist: ${error.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Failed to stop ShootAssist:', err);
-      toast.error(`Failed to stop ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }, []);
+			if(!response.ok) {
+				const error = await response.json();
+				toast.error(`Failed to stop ShootAssist: ${error.error || 'Unknown error'}`);
+			}
+		} catch (err) {
+			console.error('Failed to stop ShootAssist:', err);
+			toast.error(`Failed to stop ShootAssist: ${err instanceof Error ? err.message : 'Unknown error'}`);
+		}
+	}, []);
 
-  const handleStartCapture = useCallback(async (shots: number, interval: number) => {
-    if (!folderPath) {
-      toast.error('No folder selected. Please select a folder first.');
-      return;
-    }
+	const handleStartCapture = useCallback(async(shots: number, interval: number) => {
+		if(!folderPath) {
+			toast.error('No folder selected. Please select a folder first.');
+			return;
+		}
 
-    try {
-      const response = await fetch('/api/capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'start', 
-          shots, 
-          interval,
-          path: folderPath,
-        }),
-      });
+		try {
+			const response = await fetch('/api/capture', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'start',
+					shots,
+					interval,
+					path: folderPath,
+				}),
+			});
 
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(`Failed to start capture: ${error.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Failed to start capture:', err);
-      toast.error(`Failed to start capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }, [folderPath]);
+			if(!response.ok) {
+				const error = await response.json();
+				toast.error(`Failed to start capture: ${error.error || 'Unknown error'}`);
+			}
+		} catch (err) {
+			console.error('Failed to start capture:', err);
+			toast.error(`Failed to start capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+		}
+	}, [folderPath]);
 
-  const handleStopCapture = useCallback(async () => {
-    try {
-      const response = await fetch('/api/capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop' }),
-      });
+	const handleStopCapture = useCallback(async() => {
+		try {
+			const response = await fetch('/api/capture', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'stop' }),
+			});
 
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(`Failed to stop capture: ${error.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Failed to stop capture:', err);
-      toast.error(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }, []);
+			if(!response.ok) {
+				const error = await response.json();
+				toast.error(`Failed to stop capture: ${error.error || 'Unknown error'}`);
+			}
+		} catch (err) {
+			console.error('Failed to stop capture:', err);
+			toast.error(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+		}
+	}, []);
 
-  return (
-    <div className="flex min-h-screen flex-col bg-black font-sans">
-      <main className="flex-1 flex flex-col items-center justify-center w-full">
-        {isLoading ? (
+	return (
+		<div className="flex min-h-screen flex-col bg-black font-sans">
+			<main className="flex-1 flex flex-col items-center justify-center w-full">
+				{isLoading ? (
           // Loading state
-          <div className="flex flex-col items-center gap-6 p-8">
-            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <div className="text-zinc-400 text-sm">Loading images...</div>
-          </div>
-        ) : error ? (
+					<div className="flex flex-col items-center gap-6 p-8">
+						<div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+						<div className="text-zinc-400 text-sm">Loading images...</div>
+					</div>
+				) : error ? (
           // Error state
-          <div className="flex flex-col items-center gap-6 p-8">
-            <div className="text-red-500 text-lg">{error}</div>
-            <button
-              className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition flex gap-2 items-center"
-              onClick={() => router.push('/select-folder')}
-            >
-              <Icon name="arrow_back" /> Choose another folder
-            </button>
-          </div>
-        ) : imageFiles.length > 0 ? (
-          <div className="flex flex-col w-full h-screen">
-            <Header 
-              folderName={folderName}
-              title={imageFiles[activeIndex]?.fileName}
-              isFullscreen={isFullscreen}
-              onCameraControlClick={() => setIsCameraControlModalOpen(true)}
-              onStopCapture={handleStopCapture}
-            >
-              <button
-                className="header-button"
-                onClick={handleCopyDisplayUrl}
-                title="Copy display URL to clipboard"
-              >
-                <Icon name="link" />
-              </button>
-              <button
-                className="header-button"
-                onClick={handleOpenWith}
-                title="Open with default application"
-              >
-                <Icon name="open_in_new" />
-              </button>
-              <button
-                className="header-button"
-                onClick={() => {
-                  void loadGroupFilters(folderPath);
-                  setIsFilterModalOpen(true);
-                }}
-                title="Filter images by rating"
-              >
-                <Icon name="filter_list" />
-              </button>
-              <button
-                className={`header-button ${isExifOpen ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"}`}
-                onClick={() => setIsExifOpen((open) => !open)}
-              >
-                <Icon name="info" />
-              </button>
-              <div className="text-zinc-400 text-sm">{filteredImageFiles.length}/{imageFiles.length} images</div>
-            </Header>
+					<div className="flex flex-col items-center gap-6 p-8">
+						<div className="text-red-500 text-lg">{error}</div>
+						<button
+							className="px-6 py-3 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition flex gap-2 items-center"
+							onClick={() => router.push('/select-folder')}
+						>
+							<Icon name="arrow_back" /> Choose another folder
+						</button>
+					</div>
+				) : imageFiles.length > 0 ? (
+					<div className="flex flex-col w-full h-screen">
+						<Header
+							folderName={folderName}
+							title={imageFiles[activeIndex]?.fileName}
+							isFullscreen={isFullscreen}
+							onCameraControlClick={() => setIsCameraControlModalOpen(true)}
+							onStopCapture={handleStopCapture}
+						>
+							<button
+								className="header-button"
+								onClick={handleCopyDisplayUrl}
+								title="Copy display URL to clipboard"
+							>
+								<Icon name="link" />
+							</button>
+							<button
+								className="header-button"
+								onClick={handleOpenWith}
+								title="Open with default application"
+							>
+								<Icon name="open_in_new" />
+							</button>
+							<button
+								className="header-button"
+								onClick={() => {
+									void loadGroupFilters(folderPath);
+									setIsFilterModalOpen(true);
+								}}
+								title="Filter images by rating"
+							>
+								<Icon name="filter_list" />
+							</button>
+							<button
+								className={`header-button ${isExifOpen ? 'bg-zinc-200 text-black' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'}`}
+								onClick={() => setIsExifOpen((open) => !open)}
+							>
+								<Icon name="info" />
+							</button>
+							<div className="text-zinc-400 text-sm">{filteredImageFiles.length}/{imageFiles.length} images</div>
+						</Header>
 
-            <div className="flex flex-1 w-full overflow-hidden">
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="main-image-container-wrapper flex-1 flex items-center justify-center overflow-hidden relative">
+						<div className="flex flex-1 w-full overflow-hidden">
+							<div className="flex-1 flex flex-col min-w-0">
+								<div className="main-image-container-wrapper flex-1 flex items-center justify-center overflow-hidden relative">
 
-                  <button
-                    className={`photo-nav-button left-4 ${isSwipingActive ? 'opacity-0' : ''}`}
-                    disabled={filteredImageFiles.length === 0}
-                    onClick={() => {
-                      const currentIdx = filteredImageFiles.findIndex(
-                        img => img.fileName === imageFiles[activeIndex]?.fileName
-                      );
-                      if (currentIdx > 0) {
-                        const prevImg = filteredImageFiles[currentIdx - 1];
-                        setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
-                      }
-                    }}
-                  >
-                    <Icon name="chevron_backward" />
-                  </button>
+									<button
+										className={`photo-nav-button left-4 ${isSwipingActive ? 'opacity-0' : ''}`}
+										disabled={filteredImageFiles.length === 0}
+										onClick={() => {
+											const currentIdx = filteredImageFiles.findIndex(
+												img => img.fileName === imageFiles[activeIndex]?.fileName
+											);
+											if(currentIdx > 0) {
+												const prevImg = filteredImageFiles[currentIdx - 1];
+												setActiveIndex(imageFiles.findIndex(img => img.fileName === prevImg.fileName));
+											}
+										}}
+									>
+										<Icon name="chevron_backward" />
+									</button>
 
-                  <button
-                    className={`photo-nav-button right-4 ${isSwipingActive ? 'opacity-0' : ''}`}
-                    disabled={filteredImageFiles.length === 0}
-                    onClick={() => {
-                      const currentIdx = filteredImageFiles.findIndex(
-                        img => img.fileName === imageFiles[activeIndex]?.fileName
-                      );
-                      if (currentIdx < filteredImageFiles.length - 1) {
-                        const nextImg = filteredImageFiles[currentIdx + 1];
-                        setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
-                      }
-                    }}
-                  >
-                    <Icon name="chevron_forward" />
-                  </button>
+									<button
+										className={`photo-nav-button right-4 ${isSwipingActive ? 'opacity-0' : ''}`}
+										disabled={filteredImageFiles.length === 0}
+										onClick={() => {
+											const currentIdx = filteredImageFiles.findIndex(
+												img => img.fileName === imageFiles[activeIndex]?.fileName
+											);
+											if(currentIdx < filteredImageFiles.length - 1) {
+												const nextImg = filteredImageFiles[currentIdx + 1];
+												setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
+											}
+										}}
+									>
+										<Icon name="chevron_forward" />
+									</button>
 
-                  <div id="rating-panel" className={`rating-panel ${isFullscreen ? 'hidden' : ''}`} aria-label="Rating panel">
-                    <div className="rating-star-row" aria-hidden="true" data-current-rating={hoveredRating ?? (imageFiles[activeIndex] ? (ratings.get(getFileId(imageFiles[activeIndex].fileName))?.rating ?? 0) : 0)}>
-                      <span className="rating-star">★</span>
-                      <span className="rating-star">★</span>
-                      <span className="rating-star">★</span>
-                      <span className="rating-star">★</span>
-                      <span className="rating-star">★</span>
-                    </div>
-                    <div className="rating-emoji-row noto-color-emoji-regular">
-                      <button
-                        type="button"
-                        className="rating-emoji"
-                        data-rating="1"
-                        aria-label="Rating 1"
-                        onMouseEnter={() => setHoveredRating(1)}
-                        onMouseLeave={() => setHoveredRating(null)}
-                        onClick={() => handleRatingClick(1)}
-                      >
+									<div id="rating-panel" className={`rating-panel ${isFullscreen ? 'hidden' : ''}`} aria-label="Rating panel">
+										<div className="rating-star-row" aria-hidden="true" data-current-rating={hoveredRating ?? (imageFiles[activeIndex] ? (ratings.get(getFileId(imageFiles[activeIndex].fileName))?.rating ?? 0) : 0)}>
+											<span className="rating-star">★</span>
+											<span className="rating-star">★</span>
+											<span className="rating-star">★</span>
+											<span className="rating-star">★</span>
+											<span className="rating-star">★</span>
+										</div>
+										<div className="rating-emoji-row noto-color-emoji-regular">
+											<button
+												type="button"
+												className="rating-emoji"
+												data-rating="1"
+												aria-label="Rating 1"
+												onMouseEnter={() => setHoveredRating(1)}
+												onMouseLeave={() => setHoveredRating(null)}
+												onClick={() => handleRatingClick(1)}
+											>
                         🗑️
-                      </button>
-                      <button
-                        type="button"
-                        className="rating-emoji"
-                        data-rating="2"
-                        aria-label="Rating 2"
-                        onMouseEnter={() => setHoveredRating(2)}
-                        onMouseLeave={() => setHoveredRating(null)}
-                        onClick={() => handleRatingClick(2)}
-                      >
+											</button>
+											<button
+												type="button"
+												className="rating-emoji"
+												data-rating="2"
+												aria-label="Rating 2"
+												onMouseEnter={() => setHoveredRating(2)}
+												onMouseLeave={() => setHoveredRating(null)}
+												onClick={() => handleRatingClick(2)}
+											>
                         😐
-                      </button>
-                      <button
-                        type="button"
-                        className="rating-emoji"
-                        data-rating="3"
-                        aria-label="Rating 3"
-                        onMouseEnter={() => setHoveredRating(3)}
-                        onMouseLeave={() => setHoveredRating(null)}
-                        onClick={() => handleRatingClick(3)}
-                      >
+											</button>
+											<button
+												type="button"
+												className="rating-emoji"
+												data-rating="3"
+												aria-label="Rating 3"
+												onMouseEnter={() => setHoveredRating(3)}
+												onMouseLeave={() => setHoveredRating(null)}
+												onClick={() => handleRatingClick(3)}
+											>
                         🤔
-                      </button>
-                      <button
-                        type="button"
-                        className="rating-emoji"
-                        data-rating="4"
-                        aria-label="Rating 4"
-                        onMouseEnter={() => setHoveredRating(4)}
-                        onMouseLeave={() => setHoveredRating(null)}
-                        onClick={() => handleRatingClick(4)}
-                      >
+											</button>
+											<button
+												type="button"
+												className="rating-emoji"
+												data-rating="4"
+												aria-label="Rating 4"
+												onMouseEnter={() => setHoveredRating(4)}
+												onMouseLeave={() => setHoveredRating(null)}
+												onClick={() => handleRatingClick(4)}
+											>
                         😀
-                      </button>
-                      <button
-                        type="button"
-                        className="rating-emoji"
-                        data-rating="5"
-                        aria-label="Rating 5"
-                        onMouseEnter={() => setHoveredRating(5)}
-                        onMouseLeave={() => setHoveredRating(null)}
-                        onClick={() => handleRatingClick(5)}
-                      >
+											</button>
+											<button
+												type="button"
+												className="rating-emoji"
+												data-rating="5"
+												aria-label="Rating 5"
+												onMouseEnter={() => setHoveredRating(5)}
+												onMouseLeave={() => setHoveredRating(null)}
+												onClick={() => handleRatingClick(5)}
+											>
                         🤩
-                      </button>
-                    </div>
+											</button>
+										</div>
 
-                  </div>
+									</div>
 
-                  <div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
-                    <div className="flex-1 flex items-center justify-center h-full">
-                      {imageFiles[activeIndex] && (
-                        <img
-                          key={activeIndex}
-                          src={imageFiles[activeIndex].originalPath}
-                          alt={imageFiles[activeIndex].fileName}
-                          className={`main-image max-w-full max-h-full object-contain select-none ${swipeDirection === 'left'
-                            ? 'animate-[swipeOutLeft_0.2s_ease-out]'
-                            : swipeDirection === 'right'
-                              ? 'animate-[swipeOutRight_0.2s_ease-out]'
-                              : ''
-                            } ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                          style={{
-                            transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
-                            transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
-                            touchAction: 'none'
-                          }}
-                          draggable={false}
-                          onPointerDown={handleMainImagePointerDown}
-                          onPointerMove={handleMainImagePointerMove}
-                          onPointerUp={handleMainImagePointerUp}
-                          onPointerCancel={handleMainImagePointerUp}
-                          onTouchStart={handleTouchStart}
-                          onTouchMove={handleTouchMove}
-                          onWheel={handleImageWheel}
-                        />
-                      )}
-                    </div>
-                  </div>
+									<div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
+										<div className="flex-1 flex items-center justify-center h-full">
+											{imageFiles[activeIndex] && (
+												<img
+													key={activeIndex}
+													src={imageFiles[activeIndex].originalPath}
+													alt={imageFiles[activeIndex].fileName}
+													className={`main-image max-w-full max-h-full object-contain select-none ${swipeDirection === 'left'
+														? 'animate-[swipeOutLeft_0.2s_ease-out]'
+														: swipeDirection === 'right'
+															? 'animate-[swipeOutRight_0.2s_ease-out]'
+															: ''
+													} ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+													style={{
+														transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
+														transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
+														touchAction: 'none'
+													}}
+													draggable={false}
+													onPointerDown={handleMainImagePointerDown}
+													onPointerMove={handleMainImagePointerMove}
+													onPointerUp={handleMainImagePointerUp}
+													onPointerCancel={handleMainImagePointerUp}
+													onTouchStart={handleTouchStart}
+													onTouchMove={handleTouchMove}
+													onWheel={handleImageWheel}
+												/>
+											)}
+										</div>
+									</div>
 
-                  {!isCameraControlModalOpen && isCapturing && captureProgress && (
-                    <div className="capture-progress-toast">
-                      <Icon name="camera" />
-                      <div className="flex flex-col gap-1 min-w-[120px]">
-                        <span className="text-zinc-300 font-mono">
-                          {captureProgress.current}/{captureProgress.total}
-                        </span>
-                        <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                            style={{ width: `${captureProgress.percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      <div className="flex border-l border-gray-200">
-                        <button
-                          onClick={handleStopCapture}
-                          className="border-transparent p-4 flex items-center justify-center font-medium text-blue-600 hover:text-white cursor-pointer focus:outline-none focus:ring-2"
-                        >
+									{!isCameraControlModalOpen && isCapturing && captureProgress && (
+										<div className="capture-progress-toast">
+											<Icon name="camera" />
+											<div className="flex flex-col gap-1 min-w-[120px]">
+												<span className="text-zinc-300 font-mono">
+													{captureProgress.current}/{captureProgress.total}
+												</span>
+												<div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+													<div
+														className="h-full bg-blue-500 rounded-full transition-all duration-300"
+														style={{ width: `${captureProgress.percentage}%` }}
+													></div>
+												</div>
+											</div>
+											<div className="flex border-l border-gray-200">
+												<button
+													onClick={handleStopCapture}
+													className="border-transparent p-4 flex items-center justify-center font-medium text-blue-600 hover:text-white cursor-pointer focus:outline-none focus:ring-2"
+												>
                           Stop
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+												</button>
+											</div>
+										</div>
+									)}
+								</div>
 
-                <div
-                  id="filmstrip"
-                  ref={filmstripRef}
-                  className={`flex gap-2 px-4 py-4 overflow-x-auto border-t border-zinc-800 flex-shrink-0 ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isFullscreen ? 'hidden' : ''}`}
-                  onWheel={handleFilmstripWheel}
-                  onPointerDown={handleFilmstripPointerDown}
-                  onPointerMove={handleFilmstripPointerMove}
-                  onPointerUp={handleFilmstripPointerUp}
-                  onPointerCancel={handleFilmstripPointerUp}
-                >
-                  {filteredImageFiles.map((img) => {
-                    const fileId = getFileId(img.fileName);
-                    const ratingEntry = ratings.get(fileId);
-                    const isRated = ratingEntry && ratingEntry.rating != null && ratingEntry.rating >= 1;
-                    const imgIdx = imageFiles.findIndex(item => item.fileName === img.fileName);
-                    return (
-                      <button
-                        key={imgIdx}
-                        onClick={() => setActiveIndex(imgIdx)}
-                        className={`flex-shrink-0 rounded overflow-hidden transition relative ${imgIdx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'} ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
-                      >
-                        <img
-                          src={img.thumbnailPath}
-                          alt={img.fileName}
-                          width={CONFIG.THUMBNAIL_WIDTH}
-                          height={CONFIG.THUMBNAIL_WIDTH}
-                          className="h-24 w-auto object-cover filmstrip-miniature"
-                          loading="lazy"
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+								<div
+									id="filmstrip"
+									ref={filmstripRef}
+									className={`flex gap-2 px-4 py-4 overflow-x-auto border-t border-zinc-800 flex-shrink-0 ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isFullscreen ? 'hidden' : ''}`}
+									onWheel={handleFilmstripWheel}
+									onPointerDown={handleFilmstripPointerDown}
+									onPointerMove={handleFilmstripPointerMove}
+									onPointerUp={handleFilmstripPointerUp}
+									onPointerCancel={handleFilmstripPointerUp}
+								>
+									{filteredImageFiles.map((img) => {
+										const fileId = getFileId(img.fileName);
+										const ratingEntry = ratings.get(fileId);
+										const isRated = ratingEntry && ratingEntry.rating != null && ratingEntry.rating >= 1;
+										const imgIdx = imageFiles.findIndex(item => item.fileName === img.fileName);
+										return (
+											<button
+												key={imgIdx}
+												onClick={() => setActiveIndex(imgIdx)}
+												className={`flex-shrink-0 rounded overflow-hidden transition relative ${imgIdx === activeIndex ? 'ring-2 ring-zinc-400' : 'opacity-60 hover:opacity-100'} ${isFilmstripDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isRated ? 'rated' : ''}`}
+											>
+												<img
+													src={img.thumbnailPath}
+													alt={img.fileName}
+													width={CONFIG.THUMBNAIL_WIDTH}
+													height={CONFIG.THUMBNAIL_WIDTH}
+													className="h-24 w-auto object-cover filmstrip-miniature"
+													loading="lazy"
+												/>
+											</button>
+										);
+									})}
+								</div>
+							</div>
 
-              {isExifOpen && (
-                <aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      {imageFiles[activeIndex] && (
-                        <div className="text-zinc-200 font-semibold text-base">
-                          {imageFiles[activeIndex].fileName}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-zinc-500 text-xs">
-                      {activeIndex + 1}/{imageFiles.length}
-                    </span>
-                  </div>
+							{isExifOpen && (
+								<aside className="w-[360px] max-w-full border-l border-black bg-[#0d0a0a] px-4 py-6 overflow-y-auto shadow-[inset_0_0_0_1px_rgba(0,0,0,0.6)] flex-shrink-0">
+									<div className="flex items-start justify-between gap-3 mb-4">
+										<div>
+											{imageFiles[activeIndex] && (
+												<div className="text-zinc-200 font-semibold text-base">
+													{imageFiles[activeIndex].fileName}
+												</div>
+											)}
+										</div>
+										<span className="text-zinc-500 text-xs">
+											{activeIndex + 1}/{imageFiles.length}
+										</span>
+									</div>
 
-                  {isExifLoading ? (
-                    <div className="flex flex-col items-center py-10 text-center">
-                      <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
-                      <span className="text-zinc-400 text-sm">Loading EXIF...</span>
-                    </div>
-                  ) : exifError ? (
-                    <div className="text-red-400 text-sm">{exifError}</div>
-                  ) : exifData ? (
-                    <div className="space-y-4">
+									{isExifLoading ? (
+										<div className="flex flex-col items-center py-10 text-center">
+											<div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
+											<span className="text-zinc-400 text-sm">Loading EXIF...</span>
+										</div>
+									) : exifError ? (
+										<div className="text-red-400 text-sm">{exifError}</div>
+									) : exifData ? (
+										<div className="space-y-4">
 
-                      {/* Image info */}
-                      <ExifItem
-                        icon="image"
-                        label={exifData?.FileName || imageFiles[activeIndex]?.fileName}
-                        values={[
-                          exifData?.ImageWidth && exifData?.ImageHeight
-                            ? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
-                            : null,
-                          formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
-                          formatDPI(exifData),
-                        ]}
-                      />
+											{/* Image info */}
+											<ExifItem
+												icon="image"
+												label={exifData?.FileName || imageFiles[activeIndex]?.fileName}
+												values={[
+													exifData?.ImageWidth && exifData?.ImageHeight
+														? `${exifData.ImageWidth} × ${exifData.ImageHeight}`
+														: null,
+													formatMegapixels(exifData?.ImageWidth, exifData?.ImageHeight),
+													formatDPI(exifData),
+												]}
+											/>
 
-                      {/* Date taken */}
-                      <ExifItem
-                        icon="today"
-                        label="Date/time"
-                        values={[formatDate(exifData)]}
-                      />
+											{/* Date taken */}
+											<ExifItem
+												icon="today"
+												label="Date/time"
+												values={[formatDate(exifData)]}
+											/>
 
-                      {/* Camera */}
-                      <ExifItem
-                        icon="photo_camera"
-                        label={[exifData?.Make, exifData?.Model].filter(Boolean).join(" ") || "Camera"}
-                        values={[
-                          formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                          formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
-                          formatISO(exifData?.ISO),
-                        ]}
-                      />
+											{/* Camera */}
+											<ExifItem
+												icon="photo_camera"
+												label={[exifData?.Make, exifData?.Model].filter(Boolean).join(' ') || 'Camera'}
+												values={[
+													formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+													formatExposureTime(exifData?.ExposureTime ?? exifData?.ShutterSpeedValue),
+													formatISO(exifData?.ISO),
+												]}
+											/>
 
-                      {/* Flash */}
-                      <ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
+											{/* Flash */}
+											<ExifItem icon={formatFlash(exifData, true)} label="Flash" values={[formatFlash(exifData)]} />
 
-                      {/* Lens */}
-                      <ExifItem
-                        icon="camera"
-                        label={exifData?.LensModel || exifData?.LensID || exifData?.LensType || "Lens"}
-                        values={[
-                          formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
-                          formatFocalLength(exifData?.FocalLength),
-                          formatCropFactor(exifData),
-                        ]}
-                      />
+											{/* Lens */}
+											<ExifItem
+												icon="camera"
+												label={exifData?.LensModel || exifData?.LensID || exifData?.LensType || 'Lens'}
+												values={[
+													formatAperture(exifData?.FNumber ?? exifData?.ApertureValue),
+													formatFocalLength(exifData?.FocalLength),
+													formatCropFactor(exifData),
+												]}
+											/>
 
-                      {/* White balance */}
-                      <ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
+											{/* White balance */}
+											<ExifItem icon="wb_auto" label="White balance" values={[formatWhiteBalance(exifData)]} />
 
-                      {/* Exposure */}
-                      <ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
+											{/* Exposure */}
+											<ExifItem icon="exposure" label="Exposure" values={[formatExposure(exifData)]} />
 
-                      {/* File size */}
-                      <ExifItem
-                        icon="perm_media"
-                        label="File"
-                        values={[
-                          formatFileSize(exifData),
-                          exifData?.MIMEType || null,
-                        ]}
-                      />
+											{/* File size */}
+											<ExifItem
+												icon="perm_media"
+												label="File"
+												values={[
+													formatFileSize(exifData),
+													exifData?.MIMEType || null,
+												]}
+											/>
 
-                      {/* Color */}
-                      {(() => {
-                        const c = formatColor(exifData);
-                        return (
-                          <ExifItem
-                            icon="colors"
-                            label="Color"
-                            values={[c.left, c.right, c.extra]}
-                          />
-                        );
-                      })()}
-                    </div>
-                  ) : (
-                    <div className="text-zinc-500 text-sm">No EXIF information available.</div>
-                  )}
-                </aside>
-              )}
-            </div>
-          </div>
-        ) : (
+											{/* Color */}
+											{(() => {
+												const c = formatColor(exifData);
+												return (
+													<ExifItem
+														icon="colors"
+														label="Color"
+														values={[c.left, c.right, c.extra]}
+													/>
+												);
+											})()}
+										</div>
+									) : (
+										<div className="text-zinc-500 text-sm">No EXIF information available.</div>
+									)}
+								</aside>
+							)}
+						</div>
+					</div>
+				) : (
           // Empty folder state
-          <div className="flex flex-col w-full h-screen">
-            <Header 
-              folderName={folderName}
-              title="No images"
-              isFullscreen={isFullscreen}
-              onCameraControlClick={() => setIsCameraControlModalOpen(true)}
-              onStopCapture={handleStopCapture}
-            >
-              <div className="text-zinc-400 text-sm">0 images</div>
-            </Header>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-6 p-8">
-                <Icon name="photo_library" />
-                <div className="text-zinc-400 text-lg">This folder is empty</div>
-                <div className="text-zinc-500 text-sm">Add images to this folder or use camera control to capture photos</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+					<div className="flex flex-col w-full h-screen">
+						<Header
+							folderName={folderName}
+							title="No images"
+							isFullscreen={isFullscreen}
+							onCameraControlClick={() => setIsCameraControlModalOpen(true)}
+							onStopCapture={handleStopCapture}
+						>
+							<div className="text-zinc-400 text-sm">0 images</div>
+						</Header>
+						<div className="flex-1 flex items-center justify-center">
+							<div className="flex flex-col items-center gap-6 p-8">
+								<Icon name="photo_library" />
+								<div className="text-zinc-400 text-lg">This folder is empty</div>
+								<div className="text-zinc-500 text-sm">Add images to this folder or use camera control to capture photos</div>
+							</div>
+						</div>
+					</div>
+				)}
+			</main>
 
-      <ConflictModal
-        isOpen={isRatingConflictModalOpen}
-        conflictData={ratingConflictData}
-        onUseNewRating={async () => {
-          if (ratingConflictData && ratingConflictData.newRating !== null) {
-            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.newRating, true);
-            setIsRatingConflictModalOpen(false);
-            setRatingConflictData(null);
-          }
-        }}
-        onUseExifRating={async () => {
-          if (ratingConflictData) {
-            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);
-            setIsRatingConflictModalOpen(false);
-            setRatingConflictData(null);
-          }
-        }}
-        onUseDatabaseRating={async () => {
-          if (ratingConflictData) {
-            await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.dbRating, true);
-            setIsRatingConflictModalOpen(false);
-            setRatingConflictData(null);
-          }
-        }}
-        onIgnore={() => {
-          setIsRatingConflictModalOpen(false);
-          setRatingConflictData(null);
-        }}
-      />
+			<ConflictModal
+				isOpen={isRatingConflictModalOpen}
+				conflictData={ratingConflictData}
+				onUseNewRating={async() => {
+					if(ratingConflictData && ratingConflictData.newRating !== null) {
+						await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.newRating, true);
+						setIsRatingConflictModalOpen(false);
+						setRatingConflictData(null);
+					}
+				}}
+				onUseExifRating={async() => {
+					if(ratingConflictData) {
+						await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.exifRating);
+						setIsRatingConflictModalOpen(false);
+						setRatingConflictData(null);
+					}
+				}}
+				onUseDatabaseRating={async() => {
+					if(ratingConflictData) {
+						await updateRatingInDatabase(ratingConflictData.fileName, ratingConflictData.dbRating, true);
+						setIsRatingConflictModalOpen(false);
+						setRatingConflictData(null);
+					}
+				}}
+				onIgnore={() => {
+					setIsRatingConflictModalOpen(false);
+					setRatingConflictData(null);
+				}}
+			/>
 
-      <FilterModal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        showUnrated={filterShowUnrated}
-        setShowUnrated={setFilterShowUnrated}
-        selectedRatings={filterSelectedRatings}
-        setSelectedRatings={setFilterSelectedRatings}
-        availableGroups={availableGroups.map((group) => ({
-          ...group,
-          imageCount: groupCounts.get(group.id) ?? 0,
-        }))}
-        selectedGroupIds={selectedGroupIds}
-        setSelectedGroupIds={setSelectedGroupIds}
-        conflictOption={false}
-      />
+			<FilterModal
+				isOpen={isFilterModalOpen}
+				onClose={() => setIsFilterModalOpen(false)}
+				showUnrated={filterShowUnrated}
+				setShowUnrated={setFilterShowUnrated}
+				selectedRatings={filterSelectedRatings}
+				setSelectedRatings={setFilterSelectedRatings}
+				availableGroups={availableGroups.map((group) => ({
+					...group,
+					imageCount: groupCounts.get(group.id) ?? 0,
+				}))}
+				selectedGroupIds={selectedGroupIds}
+				setSelectedGroupIds={setSelectedGroupIds}
+				conflictOption={false}
+			/>
 
-      <CameraControlModal
-        isOpen={isCameraControlModalOpen}
-        onClose={() => setIsCameraControlModalOpen(false)}
-        isShootAssistRunning={isShootAssistRunning}
-        isCapturing={isCapturing}
-        captureProgress={captureProgress}
-        folderPath={folderPath}
-        onStartShootAssist={handleStartShootAssist}
-        onStopShootAssist={handleStopShootAssist}
-        onStartCapture={handleStartCapture}
-        onStopCapture={handleStopCapture}
-      />
-    </div>
-  );
+			<CameraControlModal
+				isOpen={isCameraControlModalOpen}
+				onClose={() => setIsCameraControlModalOpen(false)}
+				isShootAssistRunning={isShootAssistRunning}
+				isCapturing={isCapturing}
+				captureProgress={captureProgress}
+				folderPath={folderPath}
+				onStartShootAssist={handleStartShootAssist}
+				onStopShootAssist={handleStopShootAssist}
+				onStartCapture={handleStartCapture}
+				onStopCapture={handleStopCapture}
+			/>
+		</div>
+	);
 }
