@@ -21,7 +21,7 @@ export default function SelectFolder() {
   const socketRef = useRef<Socket | null>(null);
   const isSocketReady = useRef<boolean>(false);
 
-  const [hasActiveFolder, setHasActiveFolder] = useState<boolean>(false);
+  const [, setHasActiveFolder] = useState<boolean>(false);
 
   async function requestCloseDatabaseConnections() {
     try {

@@ -8,7 +8,6 @@ import { FilterModal } from "@/components/filter-modal";
 import { StatusModal } from "@/components/status-modal";
 import { ExportModal } from "@/components/export-modal";
 import { ImportModal } from "@/components/import-modal";
-import Link from "next/link";
 import CONFIG from "@/config";
 import { Icon } from "@/components/icon";
 import { aggregateRatings } from "@/utils/ratings-aggregator";
@@ -1085,6 +1084,8 @@ export default function ListPage() {
                         <img
                           src={image.thumbnailPath}
                           alt={image.fileName}
+                          width={CONFIG.THUMBNAIL_WIDTH}
+                          height={CONFIG.THUMBNAIL_WIDTH}
                           className="w-full h-full object-cover"
                         />
                       </div>

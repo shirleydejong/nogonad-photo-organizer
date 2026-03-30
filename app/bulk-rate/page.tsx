@@ -49,7 +49,7 @@ export default function BulkRatePage() {
   // Rectangle selection state
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
+  const [, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -320,7 +320,7 @@ export default function BulkRatePage() {
 
     if (!gridRef.current) return;
 
-    const gridRect = gridRef.current.getBoundingClientRect();
+    gridRef.current.getBoundingClientRect();
     const x1 = Math.min(selectionStart.x, e.clientX);
     const y1 = Math.min(selectionStart.y, e.clientY);
     const x2 = Math.max(selectionStart.x, e.clientX);
@@ -565,6 +565,8 @@ export default function BulkRatePage() {
                   <img
                     src={image.thumbnailPath}
                     alt={image.fileName}
+                    width={CONFIG.THUMBNAIL_WIDTH}
+                    height={CONFIG.THUMBNAIL_WIDTH}
                     className="w-full aspect-square object-cover bg-zinc-800 select-none"
                   />
                   

@@ -66,7 +66,7 @@ export default function Home() {
   const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
   const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
-  const [isWatcherActive, setIsWatcherActive] = useState<boolean>(false);
+  const [, setIsWatcherActive] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>("");
   
   // Camera Control state
@@ -244,7 +244,7 @@ export default function Home() {
     };
 
     const handleWatcherError = ({ error, folderPath }: { error: string; folderPath: string }) => {
-      console.error('Watcher error:', error);
+      console.error(`Watcher error for folder ${folderPath}:`, error);
     };
 
     socket.on('file-added', handleFileAdded);
@@ -298,18 +298,18 @@ export default function Home() {
     };
 
     const handleCaptureStarted = ({ total, interval }: { total: number; interval: number }) => {
-      console.log('Capture started:', total, 'shots');
+      console.log(`Capture started: ${total} shots, with interval of ${interval}ms`);
       setIsCapturing(true);
       setCaptureProgress({ current: 0, total, percentage: 0 });
     };
 
     const handleCaptureProgress = ({ current, total, percentage }: { current: number; total: number; percentage: number }) => {
-      console.log('Capture progress:', current, '/', total);
+      console.log(`Capture progress: ${current} / ${total} (${percentage}%)`);
       setCaptureProgress({ current, total, percentage });
     };
 
     const handleCaptureComplete = ({ total }: { total: number }) => {
-      console.log('Capture complete:', total, 'shots');
+      console.log(`Capture complete: ${total} shots`);
       setIsCapturing(false);
       setCaptureProgress(null);
     };
@@ -568,8 +568,6 @@ export default function Home() {
 
       // Update ratings if file has rating
       if (event.hasRating) {
-        const fileId = getFileId(event.fileName);
-        // Refresh ratings for this file
         fetchRatingForFile(event.fileName, path);
       }
 
@@ -768,7 +766,8 @@ export default function Home() {
     const deltaX = e.clientX - filmstripDragStartXRef.current;
     el.scrollLeft = filmstripStartScrollLeftRef.current - (deltaX * 4);
   }
-
+  
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars */
   function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
     if (!isFilmstripDraggingRef.current) return;
 
@@ -1031,6 +1030,7 @@ export default function Home() {
         case "Backspace":
           handleRatingClick(1);
           break;
+        default: break;
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -1473,6 +1473,8 @@ export default function Home() {
                         <img
                           src={img.thumbnailPath}
                           alt={img.fileName}
+                          width={CONFIG.THUMBNAIL_WIDTH}
+                          height={CONFIG.THUMBNAIL_WIDTH}
                           className="h-24 w-auto object-cover filmstrip-miniature"
                           loading="lazy"
                         />

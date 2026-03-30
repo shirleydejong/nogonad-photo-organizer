@@ -41,33 +41,33 @@ import path from 'path';
  * }
  */
 export async function runExifTool(imagePath: string): Promise<string> {
-  await fs.access(imagePath);
+	await fs.access(imagePath);
 
-  return new Promise((resolve, reject) => {
-    const proc = spawn('exiftool', ['-json', '-n', imagePath], { windowsHide: true });
+	return new Promise((resolve, reject) => {
+		const proc = spawn('exiftool', ['-json', '-n', imagePath], { windowsHide: true });
 
-    let stdout = '';
-    let stderr = '';
+		let stdout = '';
+		let stderr = '';
 
-    proc.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
+		proc.stdout.on('data', (chunk) => {
+			stdout += chunk.toString();
+		});
 
-    proc.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
+		proc.stderr.on('data', (chunk) => {
+			stderr += chunk.toString();
+		});
 
-    proc.on('error', reject);
+		proc.on('error', reject);
 
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        const message = stderr.trim() || `exiftool exited with code ${code}`;
-        reject(new Error(message));
-        return;
-      }
-      resolve(stdout.trim());
-    });
-  });
+		proc.on('close', (code) => {
+			if(code !== 0) {
+				const message = stderr.trim() || `exiftool exited with code ${code}`;
+				reject(new Error(message));
+				return;
+			}
+			resolve(stdout.trim());
+		});
+	});
 }
 
 /**
@@ -89,12 +89,12 @@ export async function runExifTool(imagePath: string): Promise<string> {
  * console.log(exifData[0].LensModel); // 'EF24-70mm f/2.8L II USM'
  */
 export async function getExifJson(imagePath: string): Promise<any> {
-  const output = await runExifTool(imagePath);
-  try {
-    return JSON.parse(output);
-  } catch {
-    throw new Error('Could not parse exiftool output as JSON');
-  }
+	const output = await runExifTool(imagePath);
+	try {
+		return JSON.parse(output);
+	} catch {
+		throw new Error('Could not parse exiftool output as JSON');
+	}
 }
 
 /**
@@ -127,38 +127,38 @@ export async function getExifJson(imagePath: string): Promise<any> {
  * // vacation3.jpg: Rating=unrated
  */
 export async function getBatchExifJson(folderPath: string): Promise<any[]> {
-  await fs.access(folderPath);
+	await fs.access(folderPath);
 
-  return new Promise((resolve, reject) => {
-    const proc = spawn('exiftool', ['-srcfile', '%d%f.xmp', '-srcfile', '%d%f.%e', '-json', '-FileName', '-Rating', folderPath], { windowsHide: true });
+	return new Promise((resolve, reject) => {
+		const proc = spawn('exiftool', ['-srcfile', '%d%f.xmp', '-srcfile', '%d%f.%e', '-json', '-FileName', '-Rating', folderPath], { windowsHide: true });
 
-    let stdout = '';
-    let stderr = '';
+		let stdout = '';
+		let stderr = '';
 
-    proc.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
+		proc.stdout.on('data', (chunk) => {
+			stdout += chunk.toString();
+		});
 
-    proc.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
+		proc.stderr.on('data', (chunk) => {
+			stderr += chunk.toString();
+		});
 
-    proc.on('error', reject);
+		proc.on('error', reject);
 
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        const message = stderr.trim() || `exiftool exited with code ${code}`;
-        reject(new Error(message));
-        return;
-      }
-      try {
-        const data = JSON.parse(stdout.trim());
-        resolve(Array.isArray(data) ? data : [data]);
-      } catch {
-        reject(new Error('Could not parse exiftool output as JSON'));
-      }
-    });
-  });
+		proc.on('close', (code) => {
+			if(code !== 0) {
+				const message = stderr.trim() || `exiftool exited with code ${code}`;
+				reject(new Error(message));
+				return;
+			}
+			try {
+				const data = JSON.parse(stdout.trim());
+				resolve(Array.isArray(data) ? data : [data]);
+			} catch {
+				reject(new Error('Could not parse exiftool output as JSON'));
+			}
+		});
+	});
 }
 
 /**
@@ -187,26 +187,26 @@ export interface RatingUpdateResult {
  * @throws {Error} If exiftool exits with non-zero code
  */
 async function executeExiftool(args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('exiftool', args, { windowsHide: true });
+	return new Promise((resolve, reject) => {
+		const proc = spawn('exiftool', args, { windowsHide: true });
 
-    let stderr = '';
+		let stderr = '';
 
-    proc.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
+		proc.stderr.on('data', (chunk) => {
+			stderr += chunk.toString();
+		});
 
-    proc.on('error', reject);
+		proc.on('error', reject);
 
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        const message = stderr.trim() || `exiftool exited with code ${code}`;
-        reject(new Error(message));
-        return;
-      }
-      resolve();
-    });
-  });
+		proc.on('close', (code) => {
+			if(code !== 0) {
+				const message = stderr.trim() || `exiftool exited with code ${code}`;
+				reject(new Error(message));
+				return;
+			}
+			resolve();
+		});
+	});
 }
 
 /**
@@ -217,12 +217,12 @@ async function executeExiftool(args: string[]): Promise<void> {
  * @returns {Promise<boolean>} True if file exists, false otherwise
  */
 async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+	try {
+		await fs.access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -240,15 +240,15 @@ async function fileExists(filePath: string): Promise<boolean> {
  * @returns {number} Percentage value (0-99)
  */
 function ratingToPercent(rating: number): number {
-  const percentMap: { [key: number]: number } = {
-    0: 0,
-    1: 1,
-    2: 25,
-    3: 50,
-    4: 75,
-    5: 99
-  };
-  return percentMap[rating] ?? 0;
+	const percentMap: { [key: number]: number } = {
+		0: 0,
+		1: 1,
+		2: 25,
+		3: 50,
+		4: 75,
+		5: 99
+	};
+	return percentMap[rating] ?? 0;
 }
 
 /**
@@ -264,14 +264,14 @@ function ratingToPercent(rating: number): number {
  * @throws {Error} If file write fails
  */
 async function createMinimalXmp(xmpPath: string, rating: number): Promise<void> {
-  const xmpContent = `<?xml version="1.0" encoding="UTF-8"?>
+	const xmpContent = `<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" x:xmptk="Nogonad Photo Gallery">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about="" xmp:Rating="${rating}"/>
   </rdf:RDF>
 </x:xmpmeta>`;
 
-  await fs.writeFile(xmpPath, xmpContent, 'utf-8');
+	await fs.writeFile(xmpPath, xmpContent, 'utf-8');
 }
 
 /**
@@ -287,40 +287,40 @@ async function createMinimalXmp(xmpPath: string, rating: number): Promise<void> 
  * @returns {Promise<RatingUpdateResult[]>} Update results for all files
  */
 async function batchUpdateJpgRatings(jobs: RatingUpdateJob[]): Promise<RatingUpdateResult[]> {
-  const results: RatingUpdateResult[] = [];
+	const results: RatingUpdateResult[] = [];
 
   // Group files by rating value for batch processing
-  const jobsByRating = new Map<number, string[]>();
+	const jobsByRating = new Map<number, string[]>();
 
-  jobs.forEach((job) => {
-    if (!jobsByRating.has(job.rating)) {
-      jobsByRating.set(job.rating, []);
-    }
+	jobs.forEach((job) => {
+		if(!jobsByRating.has(job.rating)) {
+			jobsByRating.set(job.rating, []);
+		}
     jobsByRating.get(job.rating)!.push(job.filePath);
-  });
+	});
 
   // Execute one exiftool command per rating value
-  for (const [rating, filePaths] of jobsByRating) {
-    const ratingPercent = ratingToPercent(rating);
-    const cmdArgs = ['-overwrite_original_in_place', `-Rating=${rating}`, `-RatingPercent=${ratingPercent}`, '-MicrosoftPhoto:Rating=', '-MicrosoftPhoto:RatingPercent=', ...filePaths];
+	for(const [rating, filePaths] of jobsByRating) {
+		const ratingPercent = ratingToPercent(rating);
+		const cmdArgs = ['-overwrite_original_in_place', `-Rating=${rating}`, `-RatingPercent=${ratingPercent}`, '-MicrosoftPhoto:Rating=', '-MicrosoftPhoto:RatingPercent=', ...filePaths];
 
-    try {
-      await executeExiftool(cmdArgs);
-      filePaths.forEach((filePath) => {
-        results.push({ filePath, success: true });
-      });
-    } catch (error) {
-      filePaths.forEach((filePath) => {
-        results.push({
-          filePath,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }
-  }
+		try {
+			await executeExiftool(cmdArgs);
+			filePaths.forEach((filePath) => {
+				results.push({ filePath, success: true });
+			});
+		} catch (error) {
+			filePaths.forEach((filePath) => {
+				results.push({
+					filePath,
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			});
+		}
+	}
 
-  return results;
+	return results;
 }
 
 /**
@@ -335,31 +335,31 @@ async function batchUpdateJpgRatings(jobs: RatingUpdateJob[]): Promise<RatingUpd
  * @returns {Promise<RatingUpdateResult>} Update result for the file
  */
 async function updateRawRating(job: RatingUpdateJob): Promise<RatingUpdateResult> {
-  const dir = path.dirname(job.filePath);
-  const fileName = path.basename(job.filePath);
-  const nameWithoutExt = path.parse(fileName).name;
-  const xmpPath = path.join(dir, `${nameWithoutExt}.xmp`);
+	const dir = path.dirname(job.filePath);
+	const fileName = path.basename(job.filePath);
+	const nameWithoutExt = path.parse(fileName).name;
+	const xmpPath = path.join(dir, `${nameWithoutExt}.xmp`);
 
-  try {
-    const xmpExists = await fileExists(xmpPath);
+	try {
+		const xmpExists = await fileExists(xmpPath);
 
-    if (!xmpExists) {
+		if(!xmpExists) {
       // Create new XMP sidecar with rating
-      await createMinimalXmp(xmpPath, job.rating);
-    } else {
+			await createMinimalXmp(xmpPath, job.rating);
+		} else {
       // Update existing XMP, preserving other metadata
-      const ratingPercent = ratingToPercent(job.rating);
-      await executeExiftool(['-overwrite_original_in_place', `-Rating=${job.rating}`, `-RatingPercent=${ratingPercent}`, '-MicrosoftPhoto:Rating=', '-MicrosoftPhoto:RatingPercent=', xmpPath]);
-    }
+			const ratingPercent = ratingToPercent(job.rating);
+			await executeExiftool(['-overwrite_original_in_place', `-Rating=${job.rating}`, `-RatingPercent=${ratingPercent}`, '-MicrosoftPhoto:Rating=', '-MicrosoftPhoto:RatingPercent=', xmpPath]);
+		}
 
-    return { filePath: job.filePath, success: true };
-  } catch (error) {
-    return {
-      filePath: job.filePath,
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+		return { filePath: job.filePath, success: true };
+	} catch (error) {
+		return {
+			filePath: job.filePath,
+			success: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
 }
 
 /**
@@ -392,24 +392,24 @@ async function updateRawRating(job: RatingUpdateJob): Promise<RatingUpdateResult
  * });
  */
 export async function updateRatings(jobs: RatingUpdateJob[]): Promise<RatingUpdateResult[]> {
-  const results: RatingUpdateResult[] = [];
+	const results: RatingUpdateResult[] = [];
 
   // Separate files by type
-  const jpgJobs = jobs.filter((j) => /\.jpe?g$/i.test(j.filePath));
-  const rawJobs = jobs.filter((j) => /\.(raw|dng|nef|cr2|crw|arw|raf|rw2|orf|pef)$/i.test(j.filePath));
+	const jpgJobs = jobs.filter((j) => /\.jpe?g$/i.test(j.filePath));
+	const rawJobs = jobs.filter((j) => /\.(raw|dng|nef|cr2|crw|arw|raf|rw2|orf|pef)$/i.test(j.filePath));
 
   // Batch process JPG files
-  if (jpgJobs.length > 0) {
-    const jpgResults = await batchUpdateJpgRatings(jpgJobs);
-    results.push(...jpgResults);
-  }
+	if(jpgJobs.length > 0) {
+		const jpgResults = await batchUpdateJpgRatings(jpgJobs);
+		results.push(...jpgResults);
+	}
 
   // Process RAW files individually (need XMP sidecar management)
-  for (const job of rawJobs) {
-    const result = await updateRawRating(job);
-    results.push(result);
-  }
+	for(const job of rawJobs) {
+		const result = await updateRawRating(job);
+		results.push(result);
+	}
 
-  return results;
+	return results;
 }
 

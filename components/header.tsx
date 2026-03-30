@@ -10,7 +10,6 @@ interface HeaderProps {
   isFullscreen?: boolean;
   children?: React.ReactNode;
   onCameraControlClick?: () => void;
-  onStopCapture?: () => void;
 }
 
 export function Header({ 
@@ -19,7 +18,6 @@ export function Header({
   isFullscreen = false, 
   children,
   onCameraControlClick,
-  onStopCapture,
 }: HeaderProps) {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(true);

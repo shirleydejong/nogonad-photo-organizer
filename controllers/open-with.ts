@@ -1,7 +1,4 @@
 import { execFile } from 'child_process';
-import { promisify } from 'util';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Opens the Windows native "Open with" dialog for a given file path

@@ -4,15 +4,14 @@ import { parse } from 'url';
 import next from 'next';
 import config from '@/config';
 import { Server as SocketIOServer } from 'socket.io';
-import FileWatcher, { FileChangeEvent } from '@/controllers/file-watcher';
+import FileWatcher from '@/controllers/file-watcher';
 import getShootAssistController from '@/controllers/shoot-assist';
-import { watch } from 'fs';
 
 const dev = process.env.NODE_ENV !== 'production';
 
 console.log('Starting server in:', dev ? 'development' : 'production', 'mode');
 
-// @ts-ignore - Allow undefined config for development without .env file
+// @ts-expect-error - Allow undefined config for development without .env file
 const hostname = config?.HOSTNAME || Object.values(os.networkInterfaces())
   .flat()
   .find((iface) => iface?.family === 'IPv4' && !iface.internal)?.address || 'localhost';

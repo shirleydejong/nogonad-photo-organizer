@@ -9,7 +9,7 @@ function DisplayPageContent() {
   const sessionId = searchParams.get("session") || "default";
   
   const [imagePath, setImagePath] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [, setIsConnected] = useState(false);
 
   useEffect(() => {
     const socket = getSocket();

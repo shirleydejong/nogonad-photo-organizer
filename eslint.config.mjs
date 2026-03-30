@@ -21,6 +21,11 @@ export default [
 		},
 		rules: {
 			...nextPlugin.configs.recommended.rules,
+			// Material Symbols Rounded and Noto Color Emoji are not available in next/font/google,
+			// and layout.tsx is the App Router equivalent of _document.js (correct place for global fonts).
+			'@next/next/no-page-custom-font': 'off',
+			/* Images has to be rendered with <img> instead of next/image, because next/image doesn't support file:// protocol and we need to load images from the local filesystem. */
+			'@next/next/no-img-element': 'off',
 			indent: [
 				'error',
 				'tab',
@@ -70,6 +75,7 @@ export default [
 					},
 				},
 			],
+			'@typescript-eslint/no-explicit-any': ['off']
 		},
 	},
 ];

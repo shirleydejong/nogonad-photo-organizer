@@ -12,7 +12,7 @@ interface CameraControlModalProps {
   folderPath: string;
   onStartShootAssist: () => void;
   onStopShootAssist: () => void;
-  onStartCapture: (shots: number, interval: number) => void;
+  onStartCapture: (_shots: number, _interval: number) => void;
   onStopCapture: () => void;
 }
 
@@ -21,7 +21,6 @@ export function CameraControlModal({
   onClose,
   isShootAssistRunning,
   isCapturing,
-  captureProgress,
   folderPath,
   onStartShootAssist,
   onStopShootAssist,

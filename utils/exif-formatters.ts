@@ -146,7 +146,8 @@ export interface ColorFormatResult {
 export function formatColor(exif: any): ColorFormatResult {
   const profile = exif?.ProfileDescription;
   const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ICCProfileName || exif?.ColorSpace;
-  let cs = null;
+  let cs;
+  let bits;
   if (typeof colorSpace === "string") {
     cs = colorSpace;
   } else if (colorSpace === 65535) {
@@ -169,7 +170,6 @@ export function formatColor(exif: any): ColorFormatResult {
     cs = colorSpaceMap[colorSpace] || "Uncalibrated";
   }
   const bitsArr = exif?.BitsPerSample || exif?.BitDepth;
-  let bits = null;
   if (Array.isArray(bitsArr) && bitsArr.length) bits = `${bitsArr[0]} bits/channel`;
   else if (Number.isFinite(bitsArr)) bits = `${bitsArr} bits/channel`;
   else bits = "";
