@@ -453,10 +453,10 @@ export default function Home() {
 
 			const startData = await startResponse.json();
 
-      // Get files (can be empty array for empty folders)
+	// Get files (can be empty array for empty folders)
 			const files = (startData.files || []) as string[];
 
-      // Create ImageData objects
+	// Create ImageData objects
 			const imageData: ImageData[] = files.map((fileName) => {
 				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
 				const encodedPath = encodeURIComponent(fileName);
@@ -470,7 +470,7 @@ export default function Home() {
 
 			setImageFiles(imageData);
 
-      // Load batch EXIF data from localStorage and merge with database ratings
+	// Load batch EXIF data from localStorage and merge with database ratings
 			let batchExifData: any[] = [];
 			try {
 				const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
@@ -481,7 +481,7 @@ export default function Home() {
 				console.error('Failed to load batch EXIF data:', exifErr);
 			}
 
-      // Fetch ratings for this folder
+	// Fetch ratings for this folder
 			try {
 				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
 
@@ -493,12 +493,12 @@ export default function Home() {
 							ratingsMap.set(rating.id, rating);
 						}
 
-            // Merge EXIF ratings with database ratings
-            // EXIF ratings are used to pre-populate if there's no database rating
+			// Merge EXIF ratings with database ratings
+			// EXIF ratings are used to pre-populate if there's no database rating
 						for(const exifFile of batchExifData) {
 							if(exifFile.FileName && exifFile.Rating != null) {
 								const fileId = getFileId(exifFile.FileName);
-                // Only pre-populate from EXIF if there's no database rating yet
+				// Only pre-populate from EXIF if there's no database rating yet
 								if(!ratingsMap.has(fileId)) {
 									ratingsMap.set(fileId, {
 										id: fileId,
@@ -521,7 +521,7 @@ export default function Home() {
 
 			setIsLoading(false);
 
-      // Start folder watcher via Socket.IO
+	// Start folder watcher via Socket.IO
 			if(socketRef.current && socketRef.current.connected) {
 				socketRef.current.emit('watch-folder', normalizedPath);
 			}
@@ -1081,6 +1081,7 @@ export default function Home() {
 
 				if(!canceled) {
 					const exifData = data?.exifData ?? null;
+					console.log('Fetched EXIF data:', exifData);
 					setExifData(exifData);
 
           // Compare EXIF rating with database rating
@@ -1228,13 +1229,13 @@ export default function Home() {
 		<div className="flex min-h-screen flex-col bg-black font-sans">
 			<main className="flex-1 flex flex-col items-center justify-center w-full">
 				{isLoading ? (
-          // Loading state
+				// Loading state
 					<div className="flex flex-col items-center gap-6 p-8">
 						<div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
 						<div className="text-zinc-400 text-sm">Loading images...</div>
 					</div>
 				) : error ? (
-          // Error state
+				// Error state
 					<div className="flex flex-col items-center gap-6 p-8">
 						<div className="text-red-500 text-lg">{error}</div>
 						<button
