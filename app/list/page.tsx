@@ -545,8 +545,8 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // Conflict exists only if file has EXIF rating AND database rating differs
-    // No EXIF rating = no conflict, even if database has a rating
+	// Conflict exists only if file has EXIF rating AND database rating differs
+	// No EXIF rating = no conflict, even if database has a rating
 		if(exifRating != null && exifRating !== 0 && dbRating !== null && exifRating !== dbRating && !dbOverRule) {
 			return true;
 		}
@@ -591,12 +591,12 @@ export default function ListPage() {
 
 		return (
 			exifRating != null &&
-      exifRating !== 0 &&
-      rawRating != null &&
-      rawRating !== 0 &&
-      dbRating != null &&
-      exifRating === rawRating &&
-      exifRating === dbRating
+			exifRating !== 0 &&
+			rawRating != null &&
+			rawRating !== 0 &&
+			dbRating != null &&
+			exifRating === rawRating &&
+			exifRating === dbRating
 		);
 	}
 
