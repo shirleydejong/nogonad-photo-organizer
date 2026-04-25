@@ -6,19 +6,19 @@ import { Header } from '@/components/header';
 import { Icon } from '@/components/icon';
 
 type GroupProgress = {
-  groupId: string;
-  groupName: string;
-  minRating: number;
-  eligibleCount: number;
-  totalPairs: number;
-  completedPairs: number;
-  remainingPairs: number;
-  hasRanking: boolean;
+	groupId: string;
+	groupName: string;
+	minRating: number;
+	eligibleCount: number;
+	totalPairs: number;
+	completedPairs: number;
+	remainingPairs: number;
+	hasRanking: boolean;
 };
 
 type NextPair = {
-  leftImageId: string;
-  rightImageId: string;
+	leftImageId: string;
+	rightImageId: string;
 } | null;
 
 function normalizeWindowsPath(path: string): string {
@@ -486,7 +486,7 @@ function PairwiseComparePageContent() {
 				{progress && (
 					<section className="rounded border border-blue-900/60 bg-blue-950/20 p-4 space-y-3">
 						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div className="text-blue-100 font-semibold">Min rating: {formatRatingStars(progress.minRating)}+</div>
+							<div className="text-blue-100 font-semibold">Min rating: <span className="noto-color-emoji-regular">{formatRatingStars(progress.minRating)}</span>+</div>
 							<div className="text-blue-200/80 text-sm">{comparisonProgressPercent}% complete ({progress.completedPairs}/{progress.totalPairs})</div>
 						</div>
 						<div className="w-full h-3 rounded bg-zinc-800 overflow-hidden">

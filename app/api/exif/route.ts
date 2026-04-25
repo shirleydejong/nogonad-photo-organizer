@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
 	try {
 		const { folderPath, fileName, action } = await request.json();
 
-    // Batch EXIF extraction for all files in a folder
+	// Batch EXIF extraction for all files in a folder
 		if(action === 'batch') {
 			if(!folderPath) {
 				return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-    // Single file EXIF extraction
+	// Single file EXIF extraction
 		if(!folderPath || !fileName) {
 			return NextResponse.json(
 				{ error: 'Folder path and file name are required' },
@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
 		}
 
 		const filePath = path.join(folderPath, fileName);
-    
+
 		console.log('Extracting EXIF data from:', folderPath, fileName, filePath);
-    
+
 		getExifJson(filePath);
 		const exifData = (await getExifJson(filePath)).pop();
 
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
 			success: true,
 			exifData: exifData,
 		});
+		
 	} catch (error) {
 		console.error('EXIF extraction error:', error);
 		return NextResponse.json(

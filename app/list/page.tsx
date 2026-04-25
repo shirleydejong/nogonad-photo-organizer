@@ -156,7 +156,7 @@ export default function ListPage() {
 
 			setImageFiles(imageData);
 
-      // Load batch EXIF data from localStorage
+	// Load batch EXIF data from localStorage
 			setLoadProgress(40);
 			let batchExifData: any[] = [];
 			try {
@@ -168,7 +168,7 @@ export default function ListPage() {
 				console.error('Failed to load batch EXIF data:', exifErr);
 			}
 
-      // Create a map of fileId -> EXIF Rating for quick lookup in conflict detection
+		// Create a map of fileId -> EXIF Rating for quick lookup in conflict detection
 			const exifDataMap = new Map<string, number | null>();
 			for(const exifFile of batchExifData) {
 				if(exifFile.FileName && exifFile.Rating != null) {
@@ -178,7 +178,7 @@ export default function ListPage() {
 			}
 			setExifData(exifDataMap);
 
-      // Fetch ratings for this folder
+		// Fetch DB ratings for this folder
 			setLoadProgress(55);
 			try {
 				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
