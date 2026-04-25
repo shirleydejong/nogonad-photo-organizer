@@ -200,19 +200,17 @@ export default function ListPage() {
       // Fetch RAW files from raw subfolder
 			setLoadProgress(75);
 			try {
-				const rawResponse = await fetch('/api/raw', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ folderPath: normalizedPath }),
-				});
+				const rawResponse = await fetch(
+					`/api/exif/batch/raw?folderPath=${encodeURIComponent(normalizedPath)}`
+				);
 
 				if(rawResponse.ok) {
 					const rawData = await rawResponse.json();
-					if(rawData.success && rawData.hasRawFolder && rawData.ratings) {
+					if(rawData.success && rawData.hasRawFolder && rawData.exifData) {
 						const rawFilesMap = new Map<string, string>();
 						const xmpMap = new Map<string, boolean>();
 						const rawExifDataMap = new Map<string, number | null>();
-						for(const rawFile of rawData.ratings) {
+						for(const rawFile of rawData.exifData) {
 							if(rawFile.FileName) {
 								const fileId = getFileId(rawFile.FileName);
 								rawFilesMap.set(fileId, rawFile.FileName);
@@ -767,11 +765,9 @@ export default function ListPage() {
 	const handleStatusModalClose = useCallback(async() => {
 		try {
       // Fetch fresh batch EXIF data - same as select-folder does
-			const exifResponse = await fetch('/api/exif', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ folderPath, action: 'batch' }),
-			});
+			const exifResponse = await fetch(
+				`/api/exif/batch/default?folderPath=${encodeURIComponent(folderPath)}`
+			);
 
 			if(exifResponse.ok) {
 				const exifData = await exifResponse.json();

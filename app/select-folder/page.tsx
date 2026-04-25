@@ -217,11 +217,9 @@ export default function SelectFolder() {
 
 					try {
             // Fetch batch EXIF data for all files in the folder
-						const exifResponse = await fetch('/api/exif', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({ folderPath: normalizedPath, action: 'batch' }),
-						});
+						const exifResponse = await fetch(
+							`/api/exif/batch/default?folderPath=${encodeURIComponent(normalizedPath)}`
+						);
 
 						if(exifResponse.ok) {
 							const exifData = await exifResponse.json();

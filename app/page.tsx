@@ -1061,14 +1061,9 @@ export default function Home() {
 
 		async function fetchExifData() {
 			try {
-				const response = await fetch('/api/exif', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						folderPath,
-						fileName: currentImage.fileName,
-					}),
-				});
+				const response = await fetch(
+					`/api/exif/single/default?folderPath=${encodeURIComponent(folderPath)}&file=${encodeURIComponent(currentImage.fileName)}`
+				);
 
 				if(!response.ok) {
 					const error = await response.json();
@@ -1084,7 +1079,7 @@ export default function Home() {
 					console.log('Fetched EXIF data:', exifData);
 					setExifData(exifData);
 
-          // Compare EXIF rating with database rating
+		// Compare EXIF rating with database rating
 					if(exifData) {
 						const exifRating = exifData?.Rating;
 						const fileId = getFileId(currentImage.fileName);
@@ -1092,13 +1087,13 @@ export default function Home() {
 
 						console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);
 
-            // Only process if EXIF has a valid rating (1-5)
+			// Only process if EXIF has a valid rating (1-5)
 						if(exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
-              // EXIF has rating, database doesn't → add to database
+			// EXIF has rating, database doesn't → add to database
 							if((dbRating?.rating === null || dbRating?.rating === undefined) && !dbRating?.overRuleFileRating) {
 								await updateRatingInDatabase(currentImage.fileName, exifRating);
 							}
-              // EXIF rating differs from database → show modal
+			// EXIF rating differs from database → show modal
 							else if(exifRating !== dbRating?.rating && !dbRating?.overRuleFileRating) {
 								setRatingConflictData({
 									fileName: currentImage.fileName,
@@ -1108,7 +1103,7 @@ export default function Home() {
 								});
 								setIsRatingConflictModalOpen(true);
 							}
-              // Else: ratings match, do nothing
+			// Else: ratings match, do nothing
 						}
 					}
 				}
