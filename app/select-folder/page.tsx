@@ -17,6 +17,7 @@ export default function SelectFolder() {
 	const [pathHistory, setPathHistory] = useState<string[]>([]);
 	const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false);
 	const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
+	const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const socketRef = useRef<Socket | null>(null);
 	const isSocketReady = useRef<boolean>(false);
@@ -43,6 +44,17 @@ export default function SelectFolder() {
 			window.removeEventListener('pageshow', handlePageShow);
 		};
 	}, []);
+
+	useEffect(() => {
+		if(filteredPaths.length === 0) {
+			setHighlightedIndex(-1);
+			return;
+		}
+
+		if(highlightedIndex >= filteredPaths.length) {
+			setHighlightedIndex(filteredPaths.length - 1);
+		}
+	}, [filteredPaths, highlightedIndex]);
 
 // Load path history from localStorage on mount
 	useEffect(() => {
@@ -125,17 +137,15 @@ export default function SelectFolder() {
 // Handle input change with autocomplete
 	function handleInputChange(value: string) {
 		setInputPath(value);
-	
-		if(value.trim()) {
-			const matches = pathHistory.filter(p =>
-				p.toLowerCase().includes(value.toLowerCase())
-			);
-			setFilteredPaths(matches);
-			setShowAutocomplete(matches.length > 0);
-		} else {
-			setFilteredPaths([]);
-			setShowAutocomplete(false);
-		}
+
+		const query = value.trim().toLowerCase();
+		const matches = query
+			? pathHistory.filter((p) => p.toLowerCase().includes(query))
+			: pathHistory;
+
+		setFilteredPaths(matches);
+		setShowAutocomplete(matches.length > 0);
+		setHighlightedIndex(matches.length > 0 ? 0 : -1);
 	}
 
 // Handle autocomplete selection
@@ -143,6 +153,47 @@ export default function SelectFolder() {
 		setInputPath(path);
 		setShowAutocomplete(false);
 		setFilteredPaths([]);
+		setHighlightedIndex(-1);
+	}
+
+// Remove a single path from history and keep autocomplete in sync
+	function removePathFromHistory(pathToRemove: string) {
+		setPathHistory((prev) => {
+			const next = prev.filter((p) => p !== pathToRemove);
+			localStorage.setItem('pathHistory', JSON.stringify(next));
+			localStorage.removeItem(`batchExifData_${pathToRemove}`);
+			try {
+				const activeIndicesRaw = localStorage.getItem('activeIndices');
+				if(activeIndicesRaw) {
+					const activeIndices = JSON.parse(activeIndicesRaw) as Record<string, unknown>;
+					if(pathToRemove in activeIndices) {
+						delete activeIndices[pathToRemove];
+						localStorage.setItem('activeIndices', JSON.stringify(activeIndices));
+					}
+				}
+			} catch (error) {
+				console.error('Failed to update activeIndices:', error);
+			}
+			const shouldClearInput = inputPath === pathToRemove;
+			if(shouldClearInput) {
+				setInputPath('');
+			}
+			if(localStorage.getItem('activeFolder') === pathToRemove) {
+				localStorage.removeItem('activeFolder');
+				setHasActiveFolder(false);
+			}
+
+			const query = shouldClearInput ? '' : inputPath.trim().toLowerCase();
+			const nextFiltered = query
+				? next.filter((p) => p.toLowerCase().includes(query))
+				: next;
+
+			setFilteredPaths(nextFiltered);
+			setShowAutocomplete(nextFiltered.length > 0);
+			setHighlightedIndex(nextFiltered.length > 0 ? 0 : -1);
+
+			return next;
+		});
 	}
 
 	async function handlePickFolder(targetRoute: '/' | '/list' | '/bulk-rate' | '/pairwise-ranking') {
@@ -312,22 +363,59 @@ export default function SelectFolder() {
 								value={inputPath}
 								onChange={(e) => handleInputChange(e.target.value)}
 								onKeyDown={(e) => {
-									if(e.key === 'Enter') {
-										handlePickFolder('/');
+									if(e.key === 'ArrowDown') {
+										e.preventDefault();
+										if(!showAutocomplete) {
+											const query = inputPath.trim().toLowerCase();
+											const matches = query
+												? pathHistory.filter((p) => p.toLowerCase().includes(query))
+												: pathHistory;
+											setFilteredPaths(matches);
+											setShowAutocomplete(matches.length > 0);
+											setHighlightedIndex(matches.length > 0 ? 0 : -1);
+										} else if(filteredPaths.length > 0) {
+											setHighlightedIndex((prev) => (prev + 1) % filteredPaths.length);
+										}
+									} else if(e.key === 'ArrowUp') {
+										e.preventDefault();
+										if(showAutocomplete && filteredPaths.length > 0) {
+											setHighlightedIndex((prev) => (prev <= 0 ? filteredPaths.length - 1 : prev - 1));
+										}
+									} else if(e.key === 'Enter') {
+										if(showAutocomplete && highlightedIndex >= 0 && highlightedIndex < filteredPaths.length) {
+											e.preventDefault();
+											selectAutocompletePath(filteredPaths[highlightedIndex]);
+										} else {
+											handlePickFolder('/');
+										}
+									} else if(e.key === 'Delete') {
+										if(showAutocomplete && highlightedIndex >= 0 && highlightedIndex < filteredPaths.length) {
+											e.preventDefault();
+											removePathFromHistory(filteredPaths[highlightedIndex]);
+										}
 									} else if(e.key === 'Escape') {
 										setShowAutocomplete(false);
+										setHighlightedIndex(-1);
 									}
 								}}
 								onFocus={() => {
-									if(inputPath.trim() && filteredPaths.length > 0) {
-										setShowAutocomplete(true);
-									}
+									const query = inputPath.trim().toLowerCase();
+									const matches = query
+										? pathHistory.filter((p) => p.toLowerCase().includes(query))
+										: pathHistory;
+
+									setFilteredPaths(matches);
+									setShowAutocomplete(matches.length > 0);
+									setHighlightedIndex(matches.length > 0 ? 0 : -1);
 								}}
 								onBlur={() => {
 				// Delay to allow click on autocomplete item
-									setTimeout(() => setShowAutocomplete(false), 200);
+									setTimeout(() => {
+										setShowAutocomplete(false);
+										setHighlightedIndex(-1);
+									}, 200);
 								}}
-								placeholder="E.g: C:\Users\xxx\Pictures or \\server\share\photos"
+								placeholder={"E.g: C:\\Users\\xxx\\Pictures or \\\\server\\share\\photos"}
 								className="w-full px-4 py-3 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded focus:outline-none focus:border-zinc-500 text-sm"
 							/>
 			
@@ -335,13 +423,31 @@ export default function SelectFolder() {
 							{showAutocomplete && filteredPaths.length > 0 && (
 								<div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg max-h-60 overflow-y-auto z-10">
 									{filteredPaths.map((path, idx) => (
-										<button
+										<div
 											key={idx}
-											onClick={() => selectAutocompletePath(path)}
-											className="w-full px-4 py-2 text-left text-zinc-200 hover:bg-zinc-700 transition text-sm border-b border-zinc-700 last:border-b-0"
+											className={`flex items-center border-b border-zinc-700 last:border-b-0 ${idx === highlightedIndex ? 'bg-zinc-700' : ''}`}
 										>
-											{path}
-										</button>
+											<button
+												type="button"
+												onMouseDown={(e) => e.preventDefault()}
+												onMouseEnter={() => setHighlightedIndex(idx)}
+												onClick={() => selectAutocompletePath(path)}
+												className="flex-1 px-4 py-2 text-left text-zinc-200 hover:bg-zinc-700 transition text-sm"
+											>
+												{path}
+											</button>
+											<button
+												type="button"
+												onMouseDown={(e) => e.preventDefault()}
+												onMouseEnter={() => setHighlightedIndex(idx)}
+												onClick={() => removePathFromHistory(path)}
+												aria-label={`Remove ${path} from history`}
+												title="Remove from history"
+												className="px-3 py-2 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition text-sm"
+											>
+												x
+											</button>
+										</div>
 									))}
 								</div>
 							)}
