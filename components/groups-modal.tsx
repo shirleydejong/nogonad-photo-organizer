@@ -247,7 +247,7 @@ export function GroupsModal({ isOpen, onClose, folderPath }: GroupsModalProps) {
 
 					<div className="max-h-[420px] overflow-auto">
 						{isLoading && (
-							<div className="px-4 py-5 text-zinc-400 text-sm">Loading groups...</div>
+							<div className="px-4 py-5 text-zinc-400 text-sm">Loading groups…</div>
 						)}
 
 						{!isLoading && groupsWithCounts.length === 0 && (

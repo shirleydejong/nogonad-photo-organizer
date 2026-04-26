@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
 			return NextResponse.json({
 				success: true,
-				message: response.message || 'ShootAssist starting...'
+				message: response.message || 'ShootAssist starting…'
 			});
 		}
     
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
 			return NextResponse.json({
 				success: true,
-				message: response.message || 'ShootAssist stopping...'
+				message: response.message || 'ShootAssist stopping…'
 			});
 		}
 

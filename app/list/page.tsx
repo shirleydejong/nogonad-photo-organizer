@@ -440,7 +440,7 @@ export default function ListPage() {
 			setStatusModal({
 				isOpen: true,
 				status: 'loading',
-				message: 'Importing ratings...',
+				message: 'Importing ratings…',
 			});
 			setShowImportModal(false);
 
@@ -613,7 +613,7 @@ export default function ListPage() {
 		setStatusModal({
 			isOpen: true,
 			status: 'loading',
-			message: 'Applying ratings to all images...',
+			message: 'Applying ratings to all images…',
 		});
 
 		try {
@@ -652,7 +652,7 @@ export default function ListPage() {
 
 			console.log('Aggregated ratings to apply:', aggregated);
 
-			const response = await fetch('/api/set-ratings', {
+			const response = await fetch('/api/sync-ratings', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -713,7 +713,7 @@ export default function ListPage() {
 		setStatusModal({
 			isOpen: true,
 			status: 'loading',
-			message: `Moving ${count} 1-star files (and variants) to trash...`,
+			message: `Moving ${count} 1-star files (and variants) to trash…`,
 		});
 
 		try {
@@ -977,9 +977,7 @@ export default function ListPage() {
 			<div className="flex min-h-screen flex-col bg-black font-sans">
 				<main className="flex-1 flex flex-col items-center justify-center">
 					<div className="flex flex-col items-center gap-6 p-8">
-						<div className="text-zinc-200 text-2xl font-semibold">
-              Loading images...
-						</div>
+						<div className="text-zinc-200 text-2xl font-semibold">Loading images…</div>
 						<div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
 							<div
 								className="bg-zinc-400 h-full transition-all duration-300 ease-out"

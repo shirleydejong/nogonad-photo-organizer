@@ -52,12 +52,12 @@ function PairwiseComparePageFallback() {
 	return (
 		<div className="flex min-h-screen flex-col bg-black font-sans">
 			<Header folderName={null} title="Pairwise Comparison" isFullscreen={false}>
-				<div className="text-zinc-400 text-sm">Loading...</div>
+				<div className="text-zinc-400 text-sm">Loading…</div>
 			</Header>
 			<main className="flex-1 flex items-center justify-center">
 				<div className="flex flex-col items-center gap-4 text-zinc-300">
 					<div className="w-12 h-12 border-4 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-					<span>Loading comparison data...</span>
+					<span>Loading comparison data…</span>
 				</div>
 			</main>
 		</div>
@@ -447,12 +447,12 @@ function PairwiseComparePageContent() {
 		return (
 			<div className="flex min-h-screen flex-col bg-black font-sans">
 				<Header folderName={folderName} title="Pairwise Comparison" isFullscreen={false}>
-					<div className="text-zinc-400 text-sm">Loading...</div>
+					<div className="text-zinc-400 text-sm">Loading…</div>
 				</Header>
 				<main className="flex-1 flex items-center justify-center">
 					<div className="flex flex-col items-center gap-4 text-zinc-300">
 						<div className="w-12 h-12 border-4 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-						<span>Loading comparison data...</span>
+						<span>Loading comparison data…</span>
 					</div>
 				</main>
 			</div>

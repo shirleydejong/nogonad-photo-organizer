@@ -161,7 +161,7 @@ export default function SelectFolder() {
 
     // Wait for socket to be ready
 		if(!isSocketReady.current) {
-			setError('Socket not connected yet, please wait...');
+			setError('Socket not connected yet, please wait…');
 			return;
 		}
 
@@ -286,11 +286,9 @@ export default function SelectFolder() {
 		<div className="flex min-h-screen flex-col bg-black font-sans">
 			<main className="flex-1 flex flex-col items-center justify-center w-full">
 				{isProcessing ? (
-          // Splash screen with progress bar
+				// Splash screen with progress bar
 					<div className="flex flex-col items-center gap-6 p-8">
-						<div className="text-zinc-200 text-2xl font-semibold">
-              Generating thumbnails...
-						</div>
+						<div className="text-zinc-200 text-2xl font-semibold">Generating thumbnails…</div>
 						<div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
 							<div
 								className="bg-zinc-400 h-full transition-all duration-300 ease-out"
@@ -301,9 +299,7 @@ export default function SelectFolder() {
 							{progress}% complete
 						</div>
 						{folderName && (
-							<div className="text-zinc-500 text-sm">
-                Folder: <b>{folderName}</b>
-							</div>
+							<div className="text-zinc-500 text-sm">Folder: <b>{folderName}</b></div>
 						)}
 					</div>
 				) : (

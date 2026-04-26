@@ -1227,7 +1227,7 @@ export default function Home() {
 				// Loading state
 					<div className="flex flex-col items-center gap-6 p-8">
 						<div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-						<div className="text-zinc-400 text-sm">Loading images...</div>
+						<div className="text-zinc-400 text-sm">Loading images…</div>
 					</div>
 				) : error ? (
 				// Error state
@@ -1496,7 +1496,7 @@ export default function Home() {
 									{isExifLoading ? (
 										<div className="flex flex-col items-center py-10 text-center">
 											<div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
-											<span className="text-zinc-400 text-sm">Loading EXIF...</span>
+											<span className="text-zinc-400 text-sm">Loading EXIF…</span>
 										</div>
 									) : exifError ? (
 										<div className="text-red-400 text-sm">{exifError}</div>

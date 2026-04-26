@@ -146,7 +146,7 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'ShootAssist starting...' });
+			ack?.({ success: true, message: 'ShootAssist starting…' });
 		});
 
 		socket.on('shoot-assist-stop', (_payload: unknown, ack?: (response: CommandAck) => void) => {
@@ -156,7 +156,7 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'ShootAssist stopping...' });
+			ack?.({ success: true, message: 'ShootAssist stopping…' });
 		});
 
 		socket.on(
@@ -204,7 +204,7 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'Stopping capture...' });
+			ack?.({ success: true, message: 'Stopping capture…' });
 		});
 
     // Handle display session joining

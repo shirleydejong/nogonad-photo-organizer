@@ -76,7 +76,7 @@ function DisplayPageContent() {
 							</svg>
 						</div>
 					</div>
-					<p className="text-lg text-zinc-300">Waiting for image...</p>
+					<p className="text-lg text-zinc-300">Waiting for image…</p>
 				</div>
 			)}
 		</div>

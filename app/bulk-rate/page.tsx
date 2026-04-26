@@ -462,7 +462,7 @@ export default function BulkRatePage() {
 	if(isLoading) {
 		return (
 			<div className="flex min-h-screen flex-col bg-black font-sans">
-				<Header folderName={folderName} title="Loading..." isFullscreen={false}>
+				<Header folderName={folderName} title="Loading…" isFullscreen={false}>
 					<div className="text-zinc-400 text-sm">{Math.round(loadProgress)}%</div>
 				</Header>
 				<main className="flex-1 flex items-center justify-center">
@@ -475,7 +475,7 @@ export default function BulkRatePage() {
 								</svg>
 							</div>
 						</div>
-						<p className="text-lg text-zinc-300">Loading images...</p>
+						<p className="text-lg text-zinc-300">Loading images…</p>
 					</div>
 				</main>
 			</div>

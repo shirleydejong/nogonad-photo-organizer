@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
 			return NextResponse.json({
 				success: true,
-				message: response.message || 'Stopping capture...'
+				message: response.message || 'Stopping capture…'
 			});
 		}
 
