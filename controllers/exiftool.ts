@@ -136,16 +136,10 @@ export async function getBatchExifJson(folderPath: string): Promise<any[]> {
 		let stdout = '';
 		let stderr = '';
 
-		proc.stdout.on('data', (chunk) => {
-			stdout += chunk.toString();
-		});
-
-		proc.stderr.on('data', (chunk) => {
-			stderr += chunk.toString();
-		});
+		proc.stdout.on('data', (chunk) => stdout += chunk.toString());
+		proc.stderr.on('data', (chunk) => stderr += chunk.toString());
 
 		proc.on('error', reject);
-
 		proc.on('close', (code) => {
 			if(code !== 0) {
 				const message = stderr.trim() || `exiftool exited with code ${code}`;
@@ -153,7 +147,12 @@ export async function getBatchExifJson(folderPath: string): Promise<any[]> {
 				return;
 			}
 			try {
-				const data = JSON.parse(stdout.trim());
+				const rawData = stdout.trim();
+				if(!rawData || rawData === '[]' || rawData === '{}' ) {
+					resolve([]);
+					return;
+				}
+				const data = JSON.parse(rawData);
 				resolve(Array.isArray(data) ? data : [data]);
 			} catch {
 				reject(new Error('Could not parse exiftool output as JSON'));
