@@ -38,6 +38,17 @@ function normalizeFileNamesToIds(fileNames: unknown): string[] {
 	);
 }
 
+/**
+ * Returns all stored DB ratings for a local folder.
+ *
+ * Query parameters:
+ * - folderPath: absolute folder path to load ratings for
+ *
+ * Responses:
+ * - 200 with `{ success: true, ratings }`
+ * - 400 when folderPath is missing or does not exist
+ * - 500 on unexpected errors
+ */
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -65,6 +76,21 @@ export async function GET(request: NextRequest) {
 	}
 }
 
+/**
+ * Handles rating-related mutations for a local folder.
+ *
+ * Body fields:
+ * - folderPath (required): absolute folder path
+ * - action: when set to `ensure`, creates missing rating rows for `imageIds` and/or `fileNames`
+ * - fileName: image file name used for single rating updates (required unless action is ensure)
+ * - rating: integer 1-5 or null to clear
+ * - overRuleFileRating: optional boolean flag for override behavior
+ *
+ * Responses:
+ * - 200 with mutation result payload
+ * - 400 for validation errors (missing folder/file, invalid rating, nonexistent folder)
+ * - 500 on unexpected errors
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const body = await request.json();

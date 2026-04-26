@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 
+/**
+ * Serves an image file from the local filesystem.
+ *
+ * Query parameters:
+ * - folderPath: Absolute folder path that contains the image
+ * - fileName: Image file name inside folderPath
+ *
+ * Behavior:
+ * - Returns 400 when required query parameters are missing
+ * - Returns 404 when the file cannot be read
+ * - Sets Content-Type from file extension and enables short-term public caching
+ */
 export async function GET(request: NextRequest) {
 	try {
-    //const { filename } = await params;
+	//const { filename } = await params;
 		const { searchParams } = new URL(request.url);
 		const folderPath = searchParams.get('folderPath');
 		const fileName = searchParams.get('fileName');
@@ -15,7 +27,7 @@ export async function GET(request: NextRequest) {
 
 		const fileBuffer = await fs.readFile(path.join(folderPath, fileName));
 
-    // Determine content type based on extension
+	// Determine content type based on extension
 		const ext = path.extname(fileName).toLowerCase();
 		const contentType = {
 			'.jpg': 'image/jpeg',
