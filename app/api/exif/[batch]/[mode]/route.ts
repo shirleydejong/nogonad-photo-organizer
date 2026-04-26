@@ -60,12 +60,11 @@ function isModeParam(value: string): value is ModeParam {
  */
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: Promise<{ batch: string; mode: string }> }
+	{ params }: { params: { batch: string; mode: string } }
 ) {
 	try {
-		const resolvedParams = await params;
-		const batch = resolvedParams.batch?.toLowerCase() ?? '';
-		const mode = resolvedParams.mode?.toLowerCase() ?? '';
+		const batch = params.batch?.toLowerCase() ?? '';
+		const mode = params.mode?.toLowerCase() ?? '';
 
 		// Validate path parameters
 		if(!isBatchParam(batch)) {
