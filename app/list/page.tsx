@@ -14,16 +14,16 @@ import { aggregateRatings } from '@/utils/ratings-aggregator';
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
-  fileName: string;
-  thumbnailPath: string;
-  originalPath: string;
+	fileName: string;
+	thumbnailPath: string;
+	originalPath: string;
 }
 
 interface Rating {
-  id: string;
-  rating: number | null;
-  overRuleFileRating: boolean;
-  createdAt: string;
+	id: string;
+	rating: number | null;
+	overRuleFileRating: boolean;
+	createdAt: string;
 }
 
 export default function ListPage() {
