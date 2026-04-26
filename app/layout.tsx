@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Noto_Color_Emoji } from 'next/font/google';
+
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
 
@@ -11,6 +12,11 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
 	variable: '--font-geist-mono',
 	subsets: ['latin'],
+});
+
+const notoColorEmoji = Noto_Color_Emoji({
+	weight: '400',
+	variable: '--font-noto-color-emoji',
 });
 
 export const metadata: Metadata = {
@@ -32,10 +38,9 @@ export default function RootLayout({
 					href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
 					rel="stylesheet"
 				/>
-				<link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet" />
 			</head>
 			<body
-				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+				className={`${geistSans.variable} ${geistMono.variable} ${notoColorEmoji.variable} antialiased`}
 			>
 				<Toaster
 					position="bottom-right"
