@@ -177,6 +177,7 @@ export function CameraControlModal({
 						onClick={handleClose}
 						className="text-zinc-400 hover:text-zinc-200 transition"
 						title="Close"
+						aria-label="Close"
 					>
 						<Icon name="close" />
 					</button>
