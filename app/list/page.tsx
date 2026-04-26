@@ -51,19 +51,19 @@ export default function ListPage() {
 	const [showExportModal, setShowExportModal] = useState<boolean>(false);
 	const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
-  // Status modal state
+// Status modal state
 	const [statusModal, setStatusModal] = useState<{
-    isOpen: boolean;
-    status: 'loading' | 'success' | 'error';
-    message: string;
-    errorDetails?: string;
-  }>({
-  	isOpen: false,
-  	status: 'loading',
-  	message: '',
-  });
+	isOpen: boolean;
+	status: 'loading' | 'success' | 'error';
+	message: string;
+	errorDetails?: string;
+}>({
+	isOpen: false,
+	status: 'loading',
+	message: '',
+});
 
-  // Load folder from localStorage on mount
+// Load folder from localStorage on mount
 	useEffect(() => {
 		const activeFolder = localStorage.getItem('activeFolder');
 		if(activeFolder) {
@@ -102,7 +102,7 @@ export default function ListPage() {
 		}
 	}, []);
 
-  // Load folder and images
+// Load folder and images
 	async function loadFolder(path: string) {
 		setIsLoading(true);
 		setLoadProgress(0);
@@ -113,12 +113,12 @@ export default function ListPage() {
 			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 			setFolderPath(normalizedPath);
 
-      // Get the folder name from the path
+		// Get the folder name from the path
 			const parts = normalizedPath.split('\\');
 			const lastPart = parts[parts.length - 1];
 			setFolderName(lastPart || normalizedPath);
 
-      // Get list of files (thumbnails should already exist)
+		// Get list of files (thumbnails should already exist)
 			setLoadProgress(10);
 			const startResponse = await fetch('/api/image', {
 				method: 'POST',
@@ -133,7 +133,7 @@ export default function ListPage() {
 
 			const startData = await startResponse.json();
 
-      // If no images found
+		// If no images found
 			if(startData.total === 0) {
 				setError('No images found in this folder');
 				setIsLoading(false);
@@ -142,7 +142,7 @@ export default function ListPage() {
 
 			const files = startData.files as string[];
 
-      // Create ImageData objects
+		// Create ImageData objects
 			setLoadProgress(25);
 			const imageData: ImageData[] = files.map((fileName) => {
 				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
@@ -156,7 +156,7 @@ export default function ListPage() {
 
 			setImageFiles(imageData);
 
-	// Load batch EXIF data from localStorage
+		// Load batch EXIF data from localStorage
 			setLoadProgress(40);
 			let batchExifData: any[] = [];
 			try {
@@ -197,7 +197,7 @@ export default function ListPage() {
 				console.error('Failed to fetch ratings:', ratingErr);
 			}
 
-      // Fetch RAW files from raw subfolder
+		// Fetch RAW files from raw subfolder
 			setLoadProgress(75);
 			try {
 				const rawResponse = await fetch(
@@ -261,7 +261,7 @@ export default function ListPage() {
 		const ratingData = ratings.get(fileId);
 		const currentRating = ratingData?.rating ?? null;
 
-    // Check if conflicts-only filter is enabled
+	// Check if conflicts-only filter is enabled
 		if(showConflictsOnly) {
 			const hasConflict = hasRatingConflict(fileName) || hasJpgRawMismatch(fileName) || hasRawRatingConflict(fileName);
 			if(!hasConflict) {
@@ -271,12 +271,12 @@ export default function ListPage() {
 
 		let matchesRating = false;
 
-    // If no rating and showUnrated is true, show it
+	// If no rating and showUnrated is true, show it
 		if(currentRating === null && showUnrated) {
 			matchesRating = true;
 		}
 
-    // If has rating and it's in selectedRatings, show it
+	// If has rating and it's in selectedRatings, show it
 		if(currentRating !== null && selectedRatings.has(currentRating)) {
 			matchesRating = true;
 		}
@@ -285,7 +285,7 @@ export default function ListPage() {
 			return false;
 		}
 
-    // No selected groups keeps existing behavior.
+	// No selected groups keeps existing behavior.
 		if(selectedGroupIds.size === 0) {
 			return true;
 		}
@@ -403,7 +403,7 @@ export default function ListPage() {
 	const handleExportRatings = useCallback((filename: string, prefix: string) => {
 		try {
 			const exportData: Array<{ id: string; rating: number | null }> = [];
-      
+
 			ratings.forEach((rating, id) => {
 				if(rating && rating.rating !== null) {
 					const exportId = prefix ? `${prefix}${id}` : id;
@@ -459,14 +459,14 @@ export default function ListPage() {
 					continue;
 				}
 
-        // Check if rating already exists in database
+			// Check if rating already exists in database
 				const existingRating = ratings.get(item.id);
 				if(existingRating && existingRating.rating !== null) {
 					skippedCount++;
 					continue;
 				}
 
-        // Import the rating
+			// Import the rating
 				const response = await fetch('/api/ratings', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -480,7 +480,7 @@ export default function ListPage() {
 
 				if(response.ok) {
 					importedCount++;
-          // Update local state
+				// Update local state
 					setRatings(prev => {
 						const newMap = new Map(prev);
 						newMap.set(item.id, {
@@ -530,7 +530,7 @@ export default function ListPage() {
 						}`}
 						title={`Rate ${star} stars`}
 					>
-            ★
+					★
 					</button>
 				))}
 			</div>
@@ -558,8 +558,8 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // Conflict exists only if RAW file has EXIF rating AND database rating differs
-    // No RAW rating = no conflict, even if database has a rating
+	// Conflict exists only if RAW file has EXIF rating AND database rating differs
+	// No RAW rating = no conflict, even if database has a rating
 		if(rawRating != null && rawRating !== 0 && dbRating !== null && rawRating !== dbRating && !dbOverRule) {
 			return true;
 		}
@@ -573,7 +573,7 @@ export default function ListPage() {
 		const rawRating = rawExifData.get(fileId);
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 
-    // Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
+	// Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
 		if(exifRating != null && exifRating !== 0 && rawRating != null && rawRating !== 0 && !dbRating && exifRating !== rawRating) {
 			return true;
 		}
@@ -599,7 +599,7 @@ export default function ListPage() {
 	}
 
 	function hasAnyConflicts(): boolean {
-    // Check if any image has a conflict
+	// Check if any image has a conflict
 		for(const image of imageFiles) {
 			if(hasRatingConflict(image.fileName) || hasRawRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)) {
 				return true;
@@ -609,7 +609,7 @@ export default function ListPage() {
 	}
 
 	const handleApplyRatings = useCallback(async() => {
-    // Show modal immediately
+	// Show modal immediately
 		setStatusModal({
 			isOpen: true,
 			status: 'loading',
@@ -617,7 +617,7 @@ export default function ListPage() {
 		});
 
 		try {
-      // Transform ratings Map to match the expected format
+		// Transform ratings Map to match the expected format
 			const dbRatingsMap = new Map();
 			ratings.forEach((rating, fileId) => {
 				if(rating && rating.rating !== null && rating.rating !== 0) {
@@ -628,7 +628,7 @@ export default function ListPage() {
 				}
 			});
 
-      // Filter out 0 values from JPG ratings
+		// Filter out 0 values from JPG ratings
 			const jpgRatingsMap = new Map();
 			exifData.forEach((rating, fileId) => {
 				if(rating !== null && rating !== 0) {
@@ -636,7 +636,7 @@ export default function ListPage() {
 				}
 			});
 
-      // Filter out 0 values from RAW ratings
+		// Filter out 0 values from RAW ratings
 			const rawRatingsMap = new Map();
 			rawExifData.forEach((rating, fileId) => {
 				if(rating !== null && rating !== 0) {
@@ -663,7 +663,7 @@ export default function ListPage() {
 
 			if(response.ok) {
 				console.log('Ratings applied successfully');
-        // Automatically move 1-star files to trash if any exist
+			// Automatically move 1-star files to trash if any exist
 				const oneStarCount = getOneStarCount();
 				if(oneStarCount > 0) {
 					await handleMoveToTrash();
@@ -726,7 +726,7 @@ export default function ListPage() {
 			if(response.ok) {
 				const data = await response.json();
 
-        // Remove moved files from the local ratings map so the UI updates
+			// Remove moved files from the local ratings map so the UI updates
 				setRatings(prev => {
 					const newMap = new Map(prev);
 					data.movedFiles.forEach((fullPath: string) => {
@@ -800,13 +800,11 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
+	// No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
 		if(!dbRating && !exifRating) {
 			return (
 				<div className="flex items-center gap-2 flex-col">
-					<div className="text-zinc-500 text-xs">
-            No rating
-					</div>
+					<div className="text-zinc-500 text-xs">No rating</div>
 				</div>
 			);
 		}

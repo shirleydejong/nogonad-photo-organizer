@@ -11,16 +11,16 @@ import { Icon } from '@/components/icon';
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
-  fileName: string;
-  thumbnailPath: string;
-  originalPath: string;
+fileName: string;
+thumbnailPath: string;
+originalPath: string;
 }
 
 interface Rating {
-  id: string;
-  rating: number | null;
-  overRuleFileRating: boolean;
-  createdAt: string;
+id: string;
+rating: number | null;
+overRuleFileRating: boolean;
+createdAt: string;
 }
 
 export default function BulkRatePage() {
@@ -41,26 +41,26 @@ export default function BulkRatePage() {
 	const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
 	const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
 	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
-  
-  // Multi-select state
+
+// Multi-select state
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 	const [hoveredRating, setHoveredRating] = useState<number | null>(null);
-  
-  // Rectangle selection state
+
+// Rectangle selection state
 	const [isSelecting, setIsSelecting] = useState(false);
 	const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
 	const [, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
-  
+
 	const containerRef = useRef<HTMLDivElement>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
 
-  // Get file ID (without extension)
+// Get file ID (without extension)
 	function getFileId(fileName: string) {
 		const lastDot = fileName.lastIndexOf('.');
 		return lastDot === -1 ? fileName : fileName.substring(0, lastDot);
 	}
 
-  // Get thumbnail filename
+// Get thumbnail filename
 	function getThumbnailFilename(fileName: string) {
 		const lastDot = fileName.lastIndexOf('.');
 		if(lastDot === -1) {return fileName + '-thumb';}
@@ -86,7 +86,7 @@ export default function BulkRatePage() {
 			return false;
 		}
 
-    // No selected groups keeps existing behavior.
+	// No selected groups keeps existing behavior.
 		if(selectedGroupIds.size === 0) {
 			return true;
 		}
@@ -134,7 +134,7 @@ export default function BulkRatePage() {
 		}
 	}, []);
 
-  // Load folder and images
+// Load folder and images
 	async function loadFolder(path: string) {
 		setIsLoading(true);
 		setLoadProgress(0);
@@ -145,12 +145,12 @@ export default function BulkRatePage() {
 			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 			setFolderPath(normalizedPath);
 
-      // Get the folder name from the path
+		// Get the folder name from the path
 			const parts = normalizedPath.split('\\');
 			const lastPart = parts[parts.length - 1];
 			setFolderName(lastPart || normalizedPath);
 
-      // Get list of files (thumbnails should already exist)
+		// Get list of files (thumbnails should already exist)
 			setLoadProgress(10);
 			const startResponse = await fetch('/api/image', {
 				method: 'POST',
@@ -165,7 +165,7 @@ export default function BulkRatePage() {
 
 			const startData = await startResponse.json();
 
-      // If no images found
+		// If no images found
 			if(startData.total === 0) {
 				setError('No images found in this folder');
 				setIsLoading(false);
@@ -174,7 +174,7 @@ export default function BulkRatePage() {
 
 			const files = startData.files as string[];
 
-      // Create ImageData objects
+		// Create ImageData objects
 			setLoadProgress(25);
 			const imageData: ImageData[] = files.map((fileName) => {
 				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
@@ -188,7 +188,7 @@ export default function BulkRatePage() {
 
 			setImageFiles(imageData);
 
-      // Fetch ratings for this folder
+	// Fetch ratings for this folder
 			setLoadProgress(55);
 			try {
 				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
@@ -219,7 +219,7 @@ export default function BulkRatePage() {
 		}
 	}
 
-  // Load folder from localStorage on mount
+// Load folder from localStorage on mount
 	useEffect(() => {
 		const activeFolder = localStorage.getItem('activeFolder');
 		if(activeFolder) {
@@ -229,7 +229,7 @@ export default function BulkRatePage() {
 		}
 	}, [router]);
 
-  // Handle rating application to selected images
+// Handle rating application to selected images
 	const applyRatingToSelected = useCallback(async(rating: number | null) => {
 		if(selectedIndices.size === 0) {return;}
 
@@ -250,7 +250,7 @@ export default function BulkRatePage() {
 				}
 			}
 
-      // Update local ratings state
+	// Update local ratings state
 			setRatings(prev => {
 				const newMap = new Map(prev);
 				for(const index of selectedIndices) {
@@ -267,10 +267,12 @@ export default function BulkRatePage() {
 		}
 	}, [selectedIndices, imageFiles, folderPath]);
 
-  // Handle clicking on image thumbnail
+// Handle clicking on image thumbnail
 	const handleImageClick = useCallback((index: number, event: React.MouseEvent) => {
+		
 		if(event.ctrlKey) {
-      // Ctrl+click: toggle selection
+			
+	// Ctrl+click: toggle selection
 			setSelectedIndices(prev => {
 				const newSet = new Set(prev);
 				if(newSet.has(index)) {
@@ -280,8 +282,10 @@ export default function BulkRatePage() {
 				}
 				return newSet;
 			});
+			
 		} else if(event.shiftKey) {
-      // Shift+click: select range
+			
+	// Shift+click: select range
 			if(selectedIndices.size === 0) {
 				setSelectedIndices(new Set([index]));
 			} else {
@@ -294,20 +298,22 @@ export default function BulkRatePage() {
 				}
 				setSelectedIndices(newSet);
 			}
+			
+	// Regular click: select only this image
 		} else {
-      // Regular click: select only this image
 			setSelectedIndices(new Set([index]));
 		}
 	}, [selectedIndices]);
 
-  // Handle rectangle selection (drag)
+// Handle rectangle selection (drag)
 	const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Don't start rectangle selection if clicking on an image
+		
+	// Don't start rectangle selection if clicking on an image
 		const thumbnail = (e.target as HTMLElement).closest('[data-index]');
 		if(thumbnail) {return;}
-    
+	
 		if(!gridRef.current || e.button !== 0) {return;}
-    
+	
 		setIsSelecting(true);
 		setSelectionStart({ x: e.clientX, y: e.clientY });
 		setSelectionEnd({ x: e.clientX, y: e.clientY });
@@ -333,7 +339,7 @@ export default function BulkRatePage() {
 			const thumbRect = thumb.getBoundingClientRect();
 			const overlaps = !(
 				thumbRect.right < x1 || thumbRect.left > x2 ||
-        thumbRect.bottom < y1 || thumbRect.top > y2
+				thumbRect.bottom < y1 || thumbRect.top > y2
 			);
 
 			if(overlaps) {
@@ -397,43 +403,45 @@ export default function BulkRatePage() {
 		});
 	}, [visibleIndices]);
 
-  // Keyboard shortcuts
+// Keyboard shortcuts
 	useEffect(() => {
+		
 		const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent zoom with Ctrl+Plus, Ctrl+Minus, Ctrl+0
+			
+		// Prevent zoom with Ctrl+Plus, Ctrl+Minus, Ctrl+0
 			if(e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0' || e.key === '=')) {
 				e.preventDefault();
 				return;
 			}
 
-      // Ctrl+A: Select all
+		// Ctrl+A: Select all
 			if((e.ctrlKey || e.metaKey) && e.key === 'a') {
 				e.preventDefault();
 				setSelectedIndices(new Set(visibleImageEntries.map(({ index }) => index)));
 				return;
 			}
 
-      // Escape: Deselect all
+		// Escape: Deselect all
 			if(e.key === 'Escape') {
 				setSelectedIndices(new Set());
 				return;
 			}
 
-      // 1-5: Apply rating
+		// 1-5: Apply rating
 			if(selectedIndices.size > 0 && '12345'.includes(e.key)) {
 				applyRatingToSelected(parseInt(e.key));
 				return;
 			}
 
-      // Delete: Clear rating
+		// Delete: Clear rating
 			if(selectedIndices.size > 0 && (e.key === 'Delete' || e.key === 'Backspace')) {
 				applyRatingToSelected(null);
 				return;
 			}
 		};
 
+	// Prevent zoom with Ctrl+Scroll
 		const handleWheel = (e: WheelEvent) => {
-      // Prevent zoom with Ctrl+Scroll
 			if(e.ctrlKey) {
 				e.preventDefault();
 			}
@@ -452,7 +460,7 @@ export default function BulkRatePage() {
 			const ratings_array = Array.from(selectedIndices).map(
 				index => ratings.get(getFileId(imageFiles[index].fileName))?.rating ?? null
 			);
-        // Check if all ratings are the same
+		// Check if all ratings are the same
 			const firstRating = ratings_array[0];
 			const allSame = ratings_array.every(r => r === firstRating);
 			return allSame ? (firstRating ?? 0) : 0;
@@ -544,9 +552,7 @@ export default function BulkRatePage() {
 						className="inline-grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4 w-full mb-48"
 					>
 						{visibleImageEntries.length === 0 && (
-							<div className="col-span-full text-zinc-500 text-center py-12">
-                No images match the current filter.
-							</div>
+							<div className="col-span-full text-zinc-500 text-center py-12">No images match the current filter.</div>
 						)}
 						{visibleImageEntries.map(({ image, index }) => {
 							const fileId = getFileId(image.fileName);
@@ -569,21 +575,21 @@ export default function BulkRatePage() {
 										height={CONFIG.THUMBNAIL_WIDTH}
 										className="w-full aspect-square object-cover bg-zinc-800 select-none"
 									/>
-                  
+
 									{/* Rating badge */}
 									{imageRating && (
 										<div className="absolute top-1 right-1 bg-black/80 text-yellow-400 text-xs px-2 py-1 rounded font-semibold">
 											{'★'.repeat(imageRating)}
 										</div>
 									)}
-                  
+
 									{/* Selection indicator overlay */}
 									{isSelected && (
 										<div className="absolute inset-0 bg-blue-500/30 flex items-center justify-center">
 											<div className="text-white text-2xl drop-shadow-lg">✓</div>
 										</div>
 									)}
-                  
+
 									{/* File name on hover */}
 									<div className="absolute bottom-0 left-0 right-0 bg-black/85 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity truncate select-none">
 										{image.fileName}
@@ -601,7 +607,7 @@ export default function BulkRatePage() {
 							<div className="text-zinc-300 text-xs text-center mb-1 whitespace-nowrap">
 								{selectedIndices.size} selected
 							</div>
-              
+			
 							<div className="rating-star-row" aria-hidden="true" data-current-rating={hoveredRating ?? currentRating}>
 								<span className="rating-star">★</span>
 								<span className="rating-star">★</span>
@@ -609,7 +615,7 @@ export default function BulkRatePage() {
 								<span className="rating-star">★</span>
 								<span className="rating-star">★</span>
 							</div>
-              
+			
 							<div className="rating-emoji-row noto-color-emoji-regular user-select-none" aria-label="Rating options">
 								<button
 									type="button"
@@ -620,7 +626,7 @@ export default function BulkRatePage() {
 									onMouseLeave={() => setHoveredRating(null)}
 									onClick={() => applyRatingToSelected(1)}
 								>
-                  🗑️
+									🗑️
 								</button>
 								<button
 									type="button"
@@ -631,7 +637,7 @@ export default function BulkRatePage() {
 									onMouseLeave={() => setHoveredRating(null)}
 									onClick={() => applyRatingToSelected(2)}
 								>
-                  😐
+									😐
 								</button>
 								<button
 									type="button"
@@ -642,7 +648,7 @@ export default function BulkRatePage() {
 									onMouseLeave={() => setHoveredRating(null)}
 									onClick={() => applyRatingToSelected(3)}
 								>
-                  🤔
+									🤔
 								</button>
 								<button
 									type="button"
@@ -653,7 +659,7 @@ export default function BulkRatePage() {
 									onMouseLeave={() => setHoveredRating(null)}
 									onClick={() => applyRatingToSelected(4)}
 								>
-                  😀
+									😀
 								</button>
 								<button
 									type="button"
@@ -664,7 +670,7 @@ export default function BulkRatePage() {
 									onMouseLeave={() => setHoveredRating(null)}
 									onClick={() => applyRatingToSelected(5)}
 								>
-                  🤩
+									🤩
 								</button>
 								<button
 									type="button"
@@ -672,7 +678,7 @@ export default function BulkRatePage() {
 									aria-label="Clear rating"
 									onClick={() => applyRatingToSelected(null)}
 								>
-                  ✕
+									✕
 								</button>
 							</div>
 
@@ -686,7 +692,7 @@ export default function BulkRatePage() {
 									}}
 								>
 									<Icon name="group_work" size={16} />
-                  Groups
+									Groups
 								</button>
 							</div>
 						</div>
