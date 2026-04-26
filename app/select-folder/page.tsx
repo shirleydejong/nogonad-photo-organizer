@@ -44,14 +44,14 @@ export default function SelectFolder() {
 		};
 	}, []);
 
-  // Load path history from localStorage on mount
+// Load path history from localStorage on mount
 	useEffect(() => {
 		const savedPaths = localStorage.getItem('pathHistory');
 		if(savedPaths) {
 			try {
 				const paths = JSON.parse(savedPaths);
 				setPathHistory(paths);
-        // Auto-populate with the most recent path
+			// Auto-populate with the most recent path
 				if(paths.length > 0) {
 					setInputPath(paths[0]);
 				}
@@ -60,16 +60,16 @@ export default function SelectFolder() {
 			}
 		}
 
-    // Check if there's an active folder
+	// Check if there's an active folder
 		const activeFolder = localStorage.getItem('activeFolder');
 		if(activeFolder) {
 			setHasActiveFolder(true);
 		}
 	}, []);
 
-  // Setup socket.io connection
+// Setup socket.io connection
 	useEffect(() => {
-    // Get or create the global socket instance
+	// Get or create the global socket instance
 		const socket = getSocket();
 		socketRef.current = socket;
 
@@ -77,13 +77,13 @@ export default function SelectFolder() {
 			socket.emit('unwatch-all-folders');
 		};
 
-    // Check if already connected
+	// Check if already connected
 		if(socket.connected) {
 			isSocketReady.current = true;
 			emitUnwatchAllFolders();
 		}
 
-    // Listen for connection events
+	// Listen for connection events
 		const handleConnect = () => {
 			console.log('Socket connected:', socket.id);
 			isSocketReady.current = true;
@@ -98,34 +98,34 @@ export default function SelectFolder() {
 		socket.on('connect', handleConnect);
 		socket.on('disconnect', handleDisconnect);
 
+	// Remove only our listeners, don't disconnect the socket
 		return () => {
-      // Remove only our listeners, don't disconnect the socket
 			socket.off('connect', handleConnect);
 			socket.off('disconnect', handleDisconnect);
 		};
 	}, []);
 
-  // Save path to history
+// Save path to history
 	function savePathToHistory(path: string) {
 		const trimmedPath = path.trim();
 		if(!trimmedPath) {return;}
 
 		setPathHistory((prev) => {
-      // Remove duplicates and add to front
+	// Remove duplicates and add to front
 			const filtered = prev.filter(p => p !== trimmedPath);
 			const newHistory = [trimmedPath, ...filtered].slice(0, 20); // Keep max 20
-      
-      // Save to localStorage
+	
+	// Save to localStorage
 			localStorage.setItem('pathHistory', JSON.stringify(newHistory));
-      
+	
 			return newHistory;
 		});
 	}
 
-  // Handle input change with autocomplete
+// Handle input change with autocomplete
 	function handleInputChange(value: string) {
 		setInputPath(value);
-    
+	
 		if(value.trim()) {
 			const matches = pathHistory.filter(p =>
 				p.toLowerCase().includes(value.toLowerCase())
@@ -138,7 +138,7 @@ export default function SelectFolder() {
 		}
 	}
 
-  // Handle autocomplete selection
+// Handle autocomplete selection
 	function selectAutocompletePath(path: string) {
 		setInputPath(path);
 		setShowAutocomplete(false);
@@ -148,7 +148,7 @@ export default function SelectFolder() {
 	async function handlePickFolder(targetRoute: '/' | '/list' | '/bulk-rate' | '/pairwise-ranking') {
 		setError(null);
 		setShowAutocomplete(false);
-    
+	
 		if(!inputPath.trim()) {
 			setError('Please enter a path');
 			return;
@@ -159,7 +159,7 @@ export default function SelectFolder() {
 			return;
 		}
 
-    // Wait for socket to be ready
+	// Wait for socket to be ready
 		if(!isSocketReady.current) {
 			setError('Socket not connected yet, please wait…');
 			return;
@@ -167,37 +167,37 @@ export default function SelectFolder() {
 
 		setIsProcessing(true);
 		setProgress(0);
-    
+	
+	// Validate Windows path format
 		try {
-      // Valideer Windows pad format
 			const trimmedPath = inputPath.trim();
-      
-      // Check if it's the thumbnails folder
+			
+		// Check if it's the thumbnails folder
 			if(trimmedPath.toLowerCase().includes(`${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`.toLowerCase())) {
 				setError('You cannot use a thumbnail directory. Choose the main folder with photos.');
 				setIsProcessing(false);
 				return;
 			}
-      
-      // Basic validation: must start with drive letter (C:\\) or UNC path (\\\\)
+	
+		// Basic validation: must start with drive letter (C:\\) or UNC path (\\\\)
 			if(!/^[a-zA-Z]:\\|^\\\\/.test(trimmedPath)) {
 				setError('Please enter a valid Windows path (e.g. C:\\Users\\Photos or \\\\server\\share)');
 				setIsProcessing(false);
 				return;
 			}
 
-      // Normalize the path (convert forward slashes to backslashes)
+		// Normalize the path (convert forward slashes to backslashes)
 			const normalizedPath = trimmedPath.replace(/\//g, '\\');
-      
-      // Save to history
+	
+		// Save to history
 			savePathToHistory(normalizedPath);
 
-      // Get the folder name from the path
+		// Get the folder name from the path
 			const parts = normalizedPath.split('\\');
 			const lastPart = parts[parts.length - 1];
 			setFolderName(lastPart || normalizedPath);
 
-      // Setup socket event listeners
+		// Setup socket event listeners
 			const socket = socketRef.current;
 
 			const handleProgress = (data: { processed: number; total: number; percentage: number; folderPath: string }) => {
@@ -210,13 +210,13 @@ export default function SelectFolder() {
 			const handleComplete = async(data: { total: number; files: string[]; folderPath: string }) => {
 				console.log('Received thumbnail-complete:', data);
 				if(data.folderPath === normalizedPath) {
-          // Clean up listeners
+				// Clean up listeners
 					socket.off('thumbnail-progress', handleProgress);
 					socket.off('thumbnail-complete', handleComplete);
 					socket.off('thumbnail-error', handleError);
 
+				// Fetch batch EXIF data for all files in the folder
 					try {
-            // Fetch batch EXIF data for all files in the folder
 						const exifResponse = await fetch(
 							`/api/exif/batch/default?folderPath=${encodeURIComponent(normalizedPath)}`
 						);
@@ -224,19 +224,18 @@ export default function SelectFolder() {
 						if(exifResponse.ok) {
 							const exifData = await exifResponse.json();
 							if(exifData.success && exifData.exifData) {
-                // Store batch EXIF data in localStorage
+							// Store batch EXIF data in localStorage
 								localStorage.setItem(`batchExifData_${normalizedPath}`, JSON.stringify(exifData.exifData));
 							}
 						}
 					} catch (exifErr) {
+						// Continue anyway, EXIF data is optional
 						console.error('Failed to fetch batch EXIF data:', exifErr);
-            // Continue anyway, EXIF data is optional
 					}
 
+				// Save to localStorage as activeFolder and navigate to the selected view
 					setTimeout(() => {
-            // Save to localStorage as activeFolder
 						localStorage.setItem('activeFolder', normalizedPath);
-            // Navigate to the selected view
 						router.push(targetRoute);
 					}, 300);
 				}
@@ -245,7 +244,7 @@ export default function SelectFolder() {
 			const handleError = (data: { error: string; folderPath: string }) => {
 				console.log('Received thumbnail-error:', data);
 				if(data.folderPath === normalizedPath) {
-          // Clean up listeners
+				// Clean up listeners
 					socket.off('thumbnail-progress', handleProgress);
 					socket.off('thumbnail-complete', handleComplete);
 					socket.off('thumbnail-error', handleError);
@@ -255,16 +254,16 @@ export default function SelectFolder() {
 				}
 			};
 
-      // Register event listeners
+		// Register event listeners
 			socket.on('thumbnail-progress', handleProgress);
 			socket.on('thumbnail-complete', handleComplete);
 			socket.on('thumbnail-error', handleError);
 
-      // Emit generate-thumbnails event
+		// Emit generate-thumbnails event
 			console.log('Emitting generate-thumbnails:', normalizedPath);
 			socket.emit('generate-thumbnails', normalizedPath);
 
-      // Safety timeout after 60 seconds
+		// Safety timeout after 60 seconds
 			setTimeout(() => {
 				if(isProcessing) {
 					socket.off('thumbnail-progress', handleProgress);
@@ -305,7 +304,7 @@ export default function SelectFolder() {
 				) : (
 					<div className="flex flex-col items-center gap-6 w-full max-w-2xl px-4">
 						<div className="text-zinc-200 text-2xl font-semibold">Enter a path</div>
-            
+			
 						<div className="relative w-full">
 							<input
 								ref={inputRef}
@@ -325,13 +324,13 @@ export default function SelectFolder() {
 									}
 								}}
 								onBlur={() => {
-                  // Delay to allow click on autocomplete item
+				// Delay to allow click on autocomplete item
 									setTimeout(() => setShowAutocomplete(false), 200);
 								}}
 								placeholder="E.g: C:\Users\xxx\Pictures or \\server\share\photos"
 								className="w-full px-4 py-3 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded focus:outline-none focus:border-zinc-500 text-sm"
 							/>
-              
+			
 							{/* Autocomplete dropdown */}
 							{showAutocomplete && filteredPaths.length > 0 && (
 								<div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg max-h-60 overflow-y-auto z-10">
@@ -347,30 +346,30 @@ export default function SelectFolder() {
 								</div>
 							)}
 						</div>
-            
+			
 						<div className="flex gap-4">
 							<button
 								className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
 								onClick={() => handlePickFolder('/')}
 							>
 								<Icon name="camera_roll" />
-                View as Strip
+								View as Strip
 							</button>
 							<button
 								className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
 								onClick={() => handlePickFolder('/list')}
 							>
 								<Icon name="list_alt" />
-                View as List
+								View as List
 							</button>
 							<button
 								className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-lg flex gap-2 items-center"
 								onClick={() => handlePickFolder('/bulk-rate')}
 							>
 								<Icon name="grid_view" />
-                Bulk Rate
+								Bulk Rate
 							</button>
-              
+			
 						</div>
 						<div className="flex gap-4">
 							<button
@@ -378,10 +377,10 @@ export default function SelectFolder() {
 								onClick={() => handlePickFolder('/pairwise-ranking')}
 							>
 								<Icon name="swap_horiz" />
-                Pairwise Ranking
+								Pairwise Ranking
 							</button>
 						</div>
-            
+			
 						{error && <div className="text-red-500 text-sm text-center">{error}</div>}
 					</div>
 				)}

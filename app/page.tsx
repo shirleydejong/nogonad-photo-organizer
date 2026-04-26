@@ -369,7 +369,7 @@ export default function Home() {
 		const socket = socketRef.current;
 		if(!socket || !socket.connected) {return;}
 		if(!sessionId || !folderPath || imageFiles.length === 0) {return;}
-    
+
 		const currentImage = imageFiles[activeIndex];
 		if(!currentImage) {return;}
 
@@ -381,7 +381,7 @@ export default function Home() {
 		});
 	}, [activeIndex, folderPath, imageFiles, sessionId]);
 
-  // Load folder from localStorage on mount
+// Load folder from localStorage on mount
 	useEffect(() => {
 		const activeFolder = localStorage.getItem('activeFolder');
 		if(activeFolder) {
@@ -421,25 +421,26 @@ export default function Home() {
 		}
 	}, []);
 
-  // Load folder and images
+// Load folder and images
 	async function loadFolder(path: string) {
 		setIsLoading(true);
 		setError(null);
+		console.log('Loading folder:', path);
 
 		try {
 			const normalizedPath = path.replace(/\//g, '\\');
 			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 			setFolderPath(normalizedPath);
 
-      // Save to localStorage as activeFolder
+		// Save to localStorage as activeFolder
 			localStorage.setItem('activeFolder', normalizedPath);
 
-      // Get the folder name from the path
+		// Get the folder name from the path
 			const parts = normalizedPath.split('\\');
 			const lastPart = parts[parts.length - 1];
 			setFolderName(lastPart || normalizedPath);
 
-      // Get list of files (thumbnails should already exist)
+		// Get list of files (thumbnails should already exist)
 			const startResponse = await fetch('/api/image', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -967,12 +968,17 @@ export default function Home() {
 		}
 	}, [activeIndex, folderPath]);
 
-  // Keyboard navigation and rating
+// Keyboard navigation and rating
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
-      
+				if(e.key === 'Escape' && isCapturing) {
+					e.preventDefault();
+					void handleStopCapture();
+					return;
+				}
+
 			if(isCameraControlModalOpen) {return;}
-      
+
 			if(e.key === 'F11') {
 				e.preventDefault();
 				if(!document.fullscreenElement) {
@@ -1033,7 +1039,7 @@ export default function Home() {
 		}
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen]);
+	}, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen, isCapturing, handleStopCapture]);
 
   // Reset zoom and pan when changing photos
 	useEffect(() => {
@@ -1193,7 +1199,7 @@ export default function Home() {
 		}
 	}, [folderPath]);
 
-	const handleStopCapture = useCallback(async() => {
+	async function handleStopCapture() {
 		try {
 			const response = await fetch('/api/shoot-assist/capture/stop');
 
@@ -1205,7 +1211,7 @@ export default function Home() {
 			console.error('Failed to stop capture:', err);
 			toast.error(`Failed to stop capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
 		}
-	}, []);
+	}
 
 	return (
 		<div className="flex min-h-screen flex-col bg-black font-sans">
@@ -1323,7 +1329,7 @@ export default function Home() {
 												onMouseLeave={() => setHoveredRating(null)}
 												onClick={() => handleRatingClick(1)}
 											>
-                        🗑️
+												🗑️
 											</button>
 											<button
 												type="button"
@@ -1334,7 +1340,7 @@ export default function Home() {
 												onMouseLeave={() => setHoveredRating(null)}
 												onClick={() => handleRatingClick(2)}
 											>
-                        😐
+												😐
 											</button>
 											<button
 												type="button"
@@ -1345,7 +1351,7 @@ export default function Home() {
 												onMouseLeave={() => setHoveredRating(null)}
 												onClick={() => handleRatingClick(3)}
 											>
-                        🤔
+												🤔
 											</button>
 											<button
 												type="button"
@@ -1356,7 +1362,7 @@ export default function Home() {
 												onMouseLeave={() => setHoveredRating(null)}
 												onClick={() => handleRatingClick(4)}
 											>
-                        😀
+												😀
 											</button>
 											<button
 												type="button"
@@ -1367,7 +1373,7 @@ export default function Home() {
 												onMouseLeave={() => setHoveredRating(null)}
 												onClick={() => handleRatingClick(5)}
 											>
-                        🤩
+												🤩
 											</button>
 										</div>
 
@@ -1423,7 +1429,7 @@ export default function Home() {
 													onClick={handleStopCapture}
 													className="border-transparent p-4 flex items-center justify-center font-medium text-blue-600 hover:text-white cursor-pointer focus:outline-none focus:ring-2"
 												>
-                          Stop
+													Stop
 												</button>
 											</div>
 										</div>
@@ -1571,7 +1577,7 @@ export default function Home() {
 						</div>
 					</div>
 				) : (
-          // Empty folder state
+				// Empty folder state
 					<div className="flex flex-col w-full h-screen">
 						<Header
 							folderName={folderName}
