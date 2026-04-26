@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { access, readdir } from 'fs/promises';
 import { getExifJson, getBatchExifJson } from '@/controllers/exiftool';
+import config from '@/config';
 
 /**
  * Batch parameter type: 'batch' for multiple files, 'single' for one file
@@ -122,11 +123,11 @@ export async function GET(
 			const rawFolderPath = path.join(folderPath, rawFolder.name);
 			const rawFiles = await readdir(rawFolderPath, { withFileTypes: true });
 
-			// Filter for RAW file extensions (.raw, .arw, .dng, .xmp)
+		// Filter for RAW file extensions
 			const rawImageFiles = rawFiles.filter((entry) => {
 				if(!entry.isFile()) {return false;}
 				const ext = path.extname(entry.name).toLowerCase();
-				return ext === '.raw' || ext === '.arw' || ext === '.dng' || ext === '.xmp';
+				return config.RAW_EXTENSIONS.includes(ext) || ext === '.xmp';
 			});
 
 			// Build set of XMP sidecar filenames for quick lookup
@@ -159,7 +160,7 @@ export async function GET(
 				.filter((data) => {
 					if(!data.FileName) {return false;}
 					const ext = path.extname(data.FileName).toLowerCase();
-					return ext === '.raw' || ext === '.arw' || ext === '.dng' || ext === '.xmp';
+					return config.RAW_EXTENSIONS.includes(ext) || ext === '.xmp';
 				})
 				.map((data) => {
 					const baseName = path.parse(data.FileName).name.toLowerCase();

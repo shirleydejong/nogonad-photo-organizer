@@ -18,7 +18,6 @@ export interface AggregatedRatings {
 	rawRatings: Array<{ fileName: string; rating: number }>;
 }
 
-const RAW_EXTENSIONS = ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'];
 const JPG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl']; // Supported image formats for rating updates
 
 /**
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
 	
 	// Find all JPG and RAW variants
 			const jpgFiles = await findFileVariants(folderPath, baseName, JPG_EXTENSIONS);
-			const rawFiles = await findFileVariants(folderPath, baseName, RAW_EXTENSIONS, config.RAW_FOLDER);
+			const rawFiles = await findFileVariants(folderPath, baseName, config.RAW_EXTENSIONS, config.RAW_FOLDER);
 	
 	// Add update jobs for all found files
 			for(const filePath of [...jpgFiles, ...rawFiles]) {
@@ -101,7 +100,7 @@ export async function POST(request: NextRequest) {
 			const baseName = getBaseName(rating.fileName);
 	
 	// Find RAW variants
-			const rawFiles = await findFileVariants(folderPath, baseName, RAW_EXTENSIONS, config.RAW_FOLDER);
+			const rawFiles = await findFileVariants(folderPath, baseName, config.RAW_EXTENSIONS, config.RAW_FOLDER);
 	
 	// Add update jobs for RAW files
 			for(const filePath of rawFiles) {

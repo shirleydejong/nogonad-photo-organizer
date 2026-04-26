@@ -61,7 +61,7 @@ export async function moveToTrash(folderPath: string) {
 				if(!sourceFile || alreadyMoved.has(sourceFile)) {continue;}
 
 				const parsed = path.parse(sourceFile);
-				const isRaw = /\.(raw|dng|nef|cr2|crw|arw|raf|rw2|orf|pef)$/i.test(sourceFile);
+				const isRaw = config.RAW_EXTENSIONS.includes(path.extname(sourceFile).toLowerCase());
 				const isXmp = parsed.ext.toLowerCase() === '.xmp';
 
 				try {
@@ -78,8 +78,7 @@ export async function moveToTrash(folderPath: string) {
 					} else if(isXmp) {
 						filesToMove.push(sourceFile);
 						// Look for corresponding RAW (iterate common extensions)
-						const rawExtensions = ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'];
-						for(const ext of rawExtensions) {
+						for(const ext of config.RAW_EXTENSIONS) {
 							const rawPath = path.join(parsed.dir, parsed.name + ext);
 							if(await fileExists(rawPath)) {
 								filesToMove.push(rawPath);

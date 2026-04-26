@@ -15,6 +15,7 @@
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
+import config from '../config';
 
 /**
  * Spawns the exiftool process and executes EXIF extraction on a single image
@@ -369,7 +370,7 @@ async function updateRawRating(job: RatingUpdateJob): Promise<RatingUpdateResult
  * - **JPG files**: Updated in-place with `-overwrite_original_in_place` flag.
  *   This preserves all existing metadata (including gainmaps) and avoids
  *   recompression, ensuring file integrity.
- * - **RAW files** (.raw, .dng, .nef, .cr2, .arw, etc.): Never modified directly.
+ * - **RAW files**: Never modified directly.
  *   Instead, an XMP sidecar file is created or updated to store the rating.
  * 
  * Performance optimizations:
@@ -396,7 +397,7 @@ export async function updateRatings(jobs: RatingUpdateJob[]): Promise<RatingUpda
 
   // Separate files by type
 	const jpgJobs = jobs.filter((j) => /\.jpe?g$/i.test(j.filePath));
-	const rawJobs = jobs.filter((j) => /\.(raw|dng|nef|cr2|crw|arw|raf|rw2|orf|pef)$/i.test(j.filePath));
+	const rawJobs = jobs.filter((j) => config.RAW_EXTENSIONS.includes(path.extname(j.filePath).toLowerCase()));
 
   // Batch process JPG files
 	if(jpgJobs.length > 0) {

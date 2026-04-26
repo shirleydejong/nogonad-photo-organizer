@@ -9,4 +9,5 @@ export default {
 	HTTP_PORT: 3000,
 	SOCKET_PORT: 3001,
 	SHOOT_ASSIST: 'ShootAssist.exe',
+	RAW_EXTENSIONS: ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'] as string[],
 };
