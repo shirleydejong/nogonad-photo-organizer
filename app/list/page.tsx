@@ -762,37 +762,9 @@ export default function ListPage() {
 		}
 	}, [folderPath, getOneStarCount]);
 
-	const handleStatusModalClose = useCallback(async() => {
-		try {
-      // Fetch fresh batch EXIF data - same as select-folder does
-			const exifResponse = await fetch(
-				`/api/exif/batch/default?folderPath=${encodeURIComponent(folderPath)}`
-			);
-
-			if(exifResponse.ok) {
-				const exifData = await exifResponse.json();
-				if(exifData.success && exifData.exifData) {
-          // Store batch EXIF data in localStorage (same way as select-folder)
-					localStorage.setItem(`batchExifData_${folderPath}`, JSON.stringify(exifData.exifData));
-				}
-			}
-		} catch (exifErr) {
-			console.error('Failed to fetch batch EXIF data:', exifErr);
-      // Continue anyway, loadFolder will use cached data
-		}
-
-    // Reload the folder to refresh all data (will use fresh EXIF data from localStorage)
-		if(folderPath) {
-			await loadFolder(folderPath);
-		}
-
-    // Close the modal
-		setStatusModal({
-			isOpen: false,
-			status: 'loading',
-			message: '',
-		});
-	}, [folderPath]);
+	const handleStatusModalClose = useCallback(() => {
+		router.push('/select-folder');
+	}, [router]);
 
 	function renderConflictIndicator(fileName: string) {
 		const fileId = getFileId(fileName);
