@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
 			message: `Moved ${movedFiles.length} files to trash`,
 			movedFiles
 		});
+		
 	} catch (error) {
 		console.error('Trash API error:', error);
 		return NextResponse.json(

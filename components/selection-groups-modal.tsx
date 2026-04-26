@@ -224,7 +224,7 @@ export function SelectionGroupsModal({
 												className="px-2.5 py-1.5 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium transition cursor-pointer"
 												title="Link selected images to this group"
 											>
-												{thisRowBusy && busyAction === 'link' ? 'Linking...' : 'Link'}
+												{thisRowBusy && busyAction === 'link' ? 'Linking…' : 'Link'}
 											</button>
 
 											<button
@@ -234,7 +234,7 @@ export function SelectionGroupsModal({
 												className="px-2.5 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 text-xs font-medium transition cursor-pointer"
 												title="Unlink selected images from this group"
 											>
-												{thisRowBusy && busyAction === 'unlink' ? 'Unlinking...' : 'Unlink'}
+												{thisRowBusy && busyAction === 'unlink' ? 'Unlinking…' : 'Unlink'}
 											</button>
 										</div>
 									</div>

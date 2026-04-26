@@ -46,7 +46,7 @@ export function StatusModal({
 					</div>
 					<div className="flex-1">
 						<h3 className="text-zinc-100 font-semibold text-lg mb-1">
-							{status === 'loading' ? 'Processing...' :
+							{status === 'loading' ? 'Processing…' :
 								status === 'success' ? 'Success' :
 									'Error'}
 						</h3>
@@ -77,7 +77,7 @@ export function StatusModal({
 								: 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
 							}`}
 						>
-							{isComplete || status === 'error' ? 'Close' : 'Please wait...'}
+							{isComplete || status === 'error' ? 'Close' : 'Please wait…'}
 						</button>
 
 						{status === 'success' && secondaryActionLabel && onSecondaryAction && !showProgress && (

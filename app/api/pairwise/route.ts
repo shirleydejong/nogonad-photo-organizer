@@ -35,10 +35,23 @@ type RankingRow = {
   score: number;
 };
 
+/**
+ * Normalizes a value to a trimmed string.
+ *
+ * @param value Unknown input value.
+ * @returns Trimmed string or an empty string for non-string inputs.
+ */
 function normalizeText(value: unknown): string {
 	return typeof value === 'string' ? value.trim() : '';
 }
 
+/**
+ * Parses and clamps a minimum rating value to the supported range.
+ *
+ * @param value Unknown input value.
+ * @param fallback Fallback value when parsing fails.
+ * @returns Rating between 1 and 5.
+ */
 function normalizeMinRating(value: unknown, fallback: number = 1): number {
 	const parsed = Number.parseInt(String(value), 10);
 	if(!Number.isFinite(parsed)) {
@@ -48,14 +61,34 @@ function normalizeMinRating(value: unknown, fallback: number = 1): number {
 	return Math.max(1, Math.min(5, parsed));
 }
 
+/**
+ * Calculates the number of unique unordered pairs for a list size.
+ *
+ * @param count Number of eligible images.
+ * @returns Total number of unique image pairs.
+ */
 function calculatePairCount(count: number): number {
 	return count < 2 ? 0 : (count * (count - 1)) / 2;
 }
 
+/**
+ * Builds a stable key for an unordered image pair.
+ *
+ * @param imageAId First image id.
+ * @param imageBId Second image id.
+ * @returns Deterministic pair key for set membership checks.
+ */
 function buildPairKey(imageAId: string, imageBId: string): string {
 	return imageAId < imageBId ? `${imageAId}::${imageBId}` : `${imageBId}::${imageAId}`;
 }
 
+/**
+ * Converts two image ids into a random left/right display pair.
+ *
+ * @param imageAId First image id.
+ * @param imageBId Second image id.
+ * @returns Pair in random orientation.
+ */
 function toNextPair(imageAId: string, imageBId: string): NextPair {
 	if(Math.random() < 0.5) {
 		return {
@@ -66,6 +99,13 @@ function toNextPair(imageAId: string, imageBId: string): NextPair {
 
 	return {
 		leftImageId: imageBId,
+/**
+ * Picks one random unfinished pair using reservoir sampling.
+ *
+ * @param imageIds Eligible image ids.
+ * @param donePairKeys Set of already compared pair keys.
+ * @returns A random remaining pair, or null when no pair remains.
+ */
 		rightImageId: imageAId,
 	};
 }
@@ -98,6 +138,13 @@ function pickRandomRemainingPair(imageIds: string[], donePairKeys: Set<string>):
 	return toNextPair(selected.imageAId, selected.imageBId);
 }
 
+/**
+ * Loads completed comparison keys for a set of image ids.
+ *
+ * @param folderPath Folder path that owns the database.
+ * @param imageIds Eligible image ids for lookup.
+ * @returns Set containing normalized completed pair keys.
+ */
 function getDonePairKeys(folderPath: string, imageIds: string[]): Set<string> {
 	const comparisons = getPairwiseComparisonsForImageIds(folderPath, imageIds);
 	const doneKeys = new Set<string>();
@@ -109,11 +156,19 @@ function getDonePairKeys(folderPath: string, imageIds: string[]): Set<string> {
 	return doneKeys;
 }
 
+/**
+ * Builds pairwise progress data and a next pair candidate for one group.
+ *
+ * @param folderPath Folder path that owns the database.
+ * @param groupId Target group id.
+ * @param minRating Minimum image rating threshold.
+ * @throws Error when the group does not exist.
+ */
 function buildProgress(folderPath: string, groupId: string, minRating: number): {
-  groupName: string;
-  images: GroupRatedImageRecord[];
-  progress: GroupProgress;
-  nextPair: NextPair;
+	groupName: string;
+	images: GroupRatedImageRecord[];
+	progress: GroupProgress;
+	nextPair: NextPair;
 } {
 	const group = getGroup(folderPath, groupId);
 	if(!group) {
@@ -163,6 +218,13 @@ function buildProgress(folderPath: string, groupId: string, minRating: number): 
 	};
 }
 
+/**
+ * Builds pairwise progress overview for all groups.
+ *
+ * @param folderPath Folder path that owns the database.
+ * @param minRating Minimum image rating threshold.
+ * @returns Per-group progress snapshots.
+ */
 function buildOverview(folderPath: string, minRating: number): GroupProgress[] {
 	const groups = getAllGroups(folderPath);
 
@@ -199,9 +261,17 @@ function buildOverview(folderPath: string, minRating: number): GroupProgress[] {
 	});
 }
 
+/**
+ * Builds ranking rows for one group based on recorded comparisons.
+ *
+ * @param folderPath Folder path that owns the database.
+ * @param groupId Target group id.
+ * @param minRating Minimum image rating threshold.
+ * @returns Group progress and sorted ranking rows.
+ */
 function buildRankingRows(folderPath: string, groupId: string, minRating: number): {
-  progress: GroupProgress;
-  rows: RankingRow[];
+	progress: GroupProgress;
+	rows: RankingRow[];
 } {
 	const { progress, images } = buildProgress(folderPath, groupId, minRating);
 	const imageIds = images.map((image) => image.imageId);
@@ -275,6 +345,12 @@ function buildRankingRows(folderPath: string, groupId: string, minRating: number
 	};
 }
 
+/**
+ * Validates that a folder path is provided and exists on disk.
+ *
+ * @param folderPath Folder path from request input.
+ * @returns A validated folder path string, or a 400 response when invalid.
+ */
 async function validateFolderPath(folderPath: string | null): Promise<string | NextResponse> {
 	if(!folderPath) {
 		return NextResponse.json({ error: 'Folder path is required' }, { status: 400 });
@@ -289,6 +365,15 @@ async function validateFolderPath(folderPath: string | null): Promise<string | N
 	return folderPath;
 }
 
+/**
+ * Handles pairwise read operations.
+ *
+ * Query params:
+ * - folderPath: required absolute folder path.
+ * - action: overview | prepare | results (defaults to overview).
+ * - minRating: optional minimum rating filter.
+ * - groupId: required for prepare and results.
+ */
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -334,6 +419,17 @@ export async function GET(request: NextRequest) {
 	}
 }
 
+/**
+ * Handles pairwise write operations.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - action: must be compare.
+ * - groupId: required group id.
+ * - minRating: optional minimum rating filter.
+ * - leftImageId/rightImageId: required compared image ids.
+ * - winnerImageId: null for skip, otherwise one of the compared ids.
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const body = await request.json();
@@ -395,6 +491,7 @@ export async function POST(request: NextRequest) {
 			progress,
 			nextPair,
 		});
+		
 	} catch (error) {
 		console.error('Pairwise POST API error:', error);
 		if(error instanceof Error && error.message === 'Group not found') {

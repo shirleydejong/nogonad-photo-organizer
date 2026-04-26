@@ -197,12 +197,12 @@ export class ShootAssistController extends EventEmitter {
 		}
 
 		this.isShuttingDown = true;
-		console.log('📸 Stopping process...');
+		console.log('📸 Stopping process…');
 
 		return new Promise((resolve) => {
 	// Set a safety timeout
 			const timeout = setTimeout(() => {
-				console.log('📸 Forcing process termination...');
+				console.log('📸 Forcing process termination…');
 				this.process?.kill('SIGKILL');
 				resolve();
 			}, 5000);
@@ -304,7 +304,7 @@ function setupGracefulShutdown(controller: ShootAssistController): void {
 		}
 		isShuttingDown = true;
 
-		console.log(`📸 Received ${signal}, shutting down gracefully...`);
+		console.log(`📸 Received ${signal}, shutting down gracefully…`);
     
 		try {
 			if(controller.isRunning()) {
@@ -321,7 +321,7 @@ function setupGracefulShutdown(controller: ShootAssistController): void {
   // Handle process exit
 	process.on('exit', () => {
 		if(controller.isRunning() && !isShuttingDown) {
-			console.log('📸 Process exit detected, attempting cleanup...');
+			console.log('📸 Process exit detected, attempting cleanup…');
       // Can't use async here, so we send exit command synchronously
 			try {
 				controller.stop();

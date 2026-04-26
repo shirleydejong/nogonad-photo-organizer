@@ -14,16 +14,16 @@ import { aggregateRatings } from '@/utils/ratings-aggregator';
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
-  fileName: string;
-  thumbnailPath: string;
-  originalPath: string;
+	fileName: string;
+	thumbnailPath: string;
+	originalPath: string;
 }
 
 interface Rating {
-  id: string;
-  rating: number | null;
-  overRuleFileRating: boolean;
-  createdAt: string;
+	id: string;
+	rating: number | null;
+	overRuleFileRating: boolean;
+	createdAt: string;
 }
 
 export default function ListPage() {
@@ -51,19 +51,19 @@ export default function ListPage() {
 	const [showExportModal, setShowExportModal] = useState<boolean>(false);
 	const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
-  // Status modal state
+// Status modal state
 	const [statusModal, setStatusModal] = useState<{
-    isOpen: boolean;
-    status: 'loading' | 'success' | 'error';
-    message: string;
-    errorDetails?: string;
-  }>({
-  	isOpen: false,
-  	status: 'loading',
-  	message: '',
-  });
+	isOpen: boolean;
+	status: 'loading' | 'success' | 'error';
+	message: string;
+	errorDetails?: string;
+}>({
+	isOpen: false,
+	status: 'loading',
+	message: '',
+});
 
-  // Load folder from localStorage on mount
+// Load folder from localStorage on mount
 	useEffect(() => {
 		const activeFolder = localStorage.getItem('activeFolder');
 		if(activeFolder) {
@@ -102,7 +102,7 @@ export default function ListPage() {
 		}
 	}, []);
 
-  // Load folder and images
+// Load folder and images
 	async function loadFolder(path: string) {
 		setIsLoading(true);
 		setLoadProgress(0);
@@ -113,12 +113,12 @@ export default function ListPage() {
 			const normalizedThumbPath = `${normalizedPath}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 			setFolderPath(normalizedPath);
 
-      // Get the folder name from the path
+		// Get the folder name from the path
 			const parts = normalizedPath.split('\\');
 			const lastPart = parts[parts.length - 1];
 			setFolderName(lastPart || normalizedPath);
 
-      // Get list of files (thumbnails should already exist)
+		// Get list of files (thumbnails should already exist)
 			setLoadProgress(10);
 			const startResponse = await fetch('/api/image', {
 				method: 'POST',
@@ -133,7 +133,7 @@ export default function ListPage() {
 
 			const startData = await startResponse.json();
 
-      // If no images found
+		// If no images found
 			if(startData.total === 0) {
 				setError('No images found in this folder');
 				setIsLoading(false);
@@ -142,7 +142,7 @@ export default function ListPage() {
 
 			const files = startData.files as string[];
 
-      // Create ImageData objects
+		// Create ImageData objects
 			setLoadProgress(25);
 			const imageData: ImageData[] = files.map((fileName) => {
 				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
@@ -156,7 +156,7 @@ export default function ListPage() {
 
 			setImageFiles(imageData);
 
-      // Load batch EXIF data from localStorage
+		// Load batch EXIF data from localStorage
 			setLoadProgress(40);
 			let batchExifData: any[] = [];
 			try {
@@ -168,7 +168,7 @@ export default function ListPage() {
 				console.error('Failed to load batch EXIF data:', exifErr);
 			}
 
-      // Create a map of fileId -> EXIF Rating for quick lookup in conflict detection
+		// Create a map of fileId -> EXIF Rating for quick lookup in conflict detection
 			const exifDataMap = new Map<string, number | null>();
 			for(const exifFile of batchExifData) {
 				if(exifFile.FileName && exifFile.Rating != null) {
@@ -178,7 +178,7 @@ export default function ListPage() {
 			}
 			setExifData(exifDataMap);
 
-      // Fetch ratings for this folder
+		// Fetch DB ratings for this folder
 			setLoadProgress(55);
 			try {
 				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
@@ -197,22 +197,20 @@ export default function ListPage() {
 				console.error('Failed to fetch ratings:', ratingErr);
 			}
 
-      // Fetch RAW files from raw subfolder
+		// Fetch RAW files from raw subfolder
 			setLoadProgress(75);
 			try {
-				const rawResponse = await fetch('/api/raw', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ folderPath: normalizedPath }),
-				});
+				const rawResponse = await fetch(
+					`/api/exif/batch/raw?folderPath=${encodeURIComponent(normalizedPath)}`
+				);
 
 				if(rawResponse.ok) {
 					const rawData = await rawResponse.json();
-					if(rawData.success && rawData.hasRawFolder && rawData.ratings) {
+					if(rawData.success && rawData.hasRawFolder && rawData.exifData) {
 						const rawFilesMap = new Map<string, string>();
 						const xmpMap = new Map<string, boolean>();
 						const rawExifDataMap = new Map<string, number | null>();
-						for(const rawFile of rawData.ratings) {
+						for(const rawFile of rawData.exifData) {
 							if(rawFile.FileName) {
 								const fileId = getFileId(rawFile.FileName);
 								rawFilesMap.set(fileId, rawFile.FileName);
@@ -263,7 +261,7 @@ export default function ListPage() {
 		const ratingData = ratings.get(fileId);
 		const currentRating = ratingData?.rating ?? null;
 
-    // Check if conflicts-only filter is enabled
+	// Check if conflicts-only filter is enabled
 		if(showConflictsOnly) {
 			const hasConflict = hasRatingConflict(fileName) || hasJpgRawMismatch(fileName) || hasRawRatingConflict(fileName);
 			if(!hasConflict) {
@@ -273,12 +271,12 @@ export default function ListPage() {
 
 		let matchesRating = false;
 
-    // If no rating and showUnrated is true, show it
+	// If no rating and showUnrated is true, show it
 		if(currentRating === null && showUnrated) {
 			matchesRating = true;
 		}
 
-    // If has rating and it's in selectedRatings, show it
+	// If has rating and it's in selectedRatings, show it
 		if(currentRating !== null && selectedRatings.has(currentRating)) {
 			matchesRating = true;
 		}
@@ -287,7 +285,7 @@ export default function ListPage() {
 			return false;
 		}
 
-    // No selected groups keeps existing behavior.
+	// No selected groups keeps existing behavior.
 		if(selectedGroupIds.size === 0) {
 			return true;
 		}
@@ -405,7 +403,7 @@ export default function ListPage() {
 	const handleExportRatings = useCallback((filename: string, prefix: string) => {
 		try {
 			const exportData: Array<{ id: string; rating: number | null }> = [];
-      
+
 			ratings.forEach((rating, id) => {
 				if(rating && rating.rating !== null) {
 					const exportId = prefix ? `${prefix}${id}` : id;
@@ -442,7 +440,7 @@ export default function ListPage() {
 			setStatusModal({
 				isOpen: true,
 				status: 'loading',
-				message: 'Importing ratings...',
+				message: 'Importing ratings…',
 			});
 			setShowImportModal(false);
 
@@ -461,14 +459,14 @@ export default function ListPage() {
 					continue;
 				}
 
-        // Check if rating already exists in database
+			// Check if rating already exists in database
 				const existingRating = ratings.get(item.id);
 				if(existingRating && existingRating.rating !== null) {
 					skippedCount++;
 					continue;
 				}
 
-        // Import the rating
+			// Import the rating
 				const response = await fetch('/api/ratings', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -482,7 +480,7 @@ export default function ListPage() {
 
 				if(response.ok) {
 					importedCount++;
-          // Update local state
+				// Update local state
 					setRatings(prev => {
 						const newMap = new Map(prev);
 						newMap.set(item.id, {
@@ -532,7 +530,7 @@ export default function ListPage() {
 						}`}
 						title={`Rate ${star} stars`}
 					>
-            ★
+					★
 					</button>
 				))}
 			</div>
@@ -545,8 +543,8 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // Conflict exists only if file has EXIF rating AND database rating differs
-    // No EXIF rating = no conflict, even if database has a rating
+	// Conflict exists only if file has EXIF rating AND database rating differs
+	// No EXIF rating = no conflict, even if database has a rating
 		if(exifRating != null && exifRating !== 0 && dbRating !== null && exifRating !== dbRating && !dbOverRule) {
 			return true;
 		}
@@ -560,8 +558,8 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // Conflict exists only if RAW file has EXIF rating AND database rating differs
-    // No RAW rating = no conflict, even if database has a rating
+	// Conflict exists only if RAW file has EXIF rating AND database rating differs
+	// No RAW rating = no conflict, even if database has a rating
 		if(rawRating != null && rawRating !== 0 && dbRating !== null && rawRating !== dbRating && !dbOverRule) {
 			return true;
 		}
@@ -575,7 +573,7 @@ export default function ListPage() {
 		const rawRating = rawExifData.get(fileId);
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 
-    // Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
+	// Yellow highlight: Both JPG and RAW have valid ratings, DB has no rating, and they differ
 		if(exifRating != null && exifRating !== 0 && rawRating != null && rawRating !== 0 && !dbRating && exifRating !== rawRating) {
 			return true;
 		}
@@ -591,17 +589,17 @@ export default function ListPage() {
 
 		return (
 			exifRating != null &&
-      exifRating !== 0 &&
-      rawRating != null &&
-      rawRating !== 0 &&
-      dbRating != null &&
-      exifRating === rawRating &&
-      exifRating === dbRating
+			exifRating !== 0 &&
+			rawRating != null &&
+			rawRating !== 0 &&
+			dbRating != null &&
+			exifRating === rawRating &&
+			exifRating === dbRating
 		);
 	}
 
 	function hasAnyConflicts(): boolean {
-    // Check if any image has a conflict
+	// Check if any image has a conflict
 		for(const image of imageFiles) {
 			if(hasRatingConflict(image.fileName) || hasRawRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)) {
 				return true;
@@ -611,15 +609,15 @@ export default function ListPage() {
 	}
 
 	const handleApplyRatings = useCallback(async() => {
-    // Show modal immediately
+	// Show modal immediately
 		setStatusModal({
 			isOpen: true,
 			status: 'loading',
-			message: 'Applying ratings to all images...',
+			message: 'Applying ratings to all images…',
 		});
 
 		try {
-      // Transform ratings Map to match the expected format
+		// Transform ratings Map to match the expected format
 			const dbRatingsMap = new Map();
 			ratings.forEach((rating, fileId) => {
 				if(rating && rating.rating !== null && rating.rating !== 0) {
@@ -630,7 +628,7 @@ export default function ListPage() {
 				}
 			});
 
-      // Filter out 0 values from JPG ratings
+		// Filter out 0 values from JPG ratings
 			const jpgRatingsMap = new Map();
 			exifData.forEach((rating, fileId) => {
 				if(rating !== null && rating !== 0) {
@@ -638,7 +636,7 @@ export default function ListPage() {
 				}
 			});
 
-      // Filter out 0 values from RAW ratings
+		// Filter out 0 values from RAW ratings
 			const rawRatingsMap = new Map();
 			rawExifData.forEach((rating, fileId) => {
 				if(rating !== null && rating !== 0) {
@@ -654,7 +652,7 @@ export default function ListPage() {
 
 			console.log('Aggregated ratings to apply:', aggregated);
 
-			const response = await fetch('/api/set-ratings', {
+			const response = await fetch('/api/sync-ratings', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -665,7 +663,7 @@ export default function ListPage() {
 
 			if(response.ok) {
 				console.log('Ratings applied successfully');
-        // Automatically move 1-star files to trash if any exist
+			// Automatically move 1-star files to trash if any exist
 				const oneStarCount = getOneStarCount();
 				if(oneStarCount > 0) {
 					await handleMoveToTrash();
@@ -715,7 +713,7 @@ export default function ListPage() {
 		setStatusModal({
 			isOpen: true,
 			status: 'loading',
-			message: `Moving ${count} 1-star files (and variants) to trash...`,
+			message: `Moving ${count} 1-star files (and variants) to trash…`,
 		});
 
 		try {
@@ -728,7 +726,7 @@ export default function ListPage() {
 			if(response.ok) {
 				const data = await response.json();
 
-        // Remove moved files from the local ratings map so the UI updates
+			// Remove moved files from the local ratings map so the UI updates
 				setRatings(prev => {
 					const newMap = new Map(prev);
 					data.movedFiles.forEach((fullPath: string) => {
@@ -764,39 +762,9 @@ export default function ListPage() {
 		}
 	}, [folderPath, getOneStarCount]);
 
-	const handleStatusModalClose = useCallback(async() => {
-		try {
-      // Fetch fresh batch EXIF data - same as select-folder does
-			const exifResponse = await fetch('/api/exif', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ folderPath, action: 'batch' }),
-			});
-
-			if(exifResponse.ok) {
-				const exifData = await exifResponse.json();
-				if(exifData.success && exifData.exifData) {
-          // Store batch EXIF data in localStorage (same way as select-folder)
-					localStorage.setItem(`batchExifData_${folderPath}`, JSON.stringify(exifData.exifData));
-				}
-			}
-		} catch (exifErr) {
-			console.error('Failed to fetch batch EXIF data:', exifErr);
-      // Continue anyway, loadFolder will use cached data
-		}
-
-    // Reload the folder to refresh all data (will use fresh EXIF data from localStorage)
-		if(folderPath) {
-			await loadFolder(folderPath);
-		}
-
-    // Close the modal
-		setStatusModal({
-			isOpen: false,
-			status: 'loading',
-			message: '',
-		});
-	}, [folderPath]);
+	const handleStatusModalClose = useCallback(() => {
+		router.push('/select-folder');
+	}, [router]);
 
 	function renderConflictIndicator(fileName: string) {
 		const fileId = getFileId(fileName);
@@ -804,13 +772,11 @@ export default function ListPage() {
 		const dbRating = ratings.get(fileId)?.rating ?? null;
 		const dbOverRule = ratings.get(fileId)?.overRuleFileRating ?? null;
 
-    // No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
+	// No ratings at all (neither EXIF nor DB) = no conflict, show "No rating"
 		if(!dbRating && !exifRating) {
 			return (
 				<div className="flex items-center gap-2 flex-col">
-					<div className="text-zinc-500 text-xs">
-            No rating
-					</div>
+					<div className="text-zinc-500 text-xs">No rating</div>
 				</div>
 			);
 		}
@@ -981,9 +947,7 @@ export default function ListPage() {
 			<div className="flex min-h-screen flex-col bg-black font-sans">
 				<main className="flex-1 flex flex-col items-center justify-center">
 					<div className="flex flex-col items-center gap-6 p-8">
-						<div className="text-zinc-200 text-2xl font-semibold">
-              Loading images...
-						</div>
+						<div className="text-zinc-200 text-2xl font-semibold">Loading images…</div>
 						<div className="w-96 bg-zinc-800 rounded-full h-4 overflow-hidden">
 							<div
 								className="bg-zinc-400 h-full transition-all duration-300 ease-out"

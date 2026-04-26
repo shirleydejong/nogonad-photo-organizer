@@ -6,19 +6,19 @@ import { Header } from '@/components/header';
 import { Icon } from '@/components/icon';
 
 type GroupProgress = {
-  groupId: string;
-  groupName: string;
-  minRating: number;
-  eligibleCount: number;
-  totalPairs: number;
-  completedPairs: number;
-  remainingPairs: number;
-  hasRanking: boolean;
+	groupId: string;
+	groupName: string;
+	minRating: number;
+	eligibleCount: number;
+	totalPairs: number;
+	completedPairs: number;
+	remainingPairs: number;
+	hasRanking: boolean;
 };
 
 type NextPair = {
-  leftImageId: string;
-  rightImageId: string;
+	leftImageId: string;
+	rightImageId: string;
 } | null;
 
 function normalizeWindowsPath(path: string): string {
@@ -52,12 +52,12 @@ function PairwiseComparePageFallback() {
 	return (
 		<div className="flex min-h-screen flex-col bg-black font-sans">
 			<Header folderName={null} title="Pairwise Comparison" isFullscreen={false}>
-				<div className="text-zinc-400 text-sm">Loading...</div>
+				<div className="text-zinc-400 text-sm">Loading…</div>
 			</Header>
 			<main className="flex-1 flex items-center justify-center">
 				<div className="flex flex-col items-center gap-4 text-zinc-300">
 					<div className="w-12 h-12 border-4 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-					<span>Loading comparison data...</span>
+					<span>Loading comparison data…</span>
 				</div>
 			</main>
 		</div>
@@ -447,12 +447,12 @@ function PairwiseComparePageContent() {
 		return (
 			<div className="flex min-h-screen flex-col bg-black font-sans">
 				<Header folderName={folderName} title="Pairwise Comparison" isFullscreen={false}>
-					<div className="text-zinc-400 text-sm">Loading...</div>
+					<div className="text-zinc-400 text-sm">Loading…</div>
 				</Header>
 				<main className="flex-1 flex items-center justify-center">
 					<div className="flex flex-col items-center gap-4 text-zinc-300">
 						<div className="w-12 h-12 border-4 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-						<span>Loading comparison data...</span>
+						<span>Loading comparison data…</span>
 					</div>
 				</main>
 			</div>
@@ -486,7 +486,7 @@ function PairwiseComparePageContent() {
 				{progress && (
 					<section className="rounded border border-blue-900/60 bg-blue-950/20 p-4 space-y-3">
 						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div className="text-blue-100 font-semibold">Min rating: {formatRatingStars(progress.minRating)}+</div>
+							<div className="text-blue-100 font-semibold">Min rating: <span className="noto-color-emoji-regular">{formatRatingStars(progress.minRating)}</span>+</div>
 							<div className="text-blue-200/80 text-sm">{comparisonProgressPercent}% complete ({progress.completedPairs}/{progress.totalPairs})</div>
 						</div>
 						<div className="w-full h-3 rounded bg-zinc-800 overflow-hidden">

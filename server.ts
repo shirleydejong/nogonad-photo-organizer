@@ -22,9 +22,9 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 type CommandAck = {
-  success: boolean;
-  message?: string;
-  error?: string;
+	success: boolean;
+	message?: string;
+	error?: string;
 };
 
 // Store active watchers per folder
@@ -42,10 +42,10 @@ app.prepare().then(() => {
 		}
 	});
 
-  // Create separate HTTP server for Socket.IO
+// Create separate HTTP server for Socket.IO
 	const socketServer = createServer();
 
-  // Initialize Socket.IO on separate server
+// Initialize Socket.IO on separate server
 	const io = new SocketIOServer(socketServer, {
 		cors: {
 			origin: '*',
@@ -53,7 +53,7 @@ app.prepare().then(() => {
 		},
 	});
 
-  // Setup ShootAssist controller with Socket.IO integration
+// Setup ShootAssist controller with Socket.IO integration
 	const shootAssistController = getShootAssistController();
 	const toErrorMessage = (error: unknown): string =>
 		error instanceof Error ? error.message : String(error);
@@ -63,7 +63,7 @@ app.prepare().then(() => {
 		currentShot: 0,
 	};
 
-  // Listen to ShootAssist events and broadcast via Socket.IO
+// Listen to ShootAssist events and broadcast via Socket.IO
 	shootAssistController.on('ready', () => {
 		console.log('[ShootAssist] Process ready');
 		io.emit('shoot-assist-ready');
@@ -89,9 +89,9 @@ app.prepare().then(() => {
 	shootAssistController.on('warning', (message) => io.emit('shoot-assist-warning', { message }));
 
 	shootAssistController.on('status', (message) => io.emit('shoot-assist-message', { message }));
-  
+
 	shootAssistController.on('command-complete', () => io.emit('shoot-assist-command-complete'));
-  
+
 	shootAssistController.on('file', (message) => io.emit('shoot-assist-file', { message }));
 
 	shootAssistController.on('capture-started', ({ count, delayMs }) => {
@@ -113,7 +113,7 @@ app.prepare().then(() => {
 		io.emit('capture-complete', { total: count });
 		captureState = { isCapturing: false, totalShots: 0, currentShot: 0 };
 	});
-  
+
 	shootAssistController.on('capture-stopped', () => {
 		console.log(`[ShootAssist] Capture stopped`);
 		io.emit('capture-stopped');
@@ -123,11 +123,11 @@ app.prepare().then(() => {
 	io.on('connection', (socket) => {
 		console.log('Client connected:', socket.id);
 
-    // Send current ShootAssist status to newly connected client
+	// Send current ShootAssist status to newly connected client
 		socket.emit('shoot-assist-status', {
 			isRunning: shootAssistController.isRunning()
 		});
-    
+	
 		if(captureState.isCapturing) {
 			const percentage = captureState.totalShots > 0
 				? Math.round((captureState.currentShot / captureState.totalShots) * 100)
@@ -146,7 +146,7 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'ShootAssist starting...' });
+			ack?.({ success: true, message: 'ShootAssist starting…' });
 		});
 
 		socket.on('shoot-assist-stop', (_payload: unknown, ack?: (response: CommandAck) => void) => {
@@ -156,7 +156,7 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'ShootAssist stopping...' });
+			ack?.({ success: true, message: 'ShootAssist stopping…' });
 		});
 
 		socket.on(
@@ -204,43 +204,43 @@ app.prepare().then(() => {
 				io.emit('shoot-assist-error', { message });
 			});
 
-			ack?.({ success: true, message: 'Stopping capture...' });
+			ack?.({ success: true, message: 'Stopping capture…' });
 		});
 
-    // Handle display session joining
+	// Handle display session joining
 		socket.on('join-display-session', (sessionId: string) => {
 			console.log(`🔌Display joined session: ${sessionId} (socket: ${socket.id})`);
 			socket.join(`display-session-${sessionId}`);
-      // Notify all viewers in this session that a display joined
+	// Notify all viewers in this session that a display joined
 			socket.to(`viewer-session-${sessionId}`).emit('display-joined', { sessionId });
 		});
 
-    // Handle viewer session joining
+	// Handle viewer session joining
 		socket.on('join-viewer-session', (sessionId: string) => {
 			console.log(`Viewer joined session: ${sessionId} (socket: ${socket.id})`);
 			socket.join(`viewer-session-${sessionId}`);
 		});
 
-    // Handle display session leaving
+	// Handle display session leaving
 		socket.on('leave-display-session', (sessionId: string) => {
 			console.log(`Display left session: ${sessionId} (socket: ${socket.id})`);
 			socket.leave(`display-session-${sessionId}`);
 		});
 
-    // Handle viewer session leaving
+	// Handle viewer session leaving
 		socket.on('leave-viewer-session', (sessionId: string) => {
 			console.log(`Viewer left session: ${sessionId} (socket: ${socket.id})`);
 			socket.leave(`viewer-session-${sessionId}`);
 		});
 
-    // Handle image sync from main viewer to displays
+	// Handle image sync from main viewer to displays
 		socket.on('sync-image-to-display', ({ sessionId, folderPath, fileName }: { sessionId: string; folderPath: string; fileName: string }) => {
 			console.log(`Syncing image to display session ${sessionId}:`, fileName);
-      // Broadcast to all displays in this session
+	// Broadcast to all displays in this session
 			io.to(`display-session-${sessionId}`).emit('display-image-sync', { folderPath, fileName });
 		});
 
-    // Handle thumbnail generation
+	// Handle thumbnail generation
 		socket.on('generate-thumbnails', async(folderPath: string) => {
 			console.log('Generate thumbnails request:', folderPath);
 
@@ -260,19 +260,19 @@ app.prepare().then(() => {
 					},
 				});
 
-        // Process existing images - this will call onThumbnailProgress for each created thumbnail
+		// Process existing images - this will call onThumbnailProgress for each created thumbnail
 				const result = await watcher.processExistingImages();
-        
+		
 				console.log(`Thumbnail processing complete: ${result.total} total, ${result.existingThumbnails} existing`);
 
-        // Emit completion
+		// Emit completion
 				socket.emit('thumbnail-complete', {
 					total: result.total,
 					files: result.files,
 					folderPath
 				});
 				watcher.stop(); // Stop the watcher after processing
-        
+		
 			} catch (error) {
 				console.error('Failed to generate thumbnails:', error);
 				socket.emit('thumbnail-error', {
@@ -282,18 +282,18 @@ app.prepare().then(() => {
 			}
 		});
 
-    // Handle folder watching
+	// Handle folder watching
 		socket.on('watch-folder', async(folderPath: string) => {
 			console.log('Watch folder request:', folderPath);
 
 			try {
-        // Stop any existing watcher for this folder
+		// Stop any existing watcher for this folder
 				const existingWatcher = activeWatchers.get(folderPath);
 				if(existingWatcher) {
 					await existingWatcher.stop();
 				}
 
-        // Create new watcher
+		// Create new watcher
 				const watcher = new FileWatcher(folderPath, {
 					onFileAdded: (fileName: string, hasRating?: boolean) => {
 						console.log('File added:', fileName, 'hasRating:', hasRating);
@@ -313,11 +313,13 @@ app.prepare().then(() => {
 					},
 				});
 
-        // Start watching
+		// Start watching
 				await watcher.start();
 				activeWatchers.set(folderPath, watcher);
 
 				socket.emit('watch-started', { folderPath });
+				console.log('Watcher started for folder:', folderPath);
+				
 			} catch (error) {
 				console.error('Failed to start watcher:', error);
 				socket.emit('watcher-error', {
@@ -327,10 +329,10 @@ app.prepare().then(() => {
 			}
 		});
 
-    // Handle stop watching
+	// Handle stop watching
 		socket.on('unwatch-folder', async(folderPath: string) => {
 			console.log('Unwatch folder request:', folderPath);
-      
+	
 			try {
 				const watcher = activeWatchers.get(folderPath);
 				if(watcher) {
@@ -339,12 +341,14 @@ app.prepare().then(() => {
 				}
 
 				socket.emit('watch-stopped', { folderPath });
+				console.log('Watcher stopped for folder:', folderPath);
+				
 			} catch (error) {
 				console.error('Failed to stop watcher:', error);
 			}
 		});
 
-    // Handle stop watching all folders
+	// Handle stop watching all folders
 		socket.on('unwatch-all-folders', async() => {
 			console.log('Unwatch all folders request');
 
@@ -359,6 +363,8 @@ app.prepare().then(() => {
 				activeWatchers.clear();
 
 				socket.emit('watch-all-stopped');
+				console.log('All watchers stopped');
+				
 			} catch (error) {
 				console.error('Failed to stop all watchers:', error);
 				socket.emit('watcher-error', {
@@ -367,9 +373,7 @@ app.prepare().then(() => {
 			}
 		});
 
-		socket.on('disconnect', () => {
-			console.log('Client disconnected:', socket.id);
-		});
+		socket.on('disconnect', () => console.log('Client disconnected:', socket.id));
 	});
 
 	httpServer
@@ -377,16 +381,12 @@ app.prepare().then(() => {
 			console.error(err);
 			process.exit(1);
 		})
-		.listen(port, () => {
-			console.log(`> Ready on http://${hostname}:${port}`);
-		});
+		.listen(port, () => console.log(`> Ready on http://${hostname}:${port}`));
 
 	socketServer
 		.once('error', (err) => {
 			console.error('Socket.IO server error:', err);
 			process.exit(1);
 		})
-		.listen(socketPort, () => {
-			console.log(`> Socket.IO server running on http://${hostname}:${socketPort}`);
-		});
+		.listen(socketPort, () => console.log(`> Socket.IO server running on http://${hostname}:${socketPort}`));
 });
