@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openWithDialog } from '@/controllers/open-with';
 
+/**
+ * Opens a file with the system's "Open With" dialog.
+ *
+ * @param request The incoming Next.js request object containing the file path.
+ * @returns A JSON response indicating success or failure.
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const { filePath } = await request.json();

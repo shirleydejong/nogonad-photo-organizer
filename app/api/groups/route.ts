@@ -10,6 +10,12 @@ import {
 	updateGroup,
 } from '@/controllers/database';
 
+/**
+ * Validates that a folder path is provided and exists on disk.
+ *
+ * @param folderPath Folder path from request input.
+ * @returns A validated folder path string, or a 400 response when invalid.
+ */
 async function validateFolderPath(folderPath: string | null): Promise<string | NextResponse> {
 	if(!folderPath) {
 		return NextResponse.json({ error: 'Folder path is required' }, { status: 400 });
@@ -24,6 +30,13 @@ async function validateFolderPath(folderPath: string | null): Promise<string | N
 	return folderPath;
 }
 
+/**
+ * Retrieves one group by id or all groups for a folder.
+ *
+ * Query params:
+ * - folderPath: required absolute folder path.
+ * - id: optional group id to fetch a single group.
+ */
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -53,6 +66,14 @@ export async function GET(request: NextRequest) {
 	}
 }
 
+/**
+ * Creates a new group for a folder.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - name: required group name.
+ * - id: optional group id; generated when omitted.
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const { folderPath, id, name } = await request.json();
@@ -83,6 +104,14 @@ export async function POST(request: NextRequest) {
 	}
 }
 
+/**
+ * Updates an existing group's name.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - id: required group id.
+ * - name: required new group name.
+ */
 export async function PUT(request: NextRequest) {
 	try {
 		const { folderPath, id, name } = await request.json();
@@ -113,6 +142,13 @@ export async function PUT(request: NextRequest) {
 	}
 }
 
+/**
+ * Deletes a group by id.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - id: required group id.
+ */
 export async function DELETE(request: NextRequest) {
 	try {
 		const { folderPath, id } = await request.json();

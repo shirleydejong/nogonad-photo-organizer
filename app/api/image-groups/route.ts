@@ -9,6 +9,12 @@ import {
 	getImageGroupRelations,
 } from '@/controllers/database';
 
+/**
+ * Validates that a folder path is provided and exists on disk.
+ *
+ * @param folderPath Folder path from request input.
+ * @returns A validated folder path string, or a 400 response when invalid.
+ */
 async function validateFolderPath(folderPath: string | null): Promise<string | NextResponse> {
 	if(!folderPath) {
 		return NextResponse.json({ error: 'Folder path is required' }, { status: 400 });
@@ -23,10 +29,22 @@ async function validateFolderPath(folderPath: string | null): Promise<string | N
 	return folderPath;
 }
 
+/**
+ * Normalizes a value to a trimmed string.
+ *
+ * @param value Unknown input value.
+ * @returns Trimmed string or an empty string for non-string inputs.
+ */
 function normalizeText(value: unknown): string {
 	return typeof value === 'string' ? value.trim() : '';
 }
 
+/**
+ * Normalizes an unknown value to a deduplicated list of non-empty image ids.
+ *
+ * @param value Unknown input value expected to be an array of ids.
+ * @returns Unique, trimmed, non-empty image id list.
+ */
 function normalizeImageIds(value: unknown): string[] {
 	if(!Array.isArray(value)) {
 		return [];
@@ -41,6 +59,14 @@ function normalizeImageIds(value: unknown): string[] {
 	);
 }
 
+/**
+ * Retrieves image-group relations for a folder, optionally filtered by image or group id.
+ *
+ * Query params:
+ * - folderPath: required absolute folder path.
+ * - imageId: optional image id filter.
+ * - groupId: optional group id filter.
+ */
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -67,6 +93,15 @@ export async function GET(request: NextRequest) {
 	}
 }
 
+/**
+ * Creates one or many image-group relations.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - groupId: required group id.
+ * - imageId: required when imageIds is not provided.
+ * - imageIds: optional list for batch creation.
+ */
 export async function POST(request: NextRequest) {
 	try {
 		const { folderPath, imageId, imageIds, groupId } = await request.json();
@@ -115,6 +150,15 @@ export async function POST(request: NextRequest) {
 	}
 }
 
+/**
+ * Deletes one or many image-group relations.
+ *
+ * Body:
+ * - folderPath: required absolute folder path.
+ * - groupId: required group id.
+ * - imageId: required when imageIds is not provided.
+ * - imageIds: optional list for batch deletion.
+ */
 export async function DELETE(request: NextRequest) {
 	try {
 		const { folderPath, imageId, imageIds, groupId } = await request.json();
