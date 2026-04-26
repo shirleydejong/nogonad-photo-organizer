@@ -1140,11 +1140,7 @@ export default function Home() {
   // Camera Control (ShootAssist) handlers
 	const handleStartShootAssist = useCallback(async() => {
 		try {
-			const response = await fetch('/api/shoot-assist', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ action: 'start' }),
-			});
+			const response = await fetch('/api/shoot-assist/startup');
 
 			if(!response.ok) {
 				const error = await response.json();
@@ -1158,11 +1154,7 @@ export default function Home() {
 
 	const handleStopShootAssist = useCallback(async() => {
 		try {
-			const response = await fetch('/api/shoot-assist', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ action: 'stop' }),
-			});
+			const response = await fetch('/api/shoot-assist/shutdown');
 
 			if(!response.ok) {
 				const error = await response.json();
@@ -1181,11 +1173,10 @@ export default function Home() {
 		}
 
 		try {
-			const response = await fetch('/api/capture', {
+			const response = await fetch('/api/shoot-assist/capture/start', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					action: 'start',
 					shots,
 					interval,
 					path: folderPath,
@@ -1204,11 +1195,7 @@ export default function Home() {
 
 	const handleStopCapture = useCallback(async() => {
 		try {
-			const response = await fetch('/api/capture', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ action: 'stop' }),
-			});
+			const response = await fetch('/api/shoot-assist/capture/stop');
 
 			if(!response.ok) {
 				const error = await response.json();
