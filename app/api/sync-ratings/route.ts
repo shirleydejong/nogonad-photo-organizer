@@ -18,8 +18,6 @@ export interface AggregatedRatings {
 	rawRatings: Array<{ fileName: string; rating: number }>;
 }
 
-const JPG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl']; // Supported image formats for rating updates
-
 /**
  * Check if a file exists
  */
@@ -86,7 +84,7 @@ export async function POST(request: NextRequest) {
 			const baseName = getBaseName(rating.fileName);
 	
 	// Find all JPG and RAW variants
-			const jpgFiles = await findFileVariants(folderPath, baseName, JPG_EXTENSIONS);
+			const jpgFiles = await findFileVariants(folderPath, baseName, config.SUPPORTED_EXTENSIONS);
 			const rawFiles = await findFileVariants(folderPath, baseName, config.RAW_EXTENSIONS, config.RAW_FOLDER);
 	
 	// Add update jobs for all found files
@@ -121,7 +119,7 @@ export async function POST(request: NextRequest) {
 			const baseName = getBaseName(rating.fileName);
 	
 	// Find JPG variants
-			const jpgFiles = await findFileVariants(folderPath, baseName, JPG_EXTENSIONS);
+			const jpgFiles = await findFileVariants(folderPath, baseName, config.SUPPORTED_EXTENSIONS);
 	
 	// Add update jobs for JPG files
 			for(const filePath of jpgFiles) {

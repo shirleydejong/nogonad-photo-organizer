@@ -10,4 +10,5 @@ export default {
 	SOCKET_PORT: 3001,
 	SHOOT_ASSIST: 'ShootAssist.exe',
 	RAW_EXTENSIONS: ['.raw', '.dng', '.nef', '.cr2', '.crw', '.arw', '.raf', '.rw2', '.orf', '.pef'] as string[],
+	SUPPORTED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'] as string[],
 };

@@ -9,7 +9,6 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 // Supported image extensions
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'];
 
 interface FileWatcherCallbacks {
   onFileAdded?: (fileName: string, hasRating?: boolean) => void;
@@ -299,7 +298,7 @@ class FileWatcher {
    */
 	private isSupportedImage(filename: string): boolean {
 		const ext = path.extname(filename).toLowerCase();
-		return SUPPORTED_EXTENSIONS.includes(ext);
+		return CONFIG.SUPPORTED_EXTENSIONS.includes(ext);
 	}
 
   /**

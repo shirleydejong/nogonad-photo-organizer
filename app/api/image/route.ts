@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
-
-// Supported image extensions
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.jxl'];
+import config from '@/config';
 
 export async function POST(request: NextRequest) {
 	try {
@@ -17,7 +15,7 @@ export async function POST(request: NextRequest) {
 		const files = await fs.readdir(folderPath);
 		const imageFiles = files.filter((file) => {
 			const ext = path.extname(file).toLowerCase();
-			return SUPPORTED_EXTENSIONS.includes(ext);
+			return config.SUPPORTED_EXTENSIONS.includes(ext);
 		});
 
 		return NextResponse.json({
