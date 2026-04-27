@@ -383,7 +383,7 @@ export default function Home() {
 			folderPath,
 			fileName: currentImage.fileName,
 		});
-	}, [activeIndex, folderPath, imageFiles, sessionId]);
+	}, [activeIndex]);
 
 // Load folder from localStorage on mount
 	useEffect(() => {

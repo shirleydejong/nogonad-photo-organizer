@@ -206,6 +206,9 @@ export default function ListPage() {
 
 				if(rawResponse.ok) {
 					const rawData = await rawResponse.json();
+					
+					console.log('😗 Raw data fetched:', rawData.exifData);
+					
 					if(rawData.success && rawData.hasRawFolder && rawData.exifData) {
 						const rawFilesMap = new Map<string, string>();
 						const xmpMap = new Map<string, boolean>();

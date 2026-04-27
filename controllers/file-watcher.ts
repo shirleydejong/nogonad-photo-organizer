@@ -67,8 +67,8 @@ class FileWatcher {
 				persistent: true,
 				ignoreInitial: true,
 				awaitWriteFinish: {
-					stabilityThreshold: 2000,
-					pollInterval: 100,
+					stabilityThreshold: 500,
+					pollInterval: 10,
 				},
 			});
 

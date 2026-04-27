@@ -395,7 +395,8 @@ export async function updateRatings(jobs: RatingUpdateJob[]): Promise<RatingUpda
 	const results: RatingUpdateResult[] = [];
 
   // Separate files by type
-	const jpgJobs = jobs.filter((j) => /\.jpe?g$/i.test(j.filePath));
+	//const jpgJobs = jobs.filter((j) => /\.jpe?g$/i.test(j.filePath));
+	const jpgJobs = jobs.filter((j) => config.SUPPORTED_EXTENSIONS.includes(path.extname(j.filePath).toLowerCase()));
 	const rawJobs = jobs.filter((j) => config.RAW_EXTENSIONS.includes(path.extname(j.filePath).toLowerCase()));
 
   // Batch process JPG files

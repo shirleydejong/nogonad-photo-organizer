@@ -49,6 +49,11 @@ async function findFileVariants(folderPath: string, baseName: string, extensions
  * Get the base name without extension from a filename
  */
 function getBaseName(fileName: string): string {
+	const ext = path.parse(fileName).ext;
+	if( !config.SUPPORTED_EXTENSIONS.includes(ext.toLowerCase()) && !config.RAW_EXTENSIONS.includes(ext.toLowerCase()) && ext !== '' ) {
+		console.warn(`Warning: Unsupported file extension "${ext}" for file "${fileName}". Base name extraction may be incorrect.`);
+		return fileName;
+	}
 	return path.parse(fileName).name;
 }
 
@@ -82,12 +87,15 @@ export async function POST(request: NextRequest) {
 	// 1. dbRatings: Apply to JPG and RAW files (not to database, already there)
 		for(const rating of dbRatings) {
 			const baseName = getBaseName(rating.fileName);
+			console.log(`Processing DB rating for ${rating.fileName} (base: ${baseName}, rating: ${rating.rating})`);
 	
-	// Find all JPG and RAW variants
+		// Find all JPG and RAW variants
 			const jpgFiles = await findFileVariants(folderPath, baseName, config.SUPPORTED_EXTENSIONS);
 			const rawFiles = await findFileVariants(folderPath, baseName, config.RAW_EXTENSIONS, config.RAW_FOLDER);
+			
+			console.log(` ↳ Found ${jpgFiles.length} base image variants and ${rawFiles.length} RAW variants for ${rating.fileName}`);
 	
-	// Add update jobs for all found files
+		// Add update jobs for all found files
 			for(const filePath of [...jpgFiles, ...rawFiles]) {
 				updateJobs.push({ filePath, rating: rating.rating });
 			}
@@ -97,15 +105,15 @@ export async function POST(request: NextRequest) {
 		for(const rating of jpgRatings) {
 			const baseName = getBaseName(rating.fileName);
 	
-	// Find RAW variants
+		// Find RAW variants
 			const rawFiles = await findFileVariants(folderPath, baseName, config.RAW_EXTENSIONS, config.RAW_FOLDER);
 	
-	// Add update jobs for RAW files
+		// Add update jobs for RAW files
 			for(const filePath of rawFiles) {
 				updateJobs.push({ filePath, rating: rating.rating });
 			}
 	
-	// Update database
+		// Update database
 			try {
 				upsertRating(rating.fileName, folderPath, rating.rating, false);
 				dbUpdatesCount++;
@@ -118,15 +126,15 @@ export async function POST(request: NextRequest) {
 		for(const rating of rawRatings) {
 			const baseName = getBaseName(rating.fileName);
 	
-	// Find JPG variants
+		// Find JPG variants
 			const jpgFiles = await findFileVariants(folderPath, baseName, config.SUPPORTED_EXTENSIONS);
 	
-	// Add update jobs for JPG files
+		// Add update jobs for JPG files
 			for(const filePath of jpgFiles) {
 				updateJobs.push({ filePath, rating: rating.rating });
 			}
 	
-	// Update database
+		// Update database
 			try {
 				upsertRating(rating.fileName, folderPath, rating.rating, false);
 				dbUpdatesCount++;
@@ -137,6 +145,7 @@ export async function POST(request: NextRequest) {
 
 	// Apply all file updates in batch
 		if(updateJobs.length > 0) {
+			console.log(`Applying ${updateJobs.length} rating updates to files...`, updateJobs);
 			const results = await updateRatings(updateJobs);
 			fileUpdatesCount = results.filter(r => r.success).length;
 	
