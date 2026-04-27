@@ -30,10 +30,10 @@ import {
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
 
 interface ImageData {
-  originalFile: File;
-  fileName: string;
-  thumbnailPath: string;
-  originalPath: string;
+	originalFile: File;
+	fileName: string;
+	thumbnailPath: string;
+	originalPath: string;
 }
 
 export default function Home() {
@@ -68,13 +68,13 @@ export default function Home() {
 	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
 	const [, setIsWatcherActive] = useState<boolean>(false);
 	const [sessionId, setSessionId] = useState<string>('');
-  
-  // Camera Control state
+
+// Camera Control state
 	const [isCameraControlModalOpen, setIsCameraControlModalOpen] = useState<boolean>(false);
 	const [isShootAssistRunning, setIsShootAssistRunning] = useState<boolean>(false);
 	const [isCapturing, setIsCapturing] = useState<boolean>(false);
 	const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; percentage: number } | null>(null);
-  
+	const [isFullscreen, setIsFullscreen] = useState(false);
 	const socketRef = useRef<Socket | null>(null);
 	const filmstripRef = useRef<HTMLDivElement>(null);
 	const isFilmstripDraggingRef = useRef(false);
@@ -95,26 +95,24 @@ export default function Home() {
 	const maxZoom = 400;
 	const pinchFactor = 1.5;
 
-	const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Calculate filtered images based on current filter settings
+// Calculate filtered images based on current filter settings
 	const filteredImageFiles = imageFiles.filter((img) => {
 		const fileId = getFileId(img.fileName);
 		const rating = ratings.get(fileId)?.rating ?? null;
 
-    // If no filters are active, show all.
+	// If no filters are active, show all.
 		if(filterSelectedRatings.size === 5 && filterShowUnrated && selectedGroupIds.size === 0) {
 			return true;
 		}
 
 		let matchesRating = false;
 
-    // If image is unrated (null, undefined, 0, or less than 1)
+	// If image is unrated (null, undefined, 0, or less than 1)
 		if(rating === null || rating === undefined || rating < 1) {
 			matchesRating = filterShowUnrated;
 		}
 
-    // If image has a rating, check if it's in the selected ratings
+	// If image has a rating, check if it's in the selected ratings
 		if(rating !== null && rating !== undefined && rating >= 1) {
 			matchesRating = filterSelectedRatings.has(rating);
 		}
@@ -123,7 +121,7 @@ export default function Home() {
 			return false;
 		}
 
-    // No selected groups keeps existing behavior.
+	// No selected groups keeps existing behavior.
 		if(selectedGroupIds.size === 0) {
 			return true;
 		}
@@ -142,16 +140,16 @@ export default function Home() {
 		return false;
 	});
 
-  // Adjust activeIndex if current image is filtered out
+// Adjust activeIndex if current image is filtered out
 	useEffect(() => {
 		if(imageFiles.length === 0 || filteredImageFiles.length === 0) {
 			setActiveIndex(0);
 			return;
 		}
-    
+
 		const currentImage = imageFiles[activeIndex];
 		if(currentImage && !filteredImageFiles.includes(currentImage)) {
-      // Current image is filtered out, find first filtered image
+		// Current image is filtered out, find first filtered image
 			const firstFilteredIndex = imageFiles.findIndex(img =>
 				filteredImageFiles.includes(img)
 			);
@@ -167,11 +165,11 @@ export default function Home() {
 		return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
 	}, []);
 
-  // Initialize session ID for display synchronization
+// Initialize session ID for display synchronization
 	useEffect(() => {
 		let storedSessionId = localStorage.getItem('displaySessionId');
 		if(!storedSessionId) {
-      // Generate a simple session ID
+		// Generate a simple session ID
 			storedSessionId = Math.random().toString(36).substring(2, 10);
 			localStorage.setItem('displaySessionId', storedSessionId);
 		}
@@ -179,7 +177,7 @@ export default function Home() {
 		sessionIdRef.current = storedSessionId;
 	}, []);
 
-  // Keep refs in sync with state
+// Keep refs in sync with state
 	useEffect(() => {
 		sessionIdRef.current = sessionId;
 	}, [sessionId]);
@@ -198,14 +196,14 @@ export default function Home() {
 
 	const MAIN_IMAGE_SWIPE_THRESHOLD = 60;
 
-  // Initialize Socket.IO connection
+// Initialize Socket.IO connection
 	useEffect(() => {
 		const socket = getSocket();
 		socketRef.current = socket;
 
 		const handleConnect = () => {
 			console.log('Socket.IO connected:', socket.id);
-      // Join viewer session when connected
+		// Join viewer session when connected
 			if(sessionIdRef.current) {
 				console.log('Joining viewer session:', sessionIdRef.current);
 				socket.emit('join-viewer-session', sessionIdRef.current);
@@ -252,14 +250,14 @@ export default function Home() {
 		socket.on('file-deleted', handleFileDeleted);
 		socket.on('watcher-error', handleWatcherError);
 
-    // Handle display joined event - send current image
+	// Handle display joined event - send current image
 		const handleDisplayJoined = () => {
 			console.log('Display joined, sending current image');
 			const currSessionId = sessionIdRef.current;
 			const currFolderPath = folderPathRef.current;
 			const currImageFiles = imageFilesRef.current;
 			const currActiveIndex = activeIndexRef.current;
-      
+
 			if(currSessionId && currFolderPath && currImageFiles.length > 0) {
 				const currentImage = currImageFiles[currActiveIndex];
 				if(currentImage && socket.connected) {
@@ -275,7 +273,7 @@ export default function Home() {
 
 		socket.on('display-joined', handleDisplayJoined);
 
-    // ShootAssist event handlers
+	// ShootAssist event handlers
 		const handleShootAssistStatus = ({ isRunning }: { isRunning: boolean }) => {
 			console.log('ShootAssist status:', isRunning);
 			setIsShootAssistRunning(isRunning);
@@ -313,7 +311,7 @@ export default function Home() {
 			setIsCapturing(false);
 			setCaptureProgress(null);
 		};
-    
+
 		const handleCaptureStopped = () => {
 			console.log('Capture stopped');
 			setIsCapturing(false);
@@ -334,13 +332,13 @@ export default function Home() {
 		socket.on('capture-stopped', handleCaptureStopped);
 		socket.on('shoot-assist-error', handleShootAssistError);
 
-    // If already connected, join viewer session
+	// If already connected, join viewer session
 		if(socket.connected && sessionIdRef.current) {
 			socket.emit('join-viewer-session', sessionIdRef.current);
 		}
 
 		return () => {
-      // Remove only our listeners, don't disconnect the socket
+		// Remove only our listeners, don't disconnect the socket
 			socket.off('connect', handleConnect);
 			socket.off('disconnect', handleDisconnect);
 			socket.off('watch-started', handleWatchStarted);
@@ -364,7 +362,7 @@ export default function Home() {
 		};
 	}, []);
 
-  // Synchronize current image to display page
+// Synchronize current image to display page
 	useEffect(() => {
 		const socket = socketRef.current;
 		if(!socket || !socket.connected) {return;}
@@ -454,10 +452,10 @@ export default function Home() {
 
 			const startData = await startResponse.json();
 
-	// Get files (can be empty array for empty folders)
+		// Get files (can be empty array for empty folders)
 			const files = (startData.files || []) as string[];
 
-	// Create ImageData objects
+		// Create ImageData objects
 			const imageData: ImageData[] = files.map((fileName) => {
 				const encodedThumbPath = encodeURIComponent(getThumbnailFilename(fileName));
 				const encodedPath = encodeURIComponent(fileName);
@@ -471,7 +469,7 @@ export default function Home() {
 
 			setImageFiles(imageData);
 
-	// Load batch EXIF data from localStorage and merge with database ratings
+		// Load batch EXIF data from localStorage and merge with database ratings
 			let batchExifData: any[] = [];
 			try {
 				const storedExifData = localStorage.getItem(`batchExifData_${normalizedPath}`);
@@ -482,7 +480,7 @@ export default function Home() {
 				console.error('Failed to load batch EXIF data:', exifErr);
 			}
 
-	// Fetch ratings for this folder
+		// Fetch ratings for this folder
 			try {
 				const ratingsResponse = await fetch(`/api/ratings?folderPath=${encodeURIComponent(normalizedPath)}`);
 
@@ -494,8 +492,8 @@ export default function Home() {
 							ratingsMap.set(rating.id, rating);
 						}
 
-			// Merge EXIF ratings with database ratings
-			// EXIF ratings are used to pre-populate if there's no database rating
+				// Merge EXIF ratings with database ratings
+				// EXIF ratings are used to pre-populate if there's no database rating
 						for(const exifFile of batchExifData) {
 							if(exifFile.FileName && exifFile.Rating != null) {
 								const fileId = getFileId(exifFile.FileName);
@@ -522,7 +520,7 @@ export default function Home() {
 
 			setIsLoading(false);
 
-	// Start folder watcher via Socket.IO
+		// Start folder watcher via Socket.IO
 			if(socketRef.current && socketRef.current.connected) {
 				socketRef.current.emit('watch-folder', normalizedPath);
 			}
@@ -536,18 +534,18 @@ export default function Home() {
 
 
 
-  // Handle watcher events
+// Handle watcher events
 	function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted'; fileName: string; hasRating?: boolean }, path: string) {
 		const normalizedThumbPath = `${path}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
 
 		if(event.type === 'added') {
 			console.log('File added:', event.fileName);
 
-      // Check if file already exists
+		// Check if file already exists
 			const exists = imageFiles.some(img => img.fileName === event.fileName);
 			if(exists) {return;}
 
-      // Add new image to the list
+		// Add new image to the list
 			const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
 			const encodedPath = encodeURIComponent(event.fileName);
 			const newImage = {
@@ -557,24 +555,24 @@ export default function Home() {
 				originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}`,
 			};
 
-      // Update state and set new image as active
+		// Update state and set new image as active
 			setImageFiles(prev => {
 				const newList = [...prev, newImage];
-        // Use setTimeout to ensure activeIndex is set after state updates
+			// Use setTimeout to ensure activeIndex is set after state updates
 				setTimeout(() => {
 					setActiveIndex(newList.length - 1);
 				}, 0);
 				return newList;
 			});
 
-      // Update ratings if file has rating
+		// Update ratings if file has rating
 			if(event.hasRating) {
 				fetchRatingForFile(event.fileName, path);
 			}
 
 		} else if(event.type === 'changed') {
 			console.log('File changed:', event.fileName);
-      // Force reload of the thumbnail by updating the path with a timestamp
+		// Force reload of the thumbnail by updating the path with a timestamp
 			setImageFiles(prev => prev.map(img => {
 				if(img.fileName === event.fileName) {
 					const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
@@ -591,31 +589,34 @@ export default function Home() {
 
 		} else if(event.type === 'deleted') {
 			console.log('File deleted:', event.fileName);
-      
-      // Find the index of the deleted file
+
+		// Find the index of the deleted file
 			const deletedIndex = imageFiles.findIndex(img => img.fileName === event.fileName);
-      
-      // Remove from list
+
+		// Remove from list
 			setImageFiles(prev => prev.filter(img => img.fileName !== event.fileName));
 
-      // Adjust activeIndex if needed
+		// Adjust activeIndex if needed
 			if(deletedIndex !== -1) {
 				setActiveIndex(prev => {
+					
+				// The active image was deleted, show previous or stay at same position
 					if(deletedIndex === prev) {
-            // The active image was deleted, show previous or stay at same position
 						return Math.max(0, Math.min(prev, imageFiles.length - 2));
+						
+				// An image before the active one was deleted, shift index down
 					} else if(deletedIndex < prev) {
-            // An image before the active one was deleted, shift index down
 						return prev - 1;
 					}
-          // deletedIndex > prev, no change needed
+					
+				// deletedIndex > prev, no change needed
 					return prev;
 				});
 			}
 		}
 	}
 
-  // Fetch rating for a single file
+// Fetch rating for a single file
 	async function fetchRatingForFile(fileName: string, path: string) {
 		try {
 			const response = await fetch(`/api/ratings?folderPath=${encodeURIComponent(path)}`);
@@ -712,17 +713,17 @@ export default function Home() {
 		const fileId = getFileId(currentImage.fileName);
 		const currentDbRating = ratings.get(fileId)?.rating ?? null;
 
-    // If no EXIF rating: save to database
+	// If no EXIF rating: save to database
 		if(!hasExifRating) {
 			updateRatingInDatabase(currentImage.fileName, rating);
 			return;
 		}
 
-    // Conflict exists only if file has EXIF rating AND database rating differs
+	// Conflict exists only if file has EXIF rating AND database rating differs
 		const hasConflict = currentDbRating !== null && exifRating !== currentDbRating;
 
 		if(hasConflict) {
-      // Show conflict modal if there's a mismatch between file and database
+		// Show conflict modal if there's a mismatch between file and database
 			setRatingConflictData({
 				fileName: currentImage.fileName,
 				exifRating,
@@ -733,7 +734,7 @@ export default function Home() {
 			return;
 		}
 
-    // No conflict: save to database
+	// No conflict: save to database
 		updateRatingInDatabase(currentImage.fileName, rating);
 	}, [imageFiles, activeIndex, exifData, ratings, updateRatingInDatabase]);
 
@@ -767,7 +768,7 @@ export default function Home() {
 		const deltaX = e.clientX - filmstripDragStartXRef.current;
 		el.scrollLeft = filmstripStartScrollLeftRef.current - (deltaX * 4);
 	}
-  
+
 /* eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars */
 	function handleFilmstripPointerUp(e: PointerEvent<HTMLDivElement>) {
 		if(!isFilmstripDraggingRef.current) {return;}
@@ -777,14 +778,14 @@ export default function Home() {
 	}
 
 	function handleMainImagePointerDown(e: PointerEvent<HTMLImageElement>) {
-  // Left mouse button + zoomed in = pan mode
+	// Left mouse button + zoomed in = pan mode
 		if(zoomLevel > 100 && e.button === 0) {
 			panStartXRef.current = e.clientX;
 			panStartYRef.current = e.clientY;
 			isMainImageSwipingRef.current = false;
 		}
 
-    // Cancel any pending timeout from previous swipe
+	// Cancel any pending timeout from previous swipe
 		if(swipeButtonTimeoutRef.current) {
 			clearTimeout(swipeButtonTimeoutRef.current);
 			swipeButtonTimeoutRef.current = null;
@@ -801,11 +802,11 @@ export default function Home() {
 	function handleMainImagePointerMove(e: PointerEvent<HTMLImageElement>) {
 		if(!isMainImageSwipingRef.current || mainImageSwipeTriggeredRef.current || filteredImageFiles.length === 0) {return;}
 
-  // Don't trigger navigation swipe when zoomed in
+// Don't trigger navigation swipe when zoomed in
 		if(zoomLevel > 100 && (e.buttons & 1) ) {
 			pan(e);
 			return;
-      
+
 		}
 		const deltaX = e.clientX - mainImageStartXRef.current;
 		const deltaY = e.clientY - mainImageStartYRef.current;
@@ -817,13 +818,13 @@ export default function Home() {
 			img => img.fileName === imageFiles[activeIndex]?.fileName
 		);
 
-    // Swipe left = next image, image goes left1
+	// Swipe left = next image, image goes left1
 		if(deltaX < 0 && currentIdx < filteredImageFiles.length - 1) {
 			const nextImg = filteredImageFiles[currentIdx + 1];
 			setSwipeDirection('left');
 			setActiveIndex(imageFiles.findIndex(img => img.fileName === nextImg.fileName));
-        
-    // Swipe right = previous image, image goes right
+
+	// Swipe right = previous image, image goes right
 		} else if(deltaX > 0 && currentIdx > 0) {
 			const prevImg = filteredImageFiles[currentIdx - 1];
 			setSwipeDirection('right');
@@ -832,9 +833,7 @@ export default function Home() {
 
 		mainImageSwipeTriggeredRef.current = true;
 		isMainImageSwipingRef.current = false;
-      
 		
-    
 	}
 
 	function handleMainImagePointerUp() {
@@ -842,7 +841,7 @@ export default function Home() {
 		mainImageSwipeTriggeredRef.current = false;
 		setIsMainImageDragging(false);
 
-    // Show buttons after 1600ms
+	// Show buttons after 1600ms
 		if(swipeButtonTimeoutRef.current) {
 			clearTimeout(swipeButtonTimeoutRef.current);
 		}
@@ -855,14 +854,12 @@ export default function Home() {
 	function handleImageWheel(e: WheelEvent<HTMLImageElement>) {
 		if(zoomLevel === 100 && e.deltaY > 0) {return;} // Don't zoom out below 100%
 
-    //e.preventDefault();
-
 		const zoomStep = 20;
 		const newZoom = Math.max(100, Math.min(maxZoom, zoomLevel - (e.deltaY > 0 ? zoomStep : -zoomStep)));
 
 		if(newZoom === zoomLevel) {return;}
 
-    // Reset pan when zooming back to 100%
+	// Reset pan when zooming back to 100%
 		if(newZoom === 100) {
 			setZoomLevel(100);
 			setPanX(0);
@@ -906,13 +903,12 @@ export default function Home() {
 	function pan(e: React.PointerEvent<HTMLImageElement>) {
 		const deltaX = (e.clientX - panStartXRef.current) * pinchFactor;
 		const deltaY = (e.clientY - panStartYRef.current) * pinchFactor;
-    
 		const zoomFactor = zoomLevel / 100;
 		const container = document.querySelector('.main-image-container');
 
-		if(!container) {return;}
+		if(!container) { return }
 
-    // Adjust for zoom level to make movement feel natural
+	// Adjust for zoom level to make movement feel natural
 		const moveX = deltaX / zoomFactor;
 		const moveY = deltaY / zoomFactor;
 
@@ -929,7 +925,7 @@ export default function Home() {
 		panStartYRef.current = e.clientY;
 	}
 
-  // Reset swipe animation after it completes
+// Reset swipe animation after it completes
 	useEffect(() => {
 		if(swipeDirection !== null) {
 			const timer = setTimeout(() => {
@@ -939,7 +935,7 @@ export default function Home() {
 		}
 	}, [swipeDirection]);
 
-  // Load last active index for this folder from localStorage
+// Load last active index for this folder from localStorage
 	useEffect(() => {
 		const lsActiveIndex = localStorage.getItem('activeIndices');
 		if(lsActiveIndex) {
@@ -955,7 +951,7 @@ export default function Home() {
 		}
 	}, [folderPath]);
 
-  // Persist activeIndex per folderPath to localStorage
+// Persist activeIndex per folderPath to localStorage
 	useEffect(() => {
 		if(!folderPath) {return;}
 		try {
@@ -1041,14 +1037,14 @@ export default function Home() {
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [filteredImageFiles, zoomLevel, handleRatingClick, imageFiles, activeIndex, isCameraControlModalOpen, isCapturing, handleStopCapture]);
 
-  // Reset zoom and pan when changing photos
+// Reset zoom and pan when changing photos
 	useEffect(() => {
 		setZoomLevel(100);
 		setPanX(0);
 		setPanY(0);
 	}, [activeIndex]);
 
-  // Fetch EXIF data when active image changes
+// Fetch EXIF data when active image changes
 	useEffect(() => {
 		if(imageFiles.length === 0 || !folderPath) {
 			setExifData(null);
@@ -1085,7 +1081,7 @@ export default function Home() {
 					console.log('Fetched EXIF data:', exifData);
 					setExifData(exifData);
 
-		// Compare EXIF rating with database rating
+				// Compare EXIF rating with database rating
 					if(exifData) {
 						const exifRating = exifData?.Rating;
 						const fileId = getFileId(currentImage.fileName);
@@ -1093,13 +1089,15 @@ export default function Home() {
 
 						console.log('DB rating:', dbRating?.rating, 'EXIF rating:', exifRating, 'overRule:', dbRating?.overRuleFileRating);
 
-			// Only process if EXIF has a valid rating (1-5)
+					// Only process if EXIF has a valid rating (1-5)
 						if(exifRating != null && Number.isInteger(exifRating) && exifRating >= 1 && exifRating <= 5) {
-			// EXIF has rating, database doesn't → add to database
+							
+						// EXIF has rating, database doesn't → add to database
 							if((dbRating?.rating === null || dbRating?.rating === undefined) && !dbRating?.overRuleFileRating) {
 								await updateRatingInDatabase(currentImage.fileName, exifRating);
 							}
-			// EXIF rating differs from database → show modal
+							
+						// EXIF rating differs from database → show modal
 							else if(exifRating !== dbRating?.rating && !dbRating?.overRuleFileRating) {
 								setRatingConflictData({
 									fileName: currentImage.fileName,
@@ -1109,14 +1107,16 @@ export default function Home() {
 								});
 								setIsRatingConflictModalOpen(true);
 							}
-			// Else: ratings match, do nothing
+						// Else: ratings match, do nothing
 						}
 					}
 				}
+				
 			} catch (err) {
 				if(!canceled) {
 					setExifError(err instanceof Error ? err.message : 'Could not retrieve EXIF data');
 				}
+				
 			} finally {
 				if(!canceled) {
 					setIsExifLoading(false);
@@ -1125,15 +1125,14 @@ export default function Home() {
 		}
 
 		fetchExifData();
-		return () => {
-			canceled = true;
-		};
+		return () => { canceled = true };
+		
 	}, [activeIndex, imageFiles, folderPath, ratings]);
 
 
 	const handleCopyDisplayUrl = useCallback(() => {
 		if(!sessionId) {return;}
-    
+
 		const displayUrl = `${window.location.origin}/display?session=${sessionId}`;
 		navigator.clipboard.writeText(displayUrl).then(() => {
 			toast.success('Display URL copied to clipboard!');
@@ -1143,7 +1142,7 @@ export default function Home() {
 		});
 	}, [sessionId]);
 
-  // Camera Control (ShootAssist) handlers
+// Camera Control (ShootAssist) handlers
 	const handleStartShootAssist = useCallback(async() => {
 		try {
 			const response = await fetch('/api/shoot-assist/startup');
