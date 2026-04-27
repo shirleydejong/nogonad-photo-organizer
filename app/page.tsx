@@ -236,6 +236,10 @@ export default function Home() {
 		const handleFileChanged = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
 			handleWatcherEvent({ type: 'changed', fileName }, folderPath);
 		};
+		
+		const handleThumbnailUpdated = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
+			handleWatcherEvent({ type: 'thumbnail-updated', fileName }, folderPath);
+		};
 
 		const handleFileDeleted = ({ fileName, folderPath }: { fileName: string; folderPath: string }) => {
 			handleWatcherEvent({ type: 'deleted', fileName }, folderPath);
@@ -247,6 +251,7 @@ export default function Home() {
 
 		socket.on('file-added', handleFileAdded);
 		socket.on('file-changed', handleFileChanged);
+		socket.on('thumbnail-updated', handleThumbnailUpdated);
 		socket.on('file-deleted', handleFileDeleted);
 		socket.on('watcher-error', handleWatcherError);
 
@@ -345,6 +350,7 @@ export default function Home() {
 			socket.off('watch-stopped', handleWatchStopped);
 			socket.off('file-added', handleFileAdded);
 			socket.off('file-changed', handleFileChanged);
+			socket.off('thumbnail-updated', handleThumbnailUpdated);
 			socket.off('file-deleted', handleFileDeleted);
 			socket.off('watcher-error', handleWatcherError);
 			socket.off('display-joined', handleDisplayJoined);
@@ -535,23 +541,24 @@ export default function Home() {
 
 
 // Handle watcher events
-	function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted'; fileName: string; hasRating?: boolean }, path: string) {
+	function handleWatcherEvent(event: { type: 'added' | 'changed' | 'deleted' | 'thumbnail-updated'; fileName: string; hasRating?: boolean }, path: string) {
 		const normalizedThumbPath = `${path}\\${CONFIG.NPO_FOLDER}\\${CONFIG.THUMBNAILS_FOLDER}`;
+		const currentImageFiles = imageFilesRef.current;
 
 		if(event.type === 'added') {
-			console.log('File added:', event.fileName);
+			console.log('⭐File added:', event.fileName);
 
 		// Check if file already exists
-			const exists = imageFiles.some(img => img.fileName === event.fileName);
+			const exists = currentImageFiles.some(img => img.fileName === event.fileName);
 			if(exists) {return;}
 
 		// Add new image to the list
-			const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+			//const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
 			const encodedPath = encodeURIComponent(event.fileName);
 			const newImage = {
 				originalFile: null as any,
 				fileName: event.fileName,
-				thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}`,
+				thumbnailPath: `/empty.webp`,
 				originalPath: `/api/image/${encodedPath}?folderPath=${encodeURIComponent(path)}&fileName=${encodedPath}`,
 			};
 
@@ -587,11 +594,31 @@ export default function Home() {
 				return img;
 			}));
 
+		} else if(event.type === 'thumbnail-updated') {
+			const exists = currentImageFiles.some(img => img.fileName === event.fileName);
+			const timeout = !exists ? 2000 : 0;
+			console.log(`🖼️ Thumbnail updated for ${event.fileName}, exists: ${exists}, using timeout: ${timeout}ms`);
+			
+			setTimeout(() => {
+				setImageFiles(prev => prev.map(img => {
+					if(img.fileName === event.fileName) {
+						const encodedThumbPath = encodeURIComponent(getThumbnailFilename(event.fileName));
+						const timestamp = Date.now();
+						return {
+							...img,
+							thumbnailPath: `/api/image/${encodedThumbPath}?folderPath=${encodeURIComponent(normalizedThumbPath)}&fileName=${encodedThumbPath}&t=${timestamp}`,
+						};
+					}
+					return img;
+				}));
+				
+			}, timeout);
+
 		} else if(event.type === 'deleted') {
 			console.log('File deleted:', event.fileName);
 
 		// Find the index of the deleted file
-			const deletedIndex = imageFiles.findIndex(img => img.fileName === event.fileName);
+			const deletedIndex = imageFilesRef.current.findIndex(img => img.fileName === event.fileName);
 
 		// Remove from list
 			setImageFiles(prev => prev.filter(img => img.fileName !== event.fileName));
@@ -602,7 +629,7 @@ export default function Home() {
 					
 				// The active image was deleted, show previous or stay at same position
 					if(deletedIndex === prev) {
-						return Math.max(0, Math.min(prev, imageFiles.length - 2));
+						return Math.max(0, Math.min(prev, imageFilesRef.current.length - 2));
 						
 				// An image before the active one was deleted, shift index down
 					} else if(deletedIndex < prev) {
@@ -1062,6 +1089,7 @@ export default function Home() {
 		setExifData(null);
 
 		async function fetchExifData() {
+			console.log('Fetching EXIF data for:', currentImage.fileName);
 			try {
 				const response = await fetch(
 					`/api/exif/single/default?folderPath=${encodeURIComponent(folderPath)}&file=${encodeURIComponent(currentImage.fileName)}`
@@ -1127,7 +1155,8 @@ export default function Home() {
 		fetchExifData();
 		return () => { canceled = true };
 		
-	}, [activeIndex, imageFiles, folderPath, ratings]);
+	}, [activeIndex, folderPath]);
+	// prev: [activeIndex, imageFiles, folderPath, ratings]);
 
 
 	const handleCopyDisplayUrl = useCallback(() => {

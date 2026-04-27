@@ -180,6 +180,7 @@ class FileWatcher {
 			const hasRating = rating !== null && rating !== undefined && rating >= 1;
 
 			this.callbacks.onFileAdded(filename, hasRating);
+
 		} catch (error) {
 			console.error(`Error handling file add for ${filename}:`, error);
 			this.callbacks.onError(error instanceof Error ? error : new Error(String(error)));

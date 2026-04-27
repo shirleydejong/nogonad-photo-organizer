@@ -251,9 +251,6 @@ app.prepare().then(() => {
 						console.log(`Progress: ${processed}/${total} (${percentage}%)`);
 						socket.emit('thumbnail-progress', { processed, total, percentage, folderPath });
 					},
-					onThumbnailCreated: (fileName: string) => {
-						console.log('Thumbnail created:', fileName);
-					},
 					onError: (error: Error) => {
 						console.error('Thumbnail generation error:', error);
 						socket.emit('thumbnail-error', { error: error.message, folderPath });
@@ -306,6 +303,9 @@ app.prepare().then(() => {
 					onFileDeleted: (fileName: string) => {
 						console.log('File deleted:', fileName);
 						io.emit('file-deleted', { fileName, folderPath });
+					},
+					onThumbnailCreated: (fileName: string) => {
+						io.emit('thumbnail-updated', { fileName, folderPath });
 					},
 					onError: (error: Error) => {
 						console.error('Watcher error:', error);
