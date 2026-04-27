@@ -260,12 +260,12 @@ app.prepare().then(() => {
 					},
 				});
 
-		// Process existing images - this will call onThumbnailProgress for each created thumbnail
+			// Process existing images - this will call onThumbnailProgress for each created thumbnail
 				const result = await watcher.processExistingImages();
 		
 				console.log(`Thumbnail processing complete: ${result.total} total, ${result.existingThumbnails} existing`);
 
-		// Emit completion
+			// Emit completion
 				socket.emit('thumbnail-complete', {
 					total: result.total,
 					files: result.files,
@@ -287,13 +287,13 @@ app.prepare().then(() => {
 			console.log('Watch folder request:', folderPath);
 
 			try {
-		// Stop any existing watcher for this folder
+			// Stop any existing watcher for this folder
 				const existingWatcher = activeWatchers.get(folderPath);
 				if(existingWatcher) {
 					await existingWatcher.stop();
 				}
-
-		// Create new watcher
+				
+			// Create new watcher
 				const watcher = new FileWatcher(folderPath, {
 					onFileAdded: (fileName: string, hasRating?: boolean) => {
 						console.log('File added:', fileName, 'hasRating:', hasRating);
@@ -313,12 +313,10 @@ app.prepare().then(() => {
 					},
 				});
 
-		// Start watching
+			// Start watching
 				await watcher.start();
 				activeWatchers.set(folderPath, watcher);
-
 				socket.emit('watch-started', { folderPath });
-				console.log('Watcher started for folder:', folderPath);
 				
 			} catch (error) {
 				console.error('Failed to start watcher:', error);
