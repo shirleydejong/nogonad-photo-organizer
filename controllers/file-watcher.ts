@@ -11,19 +11,19 @@ import { promisify } from 'util';
 // Supported image extensions
 
 interface FileWatcherCallbacks {
-  onFileAdded?: (fileName: string, hasRating?: boolean) => void;
-  onFileChanged?: (fileName: string) => void;
-  onFileDeleted?: (fileName: string) => void;
-  onThumbnailProgress?: (processed: number, total: number) => void;
-  onThumbnailCreated?: (fileName: string) => void;
-  onThumbnailDeleted?: (fileName: string) => void;
-  onError?: (error: Error) => void;
+	onFileAdded?: (fileName: string, hasRating?: boolean) => void;
+	onFileChanged?: (fileName: string) => void;
+	onFileDeleted?: (fileName: string) => void;
+	onThumbnailProgress?: (processed: number, total: number) => void;
+	onThumbnailCreated?: (fileName: string) => void;
+	onThumbnailDeleted?: (fileName: string) => void;
+	onError?: (error: Error) => void;
 }
 
 export interface FileChangeEvent {
-  type: 'added' | 'changed' | 'deleted';
-  fileName: string;
-  hasRating?: boolean;
+	type: 'added' | 'changed' | 'deleted';
+	fileName: string;
+	hasRating?: boolean;
 }
 
 class FileWatcher {
@@ -46,19 +46,19 @@ class FileWatcher {
 		};
 	}
 
-  /**
-   * Start watching the folder and begin processing existing images
-   */
+	/**
+	 * Start watching the folder and begin processing existing images
+	 */
 	async start(): Promise<void> {
 		try {
-      // Ensure thumbnails folder exists
+		// Ensure thumbnails folder exists
 			await fs.mkdir(this.thumbsPath, { recursive: true });
 
-      // Start the chokidar watcher
+		// Start the chokidar watcher
 			this.watcher = chokidar.watch(this.folderPath, {
 				ignored: [
 					(filepath: string) => {
-            // Ignore the _npo folder and its contents
+					// Ignore the _npo folder and its contents
 						const relativePath = path.relative(this.folderPath, filepath);
 						return relativePath.startsWith(CONFIG.NPO_FOLDER);
 					},
@@ -67,8 +67,8 @@ class FileWatcher {
 				persistent: true,
 				ignoreInitial: true,
 				awaitWriteFinish: {
-					stabilityThreshold: 2000,
-					pollInterval: 100,
+					stabilityThreshold: 500,
+					pollInterval: 10,
 				},
 			});
 
@@ -88,9 +88,9 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Stop the file watcher
-   */
+	/**
+	 * Stop the file watcher
+	 */
 	async stop(): Promise<void> {
 		if(this.watcher) {
 			await this.watcher.close();
@@ -99,20 +99,20 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Process all existing images in the folder and generate thumbnails
-   * Returns the total number of images and list of filenames
-   */
+	/**
+	 * Process all existing images in the folder and generate thumbnails
+	 * Returns the total number of images and list of filenames
+	 */
 	async processExistingImages(): Promise<{ total: number; files: string[]; existingThumbnails: number }> {
 		try {
-      // Ensure thumbnails folder exists
+		// Ensure thumbnails folder exists
 			await fs.mkdir(this.thumbsPath, { recursive: true });
 
-      // Get all files in the folder
+		// Get all files in the folder
 			const files = await fs.readdir(this.folderPath);
 			const imageFiles = files.filter((file) => this.isSupportedImage(file));
 
-      // Count existing thumbnails
+		// Count existing thumbnails
 			let existingThumbnails = 0;
 			for(const file of imageFiles) {
 				const thumbName = this.getThumbnailFilename(file);
@@ -121,27 +121,27 @@ class FileWatcher {
 					await fs.access(thumbPath);
 					existingThumbnails++;
 				} catch {
-          // Thumbnail doesn't exist
+			// Thumbnail doesn't exist
 				}
 			}
 
-      // Send initial progress with existing thumbnails
+		// Send initial progress with existing thumbnails
 			if(imageFiles.length > 0) {
 				this.callbacks.onThumbnailProgress(existingThumbnails, imageFiles.length);
 			}
 
-      // Process images that don't have thumbnails
+		// Process images that don't have thumbnails
 			let processed = existingThumbnails;
 			for(const file of imageFiles) {
 				const thumbName = this.getThumbnailFilename(file);
 				const thumbPath = path.join(this.thumbsPath, thumbName);
 
 				try {
-          // Check if thumbnail already exists
+				// Check if thumbnail already exists
 					await fs.access(thumbPath);
-          // Thumbnail exists, skip
+				// Thumbnail exists, skip
 				} catch {
-          // Thumbnail doesn't exist, create it
+				// Thumbnail doesn't exist, create it
 					const filepath = path.join(this.folderPath, file);
 					await this.createThumbnail(filepath);
 					processed++;
@@ -158,9 +158,9 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Handle file addition event
-   */
+	/**
+	 * Handle file addition event
+	 */
 	private async handleFileAdd(filepath: string): Promise<void> {
 		const filename = path.basename(filepath);
 
@@ -169,24 +169,27 @@ class FileWatcher {
 		}
 
 		try {
-      // Create thumbnail
-			await this.createThumbnail(filepath);
+		// Create thumbnail
+			this.createThumbnail(filepath).then(() =>
+				this.callbacks.onThumbnailCreated(filename)
+			);
 
-      // Check if file has a rating
+		// Check if file has a rating
 			const fileId = this.getFileId(filename);
 			const rating = getRating(fileId, this.folderPath);
 			const hasRating = rating !== null && rating !== undefined && rating >= 1;
 
 			this.callbacks.onFileAdded(filename, hasRating);
+
 		} catch (error) {
 			console.error(`Error handling file add for ${filename}:`, error);
 			this.callbacks.onError(error instanceof Error ? error : new Error(String(error)));
 		}
 	}
 
-  /**
-   * Handle file change event
-   */
+	/**
+	 * Handle file change event
+	 */
 	private async handleFileChange(filepath: string): Promise<void> {
 		const filename = path.basename(filepath);
 
@@ -195,7 +198,7 @@ class FileWatcher {
 		}
 
 		try {
-      // Regenerate thumbnail
+		// Regenerate thumbnail
 			await this.createThumbnail(filepath);
 			this.callbacks.onFileChanged(filename);
 		} catch (error) {
@@ -204,9 +207,9 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Handle file deletion event
-   */
+	/**
+	 * Handle file deletion event
+	 */
 	private async handleFileDelete(filepath: string): Promise<void> {
 		const filename = path.basename(filepath);
 
@@ -215,7 +218,7 @@ class FileWatcher {
 		}
 
 		try {
-      // Delete thumbnail
+		// Delete thumbnail
 			await this.deleteThumbnail(filename);
 			this.callbacks.onFileDeleted(filename);
 		} catch (error) {
@@ -224,15 +227,15 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Create thumbnail for an image
-   */
+	/**
+	 * Create thumbnail for an image
+	 */
 	private async createThumbnail(filepath: string): Promise<void> {
 		const filename = path.basename(filepath);
 		const thumbName = this.getThumbnailFilename(filename);
 		const thumbPath = path.join(this.thumbsPath, thumbName);
 
-    // Skip if thumbnail already exists
+	// Skip if thumbnail already exists
 		if(fsSync.existsSync(thumbPath)) {
 			return;
 		}
@@ -248,11 +251,9 @@ class FileWatcher {
 
 			console.log(`Thumbnail created: ${thumbName}`);
 		} catch (error) {
-      
 			if( filepath.endsWith('.jxl') ) {
 				console.log(`Sharp failed for .jxl file, trying ImageMagick: ${filename}`);
 				try {
-            
 					const execFileAsync = promisify(execFile);
 					await execFileAsync('magick', [
 						filepath,
@@ -267,16 +268,13 @@ class FileWatcher {
 					console.log(`ImageMagick also failed for ${filename}:`, imgError);
 				}
 			}
-      
-      //const err = error instanceof Error ? error : new Error(String(error));
-      //throw err;
 			console.log(`Error creating thumbnail for ${filename}:`, error);
 		}
 	}
 
-  /**
-   * Delete a thumbnail
-   */
+	/**
+	 * Delete a thumbnail
+	 */
 	private async deleteThumbnail(filename: string): Promise<void> {
 		const thumbName = this.getThumbnailFilename(filename);
 		const thumbPath = path.join(this.thumbsPath, thumbName);
@@ -293,26 +291,26 @@ class FileWatcher {
 		}
 	}
 
-  /**
-   * Check if file is a supported image
-   */
+	/**
+	 * Check if file is a supported image
+	 */
 	private isSupportedImage(filename: string): boolean {
 		const ext = path.extname(filename).toLowerCase();
 		return CONFIG.SUPPORTED_EXTENSIONS.includes(ext);
 	}
 
-  /**
-   * Get thumbnail filename from original filename
-   */
+	/**
+	 * Get thumbnail filename from original filename
+	 */
 	private getThumbnailFilename(filename: string): string {
 		const lastDot = filename.lastIndexOf('.');
 		if(lastDot === -1) {return filename + CONFIG.THUMBNAIL_SUFFIX;}
 		return filename.substring(0, lastDot) + CONFIG.THUMBNAIL_SUFFIX + filename.substring(lastDot);
 	}
 
-  /**
-   * Get file ID (filename without extension)
-   */
+	/**
+	 * Get file ID (filename without extension)
+	 */
 	private getFileId(filename: string): string {
 		const lastDot = filename.lastIndexOf('.');
 		if(lastDot === -1) {return filename;}

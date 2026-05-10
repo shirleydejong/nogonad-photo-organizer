@@ -127,17 +127,17 @@ export async function GET(
 			const rawImageFiles = rawFiles.filter((entry) => {
 				if(!entry.isFile()) {return false;}
 				const ext = path.extname(entry.name).toLowerCase();
-				return config.RAW_EXTENSIONS.includes(ext) || ext === '.xmp';
+				return config.RAW_EXTENSIONS.includes(ext);
 			});
 
-			// Build set of XMP sidecar filenames for quick lookup
+		// Build set of XMP sidecar filenames for quick lookup
 			const xmpFiles = new Set(
 				rawFiles
 					.filter((entry) => path.extname(entry.name).toLowerCase() === '.xmp')
 					.map((entry) => path.parse(entry.name).name.toLowerCase())
 			);
 
-			// No RAW files in the subfolder
+		// No RAW files in the subfolder
 			if(rawImageFiles.length === 0) {
 				return NextResponse.json({
 					success: true,
@@ -168,7 +168,12 @@ export async function GET(
 						...data,
 						hasXmp: xmpFiles.has(baseName),
 					};
-				});
+				})
+				.filter((data, index, self) => 
+					index === self.findIndex((item) => 
+						path.parse(item.FileName).name.toLowerCase() === path.parse(data.FileName).name.toLowerCase()
+					)
+				);
 
 			return NextResponse.json({
 				success: true,
