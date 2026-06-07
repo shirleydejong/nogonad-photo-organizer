@@ -62,6 +62,32 @@ button {
   image-rendering: -webkit-optimize-contrast;
 }
 
+@keyframes zoomingHoldA {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+@keyframes zoomingHoldB {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+@media (dynamic-range: high) {
+  .main-image {
+    will-change: initial;
+  }
+  .main-image.zooming {
+    will-change: transform;
+  }
+  .main-image.zooming.zooming-a {
+    animation: zoomingHoldA 200ms linear;
+  }
+
+  .main-image.zooming.zooming-b {
+    animation: zoomingHoldB 200ms linear;
+  }
+}
+
 /* Swipe animations */
 @keyframes swipeOutLeft {
   from {

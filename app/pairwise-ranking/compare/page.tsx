@@ -500,7 +500,7 @@ function PairwiseComparePageContent() {
 						<span>All combinations are complete for this selection.</span>
 						<button className="header-button" onClick={() => router.push('/pairwise-ranking')}>
 							<Icon name="leaderboard" />
-              Back to results overview
+							Back to results overview
 						</button>
 					</section>
 				)}
@@ -520,6 +520,7 @@ function PairwiseComparePageContent() {
 								onClick={() => handleImageSelect('left')}
 								title="Click to choose left image"
 							>
+								<img src="/magic-hdr-pixel.png" alt="" width="2" height="0" className="magic-hdr-pixel" />
 								{pairData.left.path ? (
 									<img
 										ref={leftImageRef}
@@ -552,6 +553,7 @@ function PairwiseComparePageContent() {
 								onClick={() => handleImageSelect('right')}
 								title="Click to choose right image"
 							>
+								<img src="/magic-hdr-pixel.png" alt="" width="2" height="0" className="magic-hdr-pixel" />
 								{pairData.right.path ? (
 									<img
 										ref={rightImageRef}

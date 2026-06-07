@@ -344,7 +344,7 @@ export default function PairwiseRankingPage() {
 														}}
 													>
 														<Icon name="play_arrow" />
-                          Start
+														Start
 													</button>
 													<button
 														className="header-button"
@@ -353,7 +353,7 @@ export default function PairwiseRankingPage() {
 														}}
 													>
 														<Icon name="leaderboard" />
-                          Results
+														Results
 													</button>
 												</div>
 											</td>
@@ -389,7 +389,7 @@ export default function PairwiseRankingPage() {
 									}}
 								>
 									<Icon name="refresh" />
-                  Refresh
+									Refresh
 								</button>
 							</div>
 						</div>

@@ -52,6 +52,8 @@ export default function Home() {
 	const [isSwipingActive, setIsSwipingActive] = useState<boolean>(false);
 	const [isMainImageDragging, setIsMainImageDragging] = useState<boolean>(false);
 	const [isFilmstripDragging, setIsFilmstripDragging] = useState<boolean>(false);
+	const [isZooming, setIsZooming] = useState<boolean>(false);
+	const [zoomingAnimationVariant, setZoomingAnimationVariant] = useState<0 | 1>(0);
 	const [zoomLevel, setZoomLevel] = useState<number>(100);
 	const [panX, setPanX] = useState<number>(0);
 	const [panY, setPanY] = useState<number>(0);
@@ -94,6 +96,13 @@ export default function Home() {
 	const activeIndexRef = useRef<number>(0);
 	const maxZoom = 400;
 	const pinchFactor = 1.5;
+	const isCurrentImageJxl = imageFiles[activeIndex]?.fileName?.toLowerCase().endsWith('.jxl') ?? false;
+
+	const triggerZooming = useCallback(() => {
+		if(!isCurrentImageJxl) {return;}
+		setIsZooming(true);
+		setZoomingAnimationVariant(prev => prev === 0 ? 1 : 0);
+	}, [isCurrentImageJxl]);
 
 // Calculate filtered images based on current filter settings
 	const filteredImageFiles = imageFiles.filter((img) => {
@@ -886,6 +895,8 @@ export default function Home() {
 
 		if(newZoom === zoomLevel) {return;}
 
+		triggerZooming();
+
 	// Reset pan when zooming back to 100%
 		if(newZoom === 100) {
 			setZoomLevel(100);
@@ -916,6 +927,8 @@ export default function Home() {
 			const newZoom = Math.max(100, Math.min(maxZoom, touchPinchRef.current.startZoom * delta));
       
 			if(newZoom !== zoomLevel) {
+				triggerZooming();
+
 				if(newZoom === 100) {
 					setZoomLevel(100);
 					setPanX(0);
@@ -944,6 +957,10 @@ export default function Home() {
 
 		const newPanX = e.currentTarget.clientWidth * zoomFactor < container.clientWidth ? 0 : Math.max(-maxPanX, Math.min(maxPanX, panX + moveX));
 		const newPanY = e.currentTarget.clientHeight * zoomFactor < container.clientHeight ? 0 : Math.max(-maxPanY, Math.min(maxPanY, panY + moveY));
+
+		if(newPanX !== panX || newPanY !== panY) {
+			triggerZooming();
+		}
 
 		setPanX(newPanX);
 		setPanY(newPanY);
@@ -1069,6 +1086,7 @@ export default function Home() {
 		setZoomLevel(100);
 		setPanX(0);
 		setPanY(0);
+		setIsZooming(false);
 	}, [activeIndex]);
 
 // Fetch EXIF data when active image changes
@@ -1409,6 +1427,7 @@ export default function Home() {
 
 									<div className="main-image-container flex w-full h-full items-center justify-center gap-4 px-4">
 										<div className="flex-1 flex items-center justify-center h-full">
+											<img src="/magic-hdr-pixel.png" alt="" width="2" height="0" className="magic-hdr-pixel" />
 											{imageFiles[activeIndex] && (
 												<img
 													key={activeIndex}
@@ -1419,13 +1438,18 @@ export default function Home() {
 														: swipeDirection === 'right'
 															? 'animate-[swipeOutRight_0.2s_ease-out]'
 															: ''
-													} ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+													} ${isMainImageDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isZooming && isCurrentImageJxl ? `zooming ${zoomingAnimationVariant === 0 ? 'zooming-a' : 'zooming-b'}` : ''}`}
 													style={{
 														transform: `scale(${zoomLevel / 100}) translate(${panX}px, ${panY}px)`,
 														transition: isMainImageDragging ? 'none' : 'transform 0.1s ease-out',
 														touchAction: 'none'
 													}}
 													draggable={false}
+													onAnimationEnd={(e) => {
+														if(e.animationName === 'zoomingHoldA' || e.animationName === 'zoomingHoldB') {
+															setIsZooming(false);
+														}
+													}}
 													onPointerDown={handleMainImagePointerDown}
 													onPointerMove={handleMainImagePointerMove}
 													onPointerUp={handleMainImagePointerUp}
