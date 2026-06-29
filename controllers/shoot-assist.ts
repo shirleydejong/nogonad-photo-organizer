@@ -3,6 +3,16 @@ import config from '@/config';
 import { EventEmitter } from 'events';
 
 const CONNECTION_TIMEOUT_MS = 15000;
+const SETTINGS_TIMEOUT_MS = 10000;
+
+type CameraSettings = Record<string, unknown>;
+
+type PendingSettingsRequest = {
+	buffer: string;
+	resolve: (settings: CameraSettings) => void;
+	reject: (error: Error) => void;
+	timeout: NodeJS.Timeout;
+};
 
 /**
  * Controller for managing the ShootAssist camera control process.
@@ -14,6 +24,7 @@ export class ShootAssistController extends EventEmitter {
 	private isShuttingDown = false;
 	private startupTimeout: NodeJS.Timeout | null = null;
 	private currentCapture: { count: number; delayMs: number } | null = null;
+	private pendingSettingsRequest: PendingSettingsRequest | null = null;
 
 	constructor() {
 		super();
@@ -53,8 +64,10 @@ export class ShootAssistController extends EventEmitter {
 
 			// Handle stdout - log to console and check for READY status
 				this.process.stdout?.on('data', (data: Buffer) => {
-					const output = data.toString().trim();
+					const rawOutput = data.toString();
+					const output = rawOutput.trim();
 					console.log(`📸 ${output}`);
+					this.collectPendingSettingsOutput(rawOutput);
 
 				// Check if process is ready
 					if(output.includes('[STATUS] READY')) {
@@ -66,14 +79,17 @@ export class ShootAssistController extends EventEmitter {
 						this.emit('ready');
 						resolve();
 					} else if(output.includes('[STATUS] OK')) {
+						this.completePendingSettingsFromStatus();
 						this.emit('command-complete');
 					}
 				});
 
 			// Handle stderr - log to console and emit status events
 				this.process.stderr?.on('data', (data: Buffer) => {
-					const output = data.toString().trim();
+					const rawOutput = data.toString();
+					const output = rawOutput.trim();
 					console.log(`📸 ${output}`);
+					this.collectPendingSettingsOutput(rawOutput);
 
 				// Parse status messages
 					if(output.includes('[STATUS]')) {
@@ -100,6 +116,7 @@ export class ShootAssistController extends EventEmitter {
 						}
 			
 					} else if(output.includes('[ERROR]')) {
+						this.rejectPendingSettings(new Error(output));
 						this.safeEmitError(output);
 					} else if(output.includes('[WARNING]')) {
 			
@@ -116,6 +133,7 @@ export class ShootAssistController extends EventEmitter {
 
 			// Handle process exit
 				this.process.on('exit', (code, signal) => {
+					this.rejectPendingSettings(new Error('ShootAssist process exited while waiting for settings'));
 					const exitCode = code ?? -1;
 					if(exitCode !== 0 && !this.isShuttingDown) {
 						const errorMessage = `ShootAssist Process exited unexpectedly with code ${exitCode} and signal ${signal}`;
@@ -145,6 +163,36 @@ export class ShootAssistController extends EventEmitter {
 			} catch (err) {
 				this.cleanup();
 				reject(err);
+			}
+		});
+	}
+
+	/**
+	 * Read current camera settings from ShootAssist.
+	 */
+	async getSettings(): Promise<CameraSettings> {
+		this.ensureReady();
+
+		if(this.pendingSettingsRequest) {
+			throw new Error('A settings request is already in progress');
+		}
+
+		return new Promise<CameraSettings>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.rejectPendingSettings(new Error('Timed out while waiting for camera settings'));
+			}, SETTINGS_TIMEOUT_MS);
+
+			this.pendingSettingsRequest = {
+				buffer: '',
+				resolve,
+				reject,
+				timeout,
+			};
+
+			try {
+				this.sendCommand('get_settings');
+			} catch (error) {
+				this.rejectPendingSettings(error instanceof Error ? error : new Error('Failed to send get_settings command'));
 			}
 		});
 	}
@@ -238,6 +286,128 @@ export class ShootAssistController extends EventEmitter {
 		this.process.stdin.write(`${command}\n`);
 	}
 
+	private collectPendingSettingsOutput(rawOutput: string): void {
+		if(!this.pendingSettingsRequest || !rawOutput) {
+			return;
+		}
+
+		this.pendingSettingsRequest.buffer += rawOutput;
+
+		const parsed = this.tryParseSettingsFromBuffer(this.pendingSettingsRequest.buffer);
+		if(parsed) {
+			this.resolvePendingSettings(parsed);
+		}
+	}
+
+	private completePendingSettingsFromStatus(): void {
+		if(!this.pendingSettingsRequest) {
+			return;
+		}
+
+		const parsed = this.tryParseSettingsFromBuffer(this.pendingSettingsRequest.buffer);
+		if(parsed) {
+			this.resolvePendingSettings(parsed);
+			return;
+		}
+
+		this.rejectPendingSettings(new Error('ShootAssist returned no parsable settings JSON'));
+	}
+
+	private resolvePendingSettings(settings: CameraSettings): void {
+		if(!this.pendingSettingsRequest) {
+			return;
+		}
+
+		const pending = this.pendingSettingsRequest;
+		this.pendingSettingsRequest = null;
+		clearTimeout(pending.timeout);
+		pending.resolve(settings);
+	}
+
+	private rejectPendingSettings(error: Error): void {
+		if(!this.pendingSettingsRequest) {
+			return;
+		}
+
+		const pending = this.pendingSettingsRequest;
+		this.pendingSettingsRequest = null;
+		clearTimeout(pending.timeout);
+		pending.reject(error);
+	}
+
+	private tryParseSettingsFromBuffer(buffer: string): CameraSettings | null {
+		const jsonText = this.findFirstJsonObject(buffer);
+		if(!jsonText) {
+			return null;
+		}
+
+		try {
+			const parsed = JSON.parse(jsonText);
+			if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				return parsed as CameraSettings;
+			}
+		} catch {
+			return null;
+		}
+
+		return null;
+	}
+
+	private findFirstJsonObject(text: string): string | null {
+		let startIndex = -1;
+		let depth = 0;
+		let inString = false;
+		let isEscaped = false;
+
+		for(let i = 0; i < text.length; i += 1) {
+			const char = text[i];
+
+			if(startIndex === -1) {
+				if(char === '{') {
+					startIndex = i;
+					depth = 1;
+				}
+				continue;
+			}
+
+			if(inString) {
+				if(isEscaped) {
+					isEscaped = false;
+					continue;
+				}
+
+				if(char === '\\') {
+					isEscaped = true;
+					continue;
+				}
+
+				if(char === '"') {
+					inString = false;
+				}
+				continue;
+			}
+
+			if(char === '"') {
+				inString = true;
+				continue;
+			}
+
+			if(char === '{') {
+				depth += 1;
+				continue;
+			}
+
+			if(char === '}') {
+				depth -= 1;
+				if(depth === 0) {
+					return text.slice(startIndex, i + 1);
+				}
+			}
+		}
+
+		return null;
+	}
+
 /**
  * Ensure the process is ready before sending commands
  * @private
@@ -269,6 +439,8 @@ export class ShootAssistController extends EventEmitter {
 			clearTimeout(this.startupTimeout);
 			this.startupTimeout = null;
 		}
+
+		this.rejectPendingSettings(new Error('ShootAssist controller cleanup interrupted pending settings request'));
 
 		this.currentCapture = null;
 		this.isShuttingDown = false;

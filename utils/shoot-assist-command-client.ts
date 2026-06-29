@@ -5,6 +5,7 @@ type CommandAck = {
   success: boolean;
   message?: string;
   error?: string;
+	data?: Record<string, unknown>;
 };
 
 const MAX_CONNECT_RETRIES = 4;
@@ -100,14 +101,17 @@ async function getCommandSocket(): Promise<Socket> {
 	return connectPromise;
 }
 
-function emitCommand<TPayload extends Record<string, unknown> | undefined = undefined>(
+function emitCommand<
+	TPayload extends Record<string, unknown> | undefined = undefined,
+	TData extends Record<string, unknown> | undefined = undefined
+>(
 	socket: Socket,
 	event: string,
 	payload?: TPayload,
 	timeoutMs = 10000
-): Promise<CommandAck> {
-	return new Promise<CommandAck>((resolve, reject) => {
-		socket.timeout(timeoutMs).emit(event, payload, (err: Error | null, response?: CommandAck) => {
+): Promise<CommandAck & { data?: TData }> {
+	return new Promise<CommandAck & { data?: TData }>((resolve, reject) => {
+		socket.timeout(timeoutMs).emit(event, payload, (err: Error | null, response?: CommandAck & { data?: TData }) => {
 			if(err) {
 				reject(err);
 				return;
@@ -123,17 +127,20 @@ function emitCommand<TPayload extends Record<string, unknown> | undefined = unde
 	});
 }
 
-export async function sendShootAssistCommand<TPayload extends Record<string, unknown> | undefined = undefined>(
+export async function sendShootAssistCommand<
+	TPayload extends Record<string, unknown> | undefined = undefined,
+	TData extends Record<string, unknown> | undefined = undefined
+>(
 	event: string,
 	payload?: TPayload,
 	timeoutMs = 10000
-): Promise<CommandAck> {
+): Promise<CommandAck & { data?: TData }> {
 	try {
 		const socket = await getCommandSocket();
-		return await emitCommand(socket, event, payload, timeoutMs);
+		return await emitCommand<TPayload, TData>(socket, event, payload, timeoutMs);
 	} catch {
 		closeCommandSocket();
 		const socket = await getCommandSocket();
-		return emitCommand(socket, event, payload, timeoutMs);
+		return emitCommand<TPayload, TData>(socket, event, payload, timeoutMs);
 	}
 }

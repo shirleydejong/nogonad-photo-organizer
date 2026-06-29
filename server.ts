@@ -25,6 +25,7 @@ type CommandAck = {
 	success: boolean;
 	message?: string;
 	error?: string;
+	data?: Record<string, unknown>;
 };
 
 // Store active watchers per folder
@@ -157,6 +158,22 @@ app.prepare().then(() => {
 			});
 
 			ack?.({ success: true, message: 'ShootAssist stopping…' });
+		});
+
+		socket.on('shoot-assist-get-settings', async(_payload: unknown, ack?: (response: CommandAck) => void) => {
+			try {
+				const settings = await shootAssistController.getSettings();
+				ack?.({
+					success: true,
+					message: 'Current camera settings retrieved',
+					data: { settings },
+				});
+			} catch (error) {
+				ack?.({
+					success: false,
+					error: toErrorMessage(error),
+				});
+			}
 		});
 
 		socket.on(

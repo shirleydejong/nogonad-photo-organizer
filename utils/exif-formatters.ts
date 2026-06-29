@@ -11,8 +11,17 @@ export function baseName(name?: string | null) {
 
 export function formatAperture(v?: number | string | null) {
 	if(v == null || v === '') {return null;}
-	const n = typeof v === 'string' ? Number(v) : v;
-	return Number.isFinite(n) ? `ƒ/${n}` : `ƒ/${v}`;
+
+	const raw = String(v).trim();
+	const normalized = raw.replace(',', '.');
+	const numericPart = normalized.replace(/^f\/?/i, '');
+	const n = Number.parseFloat(numericPart);
+
+	if(Number.isFinite(n)) {
+		return `ƒ/${n.toFixed(1)}`;
+	}
+
+	return `ƒ/${raw.replace(/^f\/?/i, '')}`;
 }
 
 export function formatExposureTime(v?: number | string | null) {
