@@ -1,3 +1,0 @@
-- swipen werkt niet op touch screens
-- default swipe van chrome overrulen
-- exiftool niet gevonden, programma crasht.

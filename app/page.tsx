@@ -152,19 +152,37 @@ export default function Home() {
 // Adjust activeIndex if current image is filtered out
 	useEffect(() => {
 		if(imageFiles.length === 0 || filteredImageFiles.length === 0) {
-			setActiveIndex(0);
 			return;
 		}
 
 		const currentImage = imageFiles[activeIndex];
-		if(currentImage && !filteredImageFiles.includes(currentImage)) {
-		// Current image is filtered out, find first filtered image
-			const firstFilteredIndex = imageFiles.findIndex(img =>
-				filteredImageFiles.includes(img)
-			);
-			setActiveIndex(firstFilteredIndex >= 0 ? firstFilteredIndex : 0);
+		if(!currentImage) {
+			return;
 		}
-	}, [filteredImageFiles.length, imageFiles.length]);
+
+		const isCurrentStillVisible = filteredImageFiles.some(
+			img => img.fileName === currentImage.fileName
+		);
+		if(isCurrentStillVisible) {
+			return;
+		}
+
+		const visibleFileNames = new Set(filteredImageFiles.map(img => img.fileName));
+
+		for(let i = activeIndex + 1; i < imageFiles.length; i++) {
+			if(visibleFileNames.has(imageFiles[i].fileName)) {
+				setActiveIndex(i);
+				return;
+			}
+		}
+
+		for(let i = activeIndex - 1; i >= 0; i--) {
+			if(visibleFileNames.has(imageFiles[i].fileName)) {
+				setActiveIndex(i);
+				return;
+			}
+		}
+	}, [activeIndex, filteredImageFiles, imageFiles]);
 
 	useEffect(() => {
 		function onFullscreenChange() {
