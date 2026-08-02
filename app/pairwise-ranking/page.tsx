@@ -59,11 +59,6 @@ function clampRating(value: number): number {
 	return Math.max(1, Math.min(5, Math.trunc(value)));
 }
 
-function formatRatingStars(rating: number): string {
-	const normalizedRating = Math.max(0, Math.min(5, Math.trunc(rating)));
-	return normalizedRating > 0 ? '⭐'.repeat(normalizedRating) : '-';
-}
-
 export default function PairwiseRankingPage() {
 	const router = useRouter();
 
@@ -85,6 +80,7 @@ export default function PairwiseRankingPage() {
 	const [isLoadingResults, setIsLoadingResults] = useState<boolean>(false);
 	const [resultsProgress, setResultsProgress] = useState<GroupProgress | null>(null);
 	const [resultsRows, setResultsRows] = useState<RankingRow[]>([]);
+	const [savingRatingsByImageId, setSavingRatingsByImageId] = useState<Set<string>>(new Set());
 
 	const thumbFolderPath = useMemo(() => {
 		if(!folderPath) {
@@ -256,6 +252,71 @@ export default function PairwiseRankingPage() {
 		}
 	}, [folderPath, startGroup, startMinRating]);
 
+	const updateResultRatingInDatabase = useCallback(async(imageId: string, targetRating: number) => {
+		if(!folderPath) {
+			return;
+		}
+
+		if(savingRatingsByImageId.has(imageId)) {
+			return;
+		}
+
+		const fileName = fileNameById.get(imageId);
+		if(!fileName) {
+			setError('Could not resolve file name for rating update');
+			return;
+		}
+
+		setSavingRatingsByImageId((prev) => {
+			const next = new Set(prev);
+			next.add(imageId);
+			return next;
+		});
+
+		const nextRating = clampRating(targetRating);
+		setError(null);
+
+		try {
+			const response = await fetch('/api/ratings', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName,
+					rating: nextRating,
+					folderPath,
+					overRuleFileRating: false,
+				}),
+			});
+
+			if(!response.ok) {
+				const errorData = await response.json().catch(() => null);
+				throw new Error(errorData?.error || 'Could not update rating');
+			}
+
+			setResultsRows((prev) => prev.map((row) => (
+				row.imageId === imageId
+					? { ...row, rating: nextRating }
+					: row
+			)));
+
+			if(selectedResultsGroupId) {
+				await loadResults(selectedResultsGroupId, resultsMinRating);
+			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Unknown error while updating rating');
+		} finally {
+			setSavingRatingsByImageId((prev) => {
+				if(!prev.has(imageId)) {
+					return prev;
+				}
+
+				const next = new Set(prev);
+				next.delete(imageId);
+				return next;
+			});
+		}
+	}, [fileNameById, folderPath, loadResults, resultsMinRating, savingRatingsByImageId, selectedResultsGroupId]);
+
 	const beginSession = useCallback(() => {
 		if(!startGroup || !startPreview) {
 			return;
@@ -425,6 +486,7 @@ export default function PairwiseRankingPage() {
 											)}
 											{resultsRows.map((row, index) => {
 												const imageData = resolveImageData(row.imageId);
+												const isSavingRating = savingRatingsByImageId.has(row.imageId);
 												return (
 													<tr key={row.imageId} className="border-b border-zinc-900 hover:bg-zinc-950/50">
 														<td className="py-2 px-4 text-zinc-300">{index + 1}</td>
@@ -438,7 +500,23 @@ export default function PairwiseRankingPage() {
 														<td className="py-2 px-4 text-zinc-300 text-sm break-all">{imageData.fileName ?? row.imageId}</td>
 														<td className="py-2 px-4 text-right text-zinc-200 font-semibold">{row.score.toFixed(1)}%</td>
 														<td className="py-2 px-4 text-right text-zinc-300">
-															<span className="noto-color-emoji-regular">{formatRatingStars(row.rating)}</span>
+															<div className="flex items-center justify-end gap-1">
+																{[1, 2, 3, 4, 5].map((ratingValue) => (
+																	<button
+																		type="button"
+																		key={ratingValue}
+																		disabled={isSavingRating}
+																		onClick={() => {
+																			void updateResultRatingInDatabase(row.imageId, ratingValue);
+																		}}
+																		className={`text-xl noto-color-emoji-regular leading-none transition-colors ${row.rating >= ratingValue ? 'text-yellow-400' : 'text-zinc-600 hover:text-zinc-500'} ${isSavingRating ? 'cursor-wait opacity-60' : 'cursor-pointer'}`}
+																		title={`Set rating to ${ratingValue}`}
+																		aria-label={`Set rating to ${ratingValue}`}
+																	>
+																		★
+																	</button>
+																))}
+															</div>
 														</td>
 													</tr>
 												);
