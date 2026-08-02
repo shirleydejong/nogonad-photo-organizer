@@ -23,6 +23,17 @@ overRuleFileRating: boolean;
 createdAt: string;
 }
 
+interface ContextMenuState {
+	x: number;
+	y: number;
+	index: number;
+}
+
+interface PanPosition {
+	x: number;
+	y: number;
+}
+
 export default function BulkRatePage() {
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
@@ -45,6 +56,11 @@ export default function BulkRatePage() {
 // Multi-select state
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 	const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+	const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+	const [previewZoom, setPreviewZoom] = useState<number>(100);
+	const [previewPan, setPreviewPan] = useState<PanPosition>({ x: 0, y: 0 });
+	const [isPreviewPanning, setIsPreviewPanning] = useState<boolean>(false);
 
 // Rectangle selection state
 	const [isSelecting, setIsSelecting] = useState(false);
@@ -53,6 +69,11 @@ export default function BulkRatePage() {
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
+	const contextMenuRef = useRef<HTMLDivElement>(null);
+	const previewViewportRef = useRef<HTMLDivElement>(null);
+	const previewImageRef = useRef<HTMLImageElement>(null);
+	const previewPanDragRef = useRef<{ lastX: number; lastY: number }>({ lastX: 0, lastY: 0 });
+	const maxPreviewZoom = 400;
 
 // Get file ID (without extension)
 	function getFileId(fileName: string) {
@@ -269,6 +290,11 @@ export default function BulkRatePage() {
 
 // Handle clicking on image thumbnail
 	const handleImageClick = useCallback((index: number, event: React.MouseEvent) => {
+		if(event.button !== 0) {
+			return;
+		}
+
+		setContextMenu(null);
 		
 		if(event.ctrlKey) {
 			
@@ -305,8 +331,134 @@ export default function BulkRatePage() {
 		}
 	}, [selectedIndices]);
 
+	const clampPreviewPan = useCallback((zoom: number, candidateX: number, candidateY: number): PanPosition => {
+		const viewport = previewViewportRef.current;
+		const image = previewImageRef.current;
+
+		if(!viewport || !image || zoom <= 100) {
+			return { x: 0, y: 0 };
+		}
+
+		const scaledWidth = image.clientWidth * (zoom / 100);
+		const scaledHeight = image.clientHeight * (zoom / 100);
+		const maxPanX = Math.max(0, (scaledWidth - viewport.clientWidth) / 2);
+		const maxPanY = Math.max(0, (scaledHeight - viewport.clientHeight) / 2);
+
+		return {
+			x: Math.max(-maxPanX, Math.min(maxPanX, candidateX)),
+			y: Math.max(-maxPanY, Math.min(maxPanY, candidateY)),
+		};
+	}, []);
+
+	const closePreview = useCallback(() => {
+		setPreviewIndex(null);
+		setPreviewZoom(100);
+		setPreviewPan({ x: 0, y: 0 });
+		setIsPreviewPanning(false);
+	}, []);
+
+	const openPreview = useCallback((index: number) => {
+		setContextMenu(null);
+		setPreviewIndex(index);
+		setPreviewZoom(100);
+		setPreviewPan({ x: 0, y: 0 });
+		setIsPreviewPanning(false);
+	}, []);
+
+	const handleThumbnailContextMenu = useCallback((index: number, event: React.MouseEvent<HTMLDivElement>) => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const menuWidth = 220;
+		const menuHeight = 104;
+		const nextX = Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12));
+		const nextY = Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12));
+
+		setContextMenu({ x: nextX, y: nextY, index });
+	}, []);
+
+	const handlePreviewWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+		event.preventDefault();
+
+		setPreviewZoom((currentZoom) => {
+			if(currentZoom === 100 && event.deltaY > 0) {
+				return currentZoom;
+			}
+
+			const zoomStep = 20;
+			const nextZoom = Math.max(100, Math.min(maxPreviewZoom, currentZoom - (event.deltaY > 0 ? zoomStep : -zoomStep)));
+
+			if(nextZoom === 100) {
+				setPreviewPan({ x: 0, y: 0 });
+			}
+
+			if(nextZoom !== currentZoom && nextZoom > 100) {
+				setPreviewPan((currentPan) => clampPreviewPan(nextZoom, currentPan.x, currentPan.y));
+			}
+
+			return nextZoom;
+		});
+	}, [clampPreviewPan]);
+
+	const handlePreviewPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+		if(event.button !== 0 || previewZoom <= 100) {
+			return;
+		}
+
+		event.currentTarget?.setPointerCapture?.(event.pointerId);
+		previewPanDragRef.current = { lastX: event.clientX, lastY: event.clientY };
+		setIsPreviewPanning(true);
+	}, [previewZoom]);
+
+	const handlePreviewPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+		if(!isPreviewPanning || previewZoom <= 100) {
+			return;
+		}
+
+		const deltaX = event.clientX - previewPanDragRef.current.lastX;
+		const deltaY = event.clientY - previewPanDragRef.current.lastY;
+		previewPanDragRef.current = { lastX: event.clientX, lastY: event.clientY };
+
+		setPreviewPan((currentPan) => clampPreviewPan(previewZoom, currentPan.x + deltaX, currentPan.y + deltaY));
+	}, [clampPreviewPan, isPreviewPanning, previewZoom]);
+
+	const handlePreviewPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+		if(event.currentTarget.hasPointerCapture(event.pointerId)) {
+			event.currentTarget.releasePointerCapture(event.pointerId);
+		}
+
+		setIsPreviewPanning(false);
+	}, []);
+
+	const handlePreviewExternal = useCallback(async(index: number) => {
+		const image = imageFiles[index];
+		if(!image || !folderPath) {
+			return;
+		}
+
+		setContextMenu(null);
+
+		try {
+			const response = await fetch('/api/open-with', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ filePath: `${folderPath}\\${image.fileName}` }),
+			});
+
+			if(!response.ok) {
+				const responseBody = await response.json().catch(() => null);
+				console.error('Failed to open preview externally:', responseBody ?? response.statusText);
+			}
+		} catch (err) {
+			console.error('Failed to open preview externally:', err);
+		}
+	}, [folderPath, imageFiles]);
+
 // Handle rectangle selection (drag)
 	const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+		if(contextMenu) {
+			setContextMenu(null);
+		}
 		
 	// Don't start rectangle selection if clicking on an image
 		const thumbnail = (e.target as HTMLElement).closest('[data-index]');
@@ -364,6 +516,31 @@ export default function BulkRatePage() {
 		}
 	}, [isSelecting]);
 
+	useEffect(() => {
+		if(!contextMenu) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if(contextMenuRef.current?.contains(event.target as Node)) {
+				return;
+			}
+
+			setContextMenu(null);
+		};
+
+		document.addEventListener('mousedown', handlePointerDown);
+		return () => document.removeEventListener('mousedown', handlePointerDown);
+	}, [contextMenu]);
+
+	useEffect(() => {
+		if(previewIndex === null || previewZoom <= 100) {
+			return;
+		}
+
+		setPreviewPan((currentPan) => clampPreviewPan(previewZoom, currentPan.x, currentPan.y));
+	}, [clampPreviewPan, previewIndex, previewZoom]);
+
 	const visibleImageEntries = useMemo(
 		() => imageFiles
 			.map((image, index) => ({ image, index }))
@@ -407,10 +584,25 @@ export default function BulkRatePage() {
 	useEffect(() => {
 		
 		const handleKeyDown = (e: KeyboardEvent) => {
+			if(e.key === 'Escape') {
+				if(contextMenu) {
+					setContextMenu(null);
+					return;
+				}
+
+				if(previewIndex !== null) {
+					closePreview();
+					return;
+				}
+			}
 			
 		// Prevent zoom with Ctrl+Plus, Ctrl+Minus, Ctrl+0
 			if(e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0' || e.key === '=')) {
 				e.preventDefault();
+				return;
+			}
+
+			if(contextMenu || previewIndex !== null) {
 				return;
 			}
 
@@ -453,7 +645,7 @@ export default function BulkRatePage() {
 			window.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('wheel', handleWheel);
 		};
-	}, [selectedIndices, visibleImageEntries, applyRatingToSelected]);
+	}, [selectedIndices, visibleImageEntries, applyRatingToSelected, closePreview, contextMenu, previewIndex]);
 
 	const currentRating = selectedIndices.size > 0
 		? (() => {
@@ -567,6 +759,7 @@ export default function BulkRatePage() {
 										isSelected ? 'ring-3 ring-blue-500' : ''
 									}`}
 									onClick={(e) => handleImageClick(index, e)}
+									onContextMenu={(e) => handleThumbnailContextMenu(index, e)}
 								>
 									<img
 										src={image.thumbnailPath}
@@ -599,6 +792,93 @@ export default function BulkRatePage() {
 						})}
 					</div>
 				</div>
+
+				{contextMenu && imageFiles[contextMenu.index] && (
+					<div
+						ref={contextMenuRef}
+						className="fixed z-[70] min-w-[220px] rounded-xl border border-zinc-700 bg-zinc-950/96 p-2 shadow-2xl backdrop-blur"
+						style={{ left: contextMenu.x, top: contextMenu.y }}
+						role="menu"
+					>
+						<div className="px-3 py-2 text-xs text-zinc-500 truncate">
+							{imageFiles[contextMenu.index].fileName}
+						</div>
+						<button
+							type="button"
+							className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-zinc-100 transition hover:bg-zinc-800"
+							onClick={() => openPreview(contextMenu.index)}
+							role="menuitem"
+						>
+							<Icon name="preview" size={18} />
+							<span>preview in app</span>
+						</button>
+						<button
+							type="button"
+							className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-zinc-100 transition hover:bg-zinc-800"
+							onClick={() => {
+								void handlePreviewExternal(contextMenu.index);
+							}}
+							role="menuitem"
+						>
+							<Icon name="open_in_new" size={18} />
+							<span>preview external app</span>
+						</button>
+					</div>
+				)}
+
+				{previewIndex !== null && imageFiles[previewIndex] && (
+					<div className="fixed inset-0 z-[80] bg-black/95" onClick={closePreview}>
+						<div className="absolute inset-0 flex flex-col">
+							<div className="flex items-center justify-between gap-4 px-4 py-3">
+								<div className="min-w-0">
+									<div className="truncate text-sm text-zinc-300">{imageFiles[previewIndex].fileName}</div>
+									<div className="text-xs text-zinc-500">Scroll to zoom, drag to pan</div>
+								</div>
+								<div className="flex items-center gap-3">
+									<div className="text-xs text-zinc-400">{Math.round(previewZoom)}%</div>
+									<button
+										type="button"
+										className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 transition hover:bg-zinc-800"
+										onClick={(event) => {
+											event.stopPropagation();
+											closePreview();
+										}}
+									>
+										<Icon name="close" size={18} />
+										<span>Close</span>
+									</button>
+								</div>
+							</div>
+							<div
+								ref={previewViewportRef}
+								className={`flex-1 overflow-hidden px-4 pb-4 ${previewZoom > 100 ? (isPreviewPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'}`}
+								onClick={(event) => event.stopPropagation()}
+								onWheel={handlePreviewWheel}
+								onPointerDown={handlePreviewPointerDown}
+								onPointerMove={handlePreviewPointerMove}
+								onPointerUp={handlePreviewPointerUp}
+								onPointerCancel={handlePreviewPointerUp}
+								onPointerLeave={handlePreviewPointerUp}
+							>
+								<div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+									<img
+										ref={previewImageRef}
+										src={imageFiles[previewIndex].originalPath}
+										alt={imageFiles[previewIndex].fileName}
+										className="main-image max-h-full max-w-full object-contain select-none"
+										style={{
+											transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom / 100})`,
+											transformOrigin: 'center center',
+											transition: isPreviewPanning ? 'none' : 'transform 0.1s ease-out',
+											touchAction: 'none',
+										}}
+										draggable={false}
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Floating Rating Panel */}
 				{selectedIndices.size > 0 && (
