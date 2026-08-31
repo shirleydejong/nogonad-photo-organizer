@@ -38,6 +38,7 @@ export default function RootLayout({
 					href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
 					rel="stylesheet"
 				/>
+				<link rel="icon" href="/logo.svg" sizes="any" type="image/svg+xml" />
 				<style>{`
 					.noto-color-emoji-regular {
 						font-family: var(--font-noto-color-emoji);
