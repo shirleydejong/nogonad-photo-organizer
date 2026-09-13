@@ -98,6 +98,120 @@ export async function getExifJson(imagePath: string): Promise<any> {
 	}
 }
 
+interface ParsedJxlInfo {
+	bitDepth: number | null;
+	hdr: boolean | null;
+	colorMode: string | null;
+	primaries: string | null;
+	transferFunction: string | null;
+}
+
+async function runJxlInfo(imagePath: string): Promise<string> {
+	await fs.access(imagePath);
+
+	return new Promise((resolve, reject) => {
+		const proc = spawn('jxlinfo', [imagePath], { windowsHide: true });
+
+		let stdout = '';
+		let stderr = '';
+
+		proc.stdout.on('data', (chunk) => {
+			stdout += chunk.toString();
+		});
+
+		proc.stderr.on('data', (chunk) => {
+			stderr += chunk.toString();
+		});
+
+		proc.on('error', reject);
+
+		proc.on('close', (code) => {
+			if(code !== 0) {
+				const message = stderr.trim() || `jxlinfo exited with code ${code}`;
+				reject(new Error(message));
+				return;
+			}
+			resolve(`${stdout}\n${stderr}`.trim());
+		});
+	});
+}
+
+function normalizeJxlColorMode(text: string): string | null {
+	if(/\brgb\s*\+\s*alpha\b/i.test(text)) {return 'RGB + Alpha';}
+	if(/\bcmyk\b/i.test(text)) {return 'CMYK';}
+	if(/\bgrayscale\b|\bgray\b/i.test(text)) {return 'Grayscale';}
+	if(/\brgb\b/i.test(text)) {return 'RGB';}
+	return null;
+}
+
+function parseJxlInfo(output: string): ParsedJxlInfo {
+	const bitDepthMatch = output.match(/\b(\d+)\s*-\s*bit\b/i);
+	const floatDepthMatch = output.match(/\b(\d+)\s*-\s*bit\s+float\b/i);
+	const bitDepth = bitDepthMatch ? Number.parseInt(bitDepthMatch[1], 10) : null;
+	const primariesMatch = output.match(/^\s*Primaries\s*:\s*(.+)$/im);
+	const transferMatch = output.match(/^\s*Transfer function\s*:\s*(.+)$/im);
+	const primaries = primariesMatch?.[1]?.trim() || null;
+	const transferFunction = transferMatch?.[1]?.trim() || null;
+
+	let hdr: boolean | null = null;
+	if(/\bhdr\b/i.test(output)) {
+		hdr = true;
+	} else if(/\bsdr\b/i.test(output)) {
+		hdr = false;
+	} else if(floatDepthMatch || (Number.isFinite(bitDepth) && (bitDepth ?? 0) > 16)) {
+		// For JPEG XL, high precision float or >16-bit encoding typically indicates HDR intent.
+		hdr = true;
+	}
+
+	return {
+		bitDepth: Number.isFinite(bitDepth) ? bitDepth : null,
+		hdr,
+		colorMode: normalizeJxlColorMode(output),
+		primaries,
+		transferFunction,
+	};
+}
+
+export async function enrichExifWithJxlInfo(exifData: Record<string, any>, imagePath: string): Promise<Record<string, any>> {
+	const output = await runJxlInfo(imagePath);
+	const parsed = parseJxlInfo(output);
+
+	const merged: Record<string, any> = {
+		...exifData,
+	};
+
+	if(parsed.bitDepth != null) {
+		merged.BitDepth = parsed.bitDepth;
+		merged.BitsPerSample = [parsed.bitDepth];
+	}
+
+	if(parsed.colorMode) {
+		merged.ColorType = parsed.colorMode;
+	}
+
+	if(parsed.primaries) {
+		merged.JxlPrimaries = parsed.primaries;
+	}
+
+	if(parsed.transferFunction) {
+		merged.JxlTransferFunction = parsed.transferFunction;
+	}
+
+	if(!merged.ProfileDescription && parsed.primaries) {
+		merged.ProfileDescription = parsed.transferFunction
+			? `${parsed.primaries} (${parsed.transferFunction})`
+			: parsed.primaries;
+	}
+
+	if(parsed.hdr != null) {
+		merged.DirectoryItemSemantic = parsed.hdr ? ['gainmap'] : [];
+		merged.HDREditMode = parsed.hdr ? 1 : 0;
+		merged.HDRMaxValue = parsed.hdr ? 1 : 0;
+	}
+
+	return merged;
+}
+
 /**
  * Batch extracts EXIF metadata from all images in a folder
  * 

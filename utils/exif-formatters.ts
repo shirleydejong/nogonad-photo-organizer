@@ -153,8 +153,15 @@ export interface ColorFormatResult {
 }
 
 export function formatColor(exif: any): ColorFormatResult {
-	const profile = exif?.ProfileDescription;
-	const colorSpace = exif?.ColorSpaceData || exif?.ColorType || exif?.ICCProfileName || exif?.ColorSpace;
+	const profile = exif?.ProfileDescription || exif?.ICCProfileName || null;
+	const jxlPrimaries = exif?.JxlPrimaries;
+	const jxlTransferFunction = exif?.JxlTransferFunction;
+	const profileOrPrimaries = profile || (
+		jxlPrimaries
+			? (jxlTransferFunction ? `${jxlPrimaries} (${jxlTransferFunction})` : jxlPrimaries)
+			: null
+	);
+	const colorSpace = exif?.ColorType || exif?.ColorSpaceData || exif?.ColorSpace;
 	let cs;
 	let bits;
 	if(typeof colorSpace === 'string') {
@@ -187,7 +194,7 @@ export function formatColor(exif: any): ColorFormatResult {
 
 	return {
 		left: cs || '',
-		right: profile || '',
+		right: profileOrPrimaries || '',
 		extra: bits,
 	};
 }

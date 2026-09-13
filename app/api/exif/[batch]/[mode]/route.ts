@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { access, readdir } from 'fs/promises';
-import { getExifJson, getBatchExifJson } from '@/controllers/exiftool';
+import { enrichExifWithJxlInfo, getExifJson, getBatchExifJson } from '@/controllers/exiftool';
 import config from '@/config';
 
 /**
@@ -169,8 +169,8 @@ export async function GET(
 						hasXmp: xmpFiles.has(baseName),
 					};
 				})
-				.filter((data, index, self) => 
-					index === self.findIndex((item) => 
+				.filter((data, index, self) =>
+					index === self.findIndex((item) =>
 						path.parse(item.FileName).name.toLowerCase() === path.parse(data.FileName).name.toLowerCase()
 					)
 				);
@@ -227,11 +227,25 @@ export async function GET(
 		}
 
 		const filePath = path.join(folderPath, file);
+		const fileExt = path.extname(file).toLowerCase();
 
 		console.log('Extracting EXIF data from:', folderPath, file, filePath);
 
 		// Extract EXIF metadata from the single file (getExifJson returns array, pop gets the single result)
-		const exifData = (await getExifJson(filePath)).pop() ?? null;
+		const baseExifData = (await getExifJson(filePath)).pop() ?? null;
+		let exifData = baseExifData;
+
+		if(baseExifData && fileExt === '.jxl') {
+			try {
+				exifData = await enrichExifWithJxlInfo(baseExifData, filePath);
+			} catch (error) {
+				console.warn('jxlinfo enrichment failed, using exiftool-only data:', {
+					file,
+					filePath,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
 
 		return NextResponse.json({
 			success: true,
