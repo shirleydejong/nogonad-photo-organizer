@@ -28,6 +28,7 @@ import {
 	formatColor,
 } from '@/utils/exif-formatters';
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
+import { readFolderFilterState, saveFolderFilterState } from '@/utils/filter-session-state';
 
 interface ImageData {
 	originalFile: File;
@@ -68,6 +69,9 @@ export default function Home() {
 	const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
 	const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
 	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+	const [availableFileTypes, setAvailableFileTypes] = useState<string[]>([]);
+	const [selectedFileTypes, setSelectedFileTypes] = useState<Set<string>>(new Set());
+	const [hasHydratedFilterState, setHasHydratedFilterState] = useState<boolean>(false);
 	const [, setIsWatcherActive] = useState<boolean>(false);
 	const [sessionId, setSessionId] = useState<string>('');
 
@@ -108,10 +112,10 @@ export default function Home() {
 	const filteredImageFiles = imageFiles.filter((img) => {
 		const fileId = getFileId(img.fileName);
 		const rating = ratings.get(fileId)?.rating ?? null;
+		const fileType = getFileTypeLabel(img.fileName);
 
-	// If no filters are active, show all.
-		if(filterSelectedRatings.size === 5 && filterShowUnrated && selectedGroupIds.size === 0) {
-			return true;
+		if(availableFileTypes.length > 0 && !selectedFileTypes.has(fileType)) {
+			return false;
 		}
 
 		let matchesRating = false;
@@ -423,6 +427,35 @@ export default function Home() {
 		}
 	}, [router]);
 
+	useEffect(() => {
+		if(!folderPath || !hasHydratedFilterState) {
+			return;
+		}
+
+		saveFolderFilterState(
+			folderPath,
+			{
+				showUnrated: filterShowUnrated,
+				selectedRatings: filterSelectedRatings,
+				selectedGroupIds,
+				selectedFileTypes,
+			},
+			{
+				availableGroups,
+				availableFileTypes,
+			}
+		);
+	}, [
+		folderPath,
+		hasHydratedFilterState,
+		filterShowUnrated,
+		filterSelectedRatings,
+		selectedGroupIds,
+		selectedFileTypes,
+		availableGroups,
+		availableFileTypes,
+	]);
+
 	const loadGroupFilters = useCallback(async(normalizedPath: string) => {
 		if(!normalizedPath) {
 			const emptyData = emptyGroupFilterData();
@@ -456,6 +489,7 @@ export default function Home() {
 	async function loadFolder(path: string) {
 		setIsLoading(true);
 		setError(null);
+		setHasHydratedFilterState(false);
 		console.log('Loading folder:', path);
 
 		try {
@@ -487,6 +521,14 @@ export default function Home() {
 
 		// Get files (can be empty array for empty folders)
 			const files = (startData.files || []) as string[];
+			const folderFileTypes = getAvailableFileTypes(files);
+			setAvailableFileTypes(folderFileTypes);
+
+			const folderFilterState = readFolderFilterState(normalizedPath, folderFileTypes);
+			setFilterShowUnrated(folderFilterState.showUnrated);
+			setFilterSelectedRatings(folderFilterState.selectedRatings);
+			setSelectedGroupIds(folderFilterState.selectedGroupIds);
+			setSelectedFileTypes(folderFilterState.selectedFileTypes);
 
 		// Create ImageData objects
 			const imageData: ImageData[] = files.map((fileName) => {
@@ -550,6 +592,7 @@ export default function Home() {
 			}
 
 			await loadGroupFilters(normalizedPath);
+			setHasHydratedFilterState(true);
 
 			setIsLoading(false);
 
@@ -703,6 +746,26 @@ export default function Home() {
 		const lastDot = filename.lastIndexOf('.');
 		if(lastDot === -1) {return filename;}
 		return filename.substring(0, lastDot);
+	}
+
+	function getFileTypeLabel(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return '';}
+		const extension = filename.substring(lastDot + 1).toLowerCase();
+		if(!extension) {return '';}
+		if(extension === 'jpg' || extension === 'jpeg') {return 'JPEG';}
+		return extension.toUpperCase();
+	}
+
+	function getAvailableFileTypes(fileNames: string[]): string[] {
+		const unique = new Set<string>();
+		for(const fileName of fileNames) {
+			const type = getFileTypeLabel(fileName);
+			if(type) {
+				unique.add(type);
+			}
+		}
+		return Array.from(unique).sort((a, b) => a.localeCompare(b));
 	}
 
 	const updateRatingInDatabase = useCallback(async(fileName: string, rating: number | null, overRuleFileRating = false) => {
@@ -964,7 +1027,7 @@ export default function Home() {
 		const zoomFactor = zoomLevel / 100;
 		const container = document.querySelector('.main-image-container');
 
-		if(!container) { return }
+		if(!container) { return; }
 
 	// Adjust for zoom level to make movement feel natural
 		const moveX = deltaX / zoomFactor;
@@ -1029,11 +1092,11 @@ export default function Home() {
 // Keyboard navigation and rating
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
-				if(e.key === 'Escape' && isCapturing) {
-					e.preventDefault();
-					void handleStopCapture();
-					return;
-				}
+			if(e.key === 'Escape' && isCapturing) {
+				e.preventDefault();
+				void handleStopCapture();
+				return;
+			}
 
 			if(isCameraControlModalOpen) {return;}
 
@@ -1189,8 +1252,7 @@ export default function Home() {
 		}
 
 		fetchExifData();
-		return () => { canceled = true };
-		
+		return () => { canceled = true; };
 	}, [activeIndex, folderPath]);
 	// prev: [activeIndex, imageFiles, folderPath, ratings]);
 
@@ -1712,6 +1774,9 @@ export default function Home() {
 				}))}
 				selectedGroupIds={selectedGroupIds}
 				setSelectedGroupIds={setSelectedGroupIds}
+				availableFileTypes={availableFileTypes}
+				selectedFileTypes={selectedFileTypes}
+				setSelectedFileTypes={setSelectedFileTypes}
 				conflictOption={false}
 			/>
 

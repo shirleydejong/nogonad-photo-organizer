@@ -2,6 +2,7 @@ import { access } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
+	deleteMostRecentPairwiseComparison,
 	getAllGroups,
 	getGroup,
 	getGroupRatedImages,
@@ -439,16 +440,34 @@ export async function POST(request: NextRequest) {
 		}
 
 		const action = normalizeText(body.action);
-		if(action !== 'compare') {
-			return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
-		}
-
 		const groupId = normalizeText(body.groupId);
 		if(!groupId) {
 			return NextResponse.json({ error: 'groupId is required' }, { status: 400 });
 		}
 
 		const minRating = normalizeMinRating(body.minRating, 1);
+
+		if(action === 'undo') {
+			const deletedComparison = deleteMostRecentPairwiseComparison(validatedFolderPath, groupId);
+			if(!deletedComparison) {
+				return NextResponse.json({ error: 'No comparison to undo for this group' }, { status: 400 });
+			}
+
+			const { progress } = buildProgress(validatedFolderPath, groupId, minRating);
+			const nextPair = toNextPair(deletedComparison.imageAId, deletedComparison.imageBId);
+
+			return NextResponse.json({
+				success: true,
+				deletedComparison,
+				progress,
+				nextPair,
+			});
+		}
+
+		if(action !== 'compare') {
+			return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+		}
+
 		const leftImageId = normalizeText(body.leftImageId);
 		const rightImageId = normalizeText(body.rightImageId);
 		const winnerImageIdRaw = body.winnerImageId;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { ConflictModal } from '@/components/conflict-modal';
@@ -8,10 +8,12 @@ import { FilterModal } from '@/components/filter-modal';
 import { StatusModal } from '@/components/status-modal';
 import { ExportModal } from '@/components/export-modal';
 import { ImportModal } from '@/components/import-modal';
+import { ImagePreviewContextLayer, useImagePreviewContext } from '@/components/image-preview-context';
 import CONFIG from '@/config';
 import { Icon } from '@/components/icon';
 import { aggregateRatings } from '@/utils/ratings-aggregator';
 import { emptyGroupFilterData, fetchGroupFilterData, sanitizeSelectedGroupIds, type GroupRecord } from '@/utils/group-filters';
+import { readFolderFilterState, saveFolderFilterState } from '@/utils/filter-session-state';
 
 interface ImageData {
 	fileName: string;
@@ -47,7 +49,10 @@ export default function ListPage() {
 	const [groupCounts, setGroupCounts] = useState<Map<string, number>>(new Map());
 	const [imageGroupIdsByImageId, setImageGroupIdsByImageId] = useState<Map<string, Set<string>>>(new Map());
 	const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+	const [availableFileTypes, setAvailableFileTypes] = useState<string[]>([]);
+	const [selectedFileTypes, setSelectedFileTypes] = useState<Set<string>>(new Set());
 	const [showConflictsOnly, setShowConflictsOnly] = useState<boolean>(false);
+	const [hasHydratedFilterState, setHasHydratedFilterState] = useState<boolean>(false);
 	const [showExportModal, setShowExportModal] = useState<boolean>(false);
 	const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
@@ -62,6 +67,7 @@ export default function ListPage() {
 	status: 'loading',
 	message: '',
 });
+	const imagePreview = useImagePreviewContext(imageFiles, folderPath);
 
 // Load folder from localStorage on mount
 	useEffect(() => {
@@ -72,6 +78,37 @@ export default function ListPage() {
 			router.push('/select-folder');
 		}
 	}, [router]);
+
+	useEffect(() => {
+		if(!folderPath || !hasHydratedFilterState) {
+			return;
+		}
+
+		saveFolderFilterState(
+			folderPath,
+			{
+				showUnrated,
+				selectedRatings,
+				selectedGroupIds,
+				selectedFileTypes,
+				showConflictsOnly,
+			},
+			{
+				availableGroups,
+				availableFileTypes,
+			}
+		);
+	}, [
+		folderPath,
+		hasHydratedFilterState,
+		showUnrated,
+		selectedRatings,
+		selectedGroupIds,
+		selectedFileTypes,
+		showConflictsOnly,
+		availableGroups,
+		availableFileTypes,
+	]);
 
 	const loadGroupFilters = useCallback(async(normalizedPath: string) => {
 		if(!normalizedPath) {
@@ -107,6 +144,7 @@ export default function ListPage() {
 		setIsLoading(true);
 		setLoadProgress(0);
 		setError(null);
+		setHasHydratedFilterState(false);
 
 		try {
 			const normalizedPath = path.replace(/\//g, '\\');
@@ -141,6 +179,15 @@ export default function ListPage() {
 			}
 
 			const files = startData.files as string[];
+			const folderFileTypes = getAvailableFileTypes(files);
+			setAvailableFileTypes(folderFileTypes);
+
+			const folderFilterState = readFolderFilterState(normalizedPath, folderFileTypes);
+			setShowUnrated(folderFilterState.showUnrated);
+			setSelectedRatings(folderFilterState.selectedRatings);
+			setSelectedGroupIds(folderFilterState.selectedGroupIds);
+			setSelectedFileTypes(folderFilterState.selectedFileTypes);
+			setShowConflictsOnly(folderFilterState.showConflictsOnly);
 
 		// Create ImageData objects
 			setLoadProgress(25);
@@ -236,6 +283,7 @@ export default function ListPage() {
 
 			setLoadProgress(85);
 			await loadGroupFilters(normalizedPath);
+			setHasHydratedFilterState(true);
 
 			setLoadProgress(95);
 			setIsLoading(false);
@@ -259,10 +307,35 @@ export default function ListPage() {
 		return filename.substring(0, lastDot);
 	}
 
+	function getFileTypeLabel(filename: string): string {
+		const lastDot = filename.lastIndexOf('.');
+		if(lastDot === -1) {return '' ;}
+		const extension = filename.substring(lastDot + 1).toLowerCase();
+		if(!extension) {return '' ;}
+		if(extension === 'jpg' || extension === 'jpeg') {return 'JPEG';}
+		return extension.toUpperCase();
+	}
+
+	function getAvailableFileTypes(fileNames: string[]): string[] {
+		const unique = new Set<string>();
+		for(const fileName of fileNames) {
+			const type = getFileTypeLabel(fileName);
+			if(type) {
+				unique.add(type);
+			}
+		}
+		return Array.from(unique).sort((a, b) => a.localeCompare(b));
+	}
+
 	function shouldShowImage(fileName: string): boolean {
 		const fileId = getFileId(fileName);
 		const ratingData = ratings.get(fileId);
 		const currentRating = ratingData?.rating ?? null;
+		const fileType = getFileTypeLabel(fileName);
+
+		if(availableFileTypes.length > 0 && !selectedFileTypes.has(fileType)) {
+			return false;
+		}
 
 	// Check if conflicts-only filter is enabled
 		if(showConflictsOnly) {
@@ -610,6 +683,13 @@ export default function ListPage() {
 		}
 		return false;
 	}
+
+	const visibleImageEntries = useMemo(
+		() => imageFiles
+			.map((image, index) => ({ image, index }))
+			.filter(({ image }) => shouldShowImage(image.fileName)),
+		[imageFiles, ratings, showUnrated, selectedRatings, selectedGroupIds, imageGroupIdsByImageId, availableFileTypes, selectedFileTypes, showConflictsOnly, exifData, rawExifData]
+	);
 
 	const handleApplyRatings = useCallback(async() => {
 	// Show modal immediately
@@ -1036,9 +1116,9 @@ export default function ListPage() {
 								</tr>
 							</thead>
 							<tbody>
-								{imageFiles.filter(image => shouldShowImage(image.fileName)).map((image, idx) => (
+								{visibleImageEntries.map(({ image, index }) => (
 									<tr
-										key={idx}
+										key={index}
 										className={`border-b border-zinc-800 hover:bg-zinc-900 transition ${hasAllRatingsMatch(image.fileName)
 											? 'bg-green-950 bg-opacity-20'
 											: hasRatingConflict(image.fileName) || hasJpgRawMismatch(image.fileName)
@@ -1047,7 +1127,10 @@ export default function ListPage() {
 										}`}
 									>
 										<td className="py-3 px-4">
-											<div className="w-20 h-20 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
+											<div
+												className="w-20 h-20 bg-zinc-800 rounded overflow-hidden flex-shrink-0"
+												onContextMenu={(event) => imagePreview.openContextMenu(index, event)}
+											>
 												<img
 													src={image.thumbnailPath}
 													alt={image.fileName}
@@ -1089,6 +1172,8 @@ export default function ListPage() {
 				)}
 			</main>
 
+			<ImagePreviewContextLayer items={imageFiles} controller={imagePreview} />
+
 			<ConflictModal
 				isOpen={selectedConflict !== null}
 				conflictData={selectedConflict}
@@ -1111,6 +1196,9 @@ export default function ListPage() {
 				}))}
 				selectedGroupIds={selectedGroupIds}
 				setSelectedGroupIds={setSelectedGroupIds}
+				availableFileTypes={availableFileTypes}
+				selectedFileTypes={selectedFileTypes}
+				setSelectedFileTypes={setSelectedFileTypes}
 				conflictOption={true}
 				showConflictsOnly={showConflictsOnly}
 				setShowConflictsOnly={setShowConflictsOnly}

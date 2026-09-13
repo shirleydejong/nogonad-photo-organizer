@@ -77,8 +77,10 @@ function PairwiseComparePageContent() {
 	const [folderPath, setFolderPath] = useState<string>('');
 	const [folderName, setFolderName] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [undoNotice, setUndoNotice] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [isSubmittingChoice, setIsSubmittingChoice] = useState<boolean>(false);
+	const [isUndoing, setIsUndoing] = useState<boolean>(false);
 	const [leftZoom, setLeftZoom] = useState<number>(100);
 	const [rightZoom, setRightZoom] = useState<number>(100);
 	const [leftPan, setLeftPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -227,6 +229,7 @@ function PairwiseComparePageContent() {
 			return;
 		}
 
+		setUndoNotice(null);
 		setIsSubmittingChoice(true);
 		try {
 			const response = await fetch('/api/pairwise', {
@@ -257,6 +260,43 @@ function PairwiseComparePageContent() {
 			setIsSubmittingChoice(false);
 		}
 	}, [folderPath, groupId, minRating, nextPair, isSubmittingChoice]);
+
+	const undoLastComparison = useCallback(async() => {
+		if(!folderPath || !groupId || isSubmittingChoice || isUndoing || !progress || progress.completedPairs === 0) {
+			return;
+		}
+
+		setIsUndoing(true);
+		setError(null);
+		setUndoNotice(null);
+
+		try {
+			const response = await fetch('/api/pairwise', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'undo',
+					folderPath,
+					groupId,
+					minRating,
+				}),
+			});
+
+			if(!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Could not undo pairwise comparison');
+			}
+
+			const data = await response.json();
+			setProgress(data.progress as GroupProgress);
+			setNextPair((data.nextPair as NextPair) ?? null);
+			setUndoNotice('Last result was cleared. This choice will appear again.');
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Could not undo pairwise comparison');
+		} finally {
+			setIsUndoing(false);
+		}
+	}, [folderPath, groupId, minRating, progress, isSubmittingChoice, isUndoing]);
 
 	const clampPanForSide = useCallback((
 		side: 'left' | 'right',
@@ -483,6 +523,12 @@ function PairwiseComparePageContent() {
 					</div>
 				)}
 
+				{undoNotice && (
+					<div className="rounded border border-amber-700 bg-amber-950/30 text-amber-100 px-4 py-3 text-sm">
+						{undoNotice}
+					</div>
+				)}
+
 				{progress && (
 					<section className="rounded border border-blue-900/60 bg-blue-950/20 p-4 space-y-3">
 						<div className="flex flex-wrap items-center justify-between gap-3">
@@ -579,11 +625,20 @@ function PairwiseComparePageContent() {
 					<section className="flex items-center justify-center gap-3 pb-1">
 						<button
 							className="header-button"
+							onClick={() => void undoLastComparison()}
+							disabled={isSubmittingChoice || isUndoing || !progress || progress.completedPairs === 0}
+							title="Undo last comparison"
+						>
+							<Icon name="undo" />
+							Undo last comparison
+						</button>
+						<button
+							className="header-button"
 							onClick={() => void submitChoice(null)}
-							disabled={isSubmittingChoice}
+							disabled={isSubmittingChoice || isUndoing}
 						>
 							<Icon name="step_over" />
-              Skip combination
+							Skip combination
 						</button>
 					</section>
 				)}

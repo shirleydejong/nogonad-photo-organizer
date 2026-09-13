@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import CONFIG from '@/config';
 import { Header } from '@/components/header';
 import { Icon } from '@/components/icon';
+import { ImagePreviewContextLayer, useImagePreviewContext } from '@/components/image-preview-context';
 
 type GroupProgress = {
   groupId: string;
@@ -221,6 +222,21 @@ export default function PairwiseRankingPage() {
 			originalPath: `/api/image/${encodeURIComponent(fileName)}?folderPath=${encodeURIComponent(folderPath)}&fileName=${encodeURIComponent(fileName)}`,
 		};
 	}, [fileNameById, folderPath, thumbFolderPath]);
+
+	const resultRowsWithImageData = useMemo(
+		() => resultsRows.map((row) => ({ row, imageData: resolveImageData(row.imageId) })),
+		[resultsRows, resolveImageData]
+	);
+
+	const pairwisePreviewItems = useMemo(
+		() => resultRowsWithImageData.map(({ row, imageData }) => ({
+			fileName: imageData.fileName ?? row.imageId,
+			originalPath: imageData.originalPath ?? '',
+		})),
+		[resultRowsWithImageData]
+	);
+
+	const imagePreview = useImagePreviewContext(pairwisePreviewItems, folderPath);
 
 	const prepareStart = useCallback(async() => {
 		if(!folderPath || !startGroup) {
@@ -484,15 +500,23 @@ export default function PairwiseRankingPage() {
 													<td colSpan={5} className="py-8 text-center text-zinc-500">No ranking rows for this selection.</td>
 												</tr>
 											)}
-											{resultsRows.map((row, index) => {
-												const imageData = resolveImageData(row.imageId);
+											{resultRowsWithImageData.map(({ row, imageData }, index) => {
 												const isSavingRating = savingRatingsByImageId.has(row.imageId);
 												return (
 													<tr key={row.imageId} className="border-b border-zinc-900 hover:bg-zinc-950/50">
 														<td className="py-2 px-4 text-zinc-300">{index + 1}</td>
 														<td className="py-2 px-4">
 															{imageData.thumbPath ? (
-																<img src={imageData.thumbPath} alt={imageData.fileName ?? row.imageId} className="w-20 h-20 rounded object-cover bg-zinc-900" />
+																<img
+																	src={imageData.thumbPath}
+																	alt={imageData.fileName ?? row.imageId}
+																	className="w-20 h-20 rounded object-cover bg-zinc-900"
+																	onContextMenu={(event) => {
+																		if(imageData.originalPath && imageData.fileName) {
+																			imagePreview.openContextMenu(index, event);
+																		}
+																	}}
+																/>
 															) : (
 																<div className="w-20 h-20 rounded bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs">N/A</div>
 															)}
@@ -530,6 +554,8 @@ export default function PairwiseRankingPage() {
 				</div>
 			</main>
 
+			<ImagePreviewContextLayer items={pairwisePreviewItems} controller={imagePreview} />
+
 			{startGroup && (
 				<div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
 					<div className="w-full max-w-xl rounded border border-zinc-700 bg-zinc-900 p-5 space-y-4">
@@ -541,7 +567,6 @@ export default function PairwiseRankingPage() {
 						</div>
 
 						<div className="text-zinc-300">Group: {startGroup.groupName}</div>
-
 						<div className="flex items-end gap-3">
 							<div>
 								<label className="text-zinc-400 text-sm">Minimum rating</label>

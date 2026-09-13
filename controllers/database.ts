@@ -749,6 +749,58 @@ export function upsertPairwiseComparison(
 };
 
 /**
+ * Removes the most recently recorded comparison for a group.
+ *
+ * This supports a single-step undo on the pairwise comparison page.
+ *
+ * @param {string} folderPath - The folder path where the database is stored
+ * @param {string} sourceGroupId - Group id whose last comparison should be undone
+ * @returns {PairwiseComparisonRecord | null} Deleted comparison, or null when no comparison exists
+ */
+export function deleteMostRecentPairwiseComparison(folderPath: string, sourceGroupId: string): PairwiseComparisonRecord | null {
+	const dbInfo = getDatabase(folderPath);
+	ensureRatingsTable(dbInfo);
+	ensureGroupsTable(dbInfo);
+	ensureImageGroupsTable(dbInfo);
+	ensurePairwiseRankingTable(dbInfo);
+
+	const row = dbInfo.db.prepare(
+		`SELECT imageAId, imageBId, winnerImageId, sourceGroupId, skipped, comparedAt
+		 FROM pairwise_ranking
+		 WHERE sourceGroupId = @sourceGroupId
+		 ORDER BY datetime(comparedAt) DESC, rowid DESC
+		 LIMIT 1`
+	).get({ sourceGroupId }) as {
+		imageAId: string;
+		imageBId: string;
+		winnerImageId: string | null;
+		sourceGroupId: string;
+		skipped: number | boolean;
+		comparedAt: string;
+	} | undefined;
+
+	if(!row) {
+		return null;
+	}
+
+	const deleted: PairwiseComparisonRecord = {
+		imageAId: row.imageAId,
+		imageBId: row.imageBId,
+		winnerImageId: row.winnerImageId,
+		sourceGroupId: row.sourceGroupId,
+		skipped: Boolean(row.skipped),
+		comparedAt: row.comparedAt,
+	};
+
+	dbInfo.db.prepare(
+		`DELETE FROM pairwise_ranking
+		 WHERE imageAId = ? AND imageBId = ?`
+	).run(row.imageAId, row.imageBId);
+
+	return deleted;
+}
+
+/**
  * Returns pairwise comparisons where both images are in the provided image id set.
  *
  * @param {string} folderPath - The folder path where the database is stored

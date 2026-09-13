@@ -2,19 +2,23 @@
 
 import { Icon } from '@/components/icon';
 
+/* eslint-disable no-unused-vars */
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   showUnrated: boolean;
-  setShowUnrated: (value: boolean) => void;
+  setShowUnrated: (_value: boolean) => void;
   selectedRatings: Set<number>;
-  setSelectedRatings: (ratings: Set<number>) => void;
+  setSelectedRatings: (_ratings: Set<number>) => void;
   availableGroups?: Array<{ id: string; name: string; imageCount?: number }>;
   selectedGroupIds?: Set<string>;
-  setSelectedGroupIds?: (groupIds: Set<string>) => void;
+  setSelectedGroupIds?: (_groupIds: Set<string>) => void;
+  availableFileTypes?: string[];
+  selectedFileTypes?: Set<string>;
+  setSelectedFileTypes?: (_types: Set<string>) => void;
   conflictOption?: boolean;
   showConflictsOnly?: boolean;
-  setShowConflictsOnly?: (value: boolean) => void;
+  setShowConflictsOnly?: (_value: boolean) => void;
 }
 
 export function FilterModal({
@@ -27,6 +31,9 @@ export function FilterModal({
 	availableGroups,
 	selectedGroupIds,
 	setSelectedGroupIds,
+	availableFileTypes,
+	selectedFileTypes,
+	setSelectedFileTypes,
 	conflictOption,
 	showConflictsOnly,
 	setShowConflictsOnly,
@@ -37,6 +44,7 @@ export function FilterModal({
 		setShowUnrated(true);
 		setSelectedRatings(new Set([1, 2, 3, 4, 5]));
 		setSelectedGroupIds?.(new Set());
+		setSelectedFileTypes?.(new Set(availableFileTypes ?? []));
 		setShowConflictsOnly?.(false);
 	};
 
@@ -151,6 +159,53 @@ export function FilterModal({
 						</div>
 					)}
           
+					{/* File types */}
+					{availableFileTypes && selectedFileTypes && setSelectedFileTypes && (
+						<div>
+							<div className="text-zinc-300 text-sm font-medium mb-4">File types</div>
+							{availableFileTypes.length === 0 ? (
+								<div className="text-zinc-500 text-sm bg-zinc-800/40 border border-zinc-800 rounded-lg px-3 py-2">
+									No file types available in this folder.
+								</div>
+							) : (
+								<div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+									{availableFileTypes.map((fileType) => {
+										const isSelected = selectedFileTypes.has(fileType);
+										return (
+											<label
+												key={fileType}
+												className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border transition ${
+													isSelected
+														? 'border-blue-500 bg-blue-500/10'
+														: 'border-zinc-800 hover:bg-zinc-800/50'
+												}`}
+											>
+												<input
+													type="checkbox"
+													checked={isSelected}
+													onChange={(e) => {
+														const next = new Set(selectedFileTypes);
+														if(e.target.checked) {
+															next.add(fileType);
+														} else {
+															next.delete(fileType);
+														}
+														setSelectedFileTypes(next);
+													}}
+													className="w-4 h-4 rounded cursor-pointer"
+												/>
+												<span className="text-zinc-100 font-medium">{fileType}</span>
+											</label>
+										);
+									})}
+								</div>
+							)}
+							<p className="text-zinc-500 text-xs mt-2">
+								Only file types present in this folder are shown here. Checked items stay visible; unchecked items are filtered out.
+							</p>
+						</div>
+					)}
+
 					{/* Unrated images and Conflicts */}
 					<div>
 						<div className="text-zinc-300 text-sm font-medium mb-4">Filter options</div>
